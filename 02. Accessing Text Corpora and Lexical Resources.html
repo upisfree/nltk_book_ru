@@ -1,0 +1,2243 @@
+﻿<html lang="ru" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ascii"></meta>
+<meta name="generator" content="Docutils 0.12: http://docutils.sourceforge.net/"></meta>
+<title>2.2 Доступ к корпусам текстов и лексическим ресурсам</title>
+<style type="text/css">/* :Author: Edward Loper, James Curran:Copyright: This stylesheet has been placed in the public domain.Stylesheet for use with Docutils.This stylesheet defines new css classes used by NLTK.It uses a Python syntax highlighting scheme that matchesthe colour scheme used by IDLE, which makes it easier forbeginners to check they are typing things in correctly. */
+/* Include the standard docutils stylesheet. */
+</style>
+</head>
+<body dir="ltr">
+<div class="document" id="accessing-text-corpora-and-lexical-resources">
+<span id="chap-corpora"></span>
+<h1 class="title">2. Доступ к корпусам текстов и лексическим ресурсам</h1>
+
+<!-- -*- mode: rst -*- -->
+<!-- -*- mode: rst -*- -->
+<!-- CAP abbreviations (map to small caps in LaTeX) -->
+<!-- Other candidates for global consistency -->
+<!-- PTB removed since it must be indexed -->
+<!-- WN removed since it must be indexed -->
+<!-- misc & punctuation -->
+<!-- cdots was unicode U+22EF but not working -->
+<!-- exercise meta-tags -->
+<!-- Unicode tests -->
+<!-- phonetic -->
+<!-- misc -->
+<!-- used in Unicode section -->
+<!-- arrows -->
+<!-- unification stuff -->
+<!-- Math & Logic -->
+<!-- sets -->
+<!-- Greek -->
+<!-- Chinese -->
+<!-- URLs -->
+<!-- Python example - a snippet of code in running text -->
+<!-- PlaceHolder example -  something that should be replaced by actual code -->
+<!-- Linguistic eXample - cited form in running text -->
+<!-- Emphasized (more declarative than just using *) -->
+<!-- Grammatical Category - e.g. NP and verb as technical terms
+.. role:: gc
+   :class: category -->
+<!-- Math expression - e.g. especially for variables -->
+<!-- Textual Math expression - for words &#39;inside&#39; a math environment -->
+<!-- Feature (or attribute) -->
+<!-- Raw LaTeX -->
+<!-- Raw HTML -->
+<!-- Feature-value -->
+<!-- Lexemes -->
+<!-- Replacements that rely on previous definitions :-) -->
+<!-- TODO: add Mark Twain -->
+<!-- TODO: discussion of resource rich/poor languages in section on corpora in other languages
+number of languages in the world, Ethnologue, etc -->
+<!-- TODO: explain double vs single vs triple quotes for strings -->
+<!-- TODO: extracting dates from a tokenized text -->
+<!-- TODO: finding a sequence of words matching some pattern (including doubled words, e.g. "the thing is is that") -->
+<!-- TODO: The Lexicon:
+* words are more than just the output of tokenization
+* explore what it means for a document to contain a word
+* ways this can fail: mis-spelling; different endings; synonyms; homonyms
+* type vs token distinction; connection of types to lemmas (cf issue 201)
+* concept of "word", many-to-many mapping between forms and meanings
+* why the lexicon is an open set, lexical productivity and challenge for NLP
+* morphology -->
+<!-- Exploratory data analysis, a technique for learning about a specific
+linguistic pattern, consists of four steps: search, categorization,
+counting, and hypothesis refinement. -->
+<!-- TODO: expand the summary -->
+<!-- TODO: explain reload() in connection with redefining the lexical_diversity function
+(suggested in issue 170) -->
+<!-- TODO: style - - reduce number of sents starting with "We can"? -->
+<p>Практическая работа по обработке естественного языка, как правило, использует большие массивы лингвистических данных, или <a name="corpora_index_term"></a> <span class="termdef">корпусы</span>.
+Цель этой главы заключается в том, чтобы ответить на следующие вопросы:</p>
+<ol class="arabic simple">
+<li>Какие существуют полезные текстовые корпусы и лексические ресурсы, и как мы можем получить к ним доступ с помощью Python?</li>
+<li>Какие конструкции Python являются наиболее полезными для этой работы?</li>
+<li>Как избежать повторения себя при написании кода на Python?</li>
+</ol>
+<p>Эта глава продолжает представлять концепции программирования с помощью примеров в контексте задачи лингвистической обработки.  Мы отложим на потом систематическое исследование каждой конструкции Python.  Не беспокойтесь, если вы видите пример, который содержит что-то незнакомое; просто попробуйте посмотреть, что он делает, и - если вы в игре - измените его, заменив некоторую часть кода другим текстом или словом.  Таким образом вы будете ассоциировать задачу с идиомой программирования, а как и почему узнаете позже.</p>
+<div class="section" id="accessing-text-corpora">
+<span id="sec-extracting-text-from-corpora"></span><h1>1 Доступ к текстам</h1>
+<p>Как упомянуто выше, корпус текста - это большой кусок текста. Многие корпусы спроектированы для хранения тщательно подобранного набора материалов в одном или нескольких жанрах.  Мы рассмотрели некоторые небольшие текстовые коллекции в <a class="reference external" href="http://www.nltk.org/book/ch01.html#chap-introduction">1.</a>, такие как выступления, известные как инаугурационные адреса президентов США.  Этот конкретный корпус фактически содержит множество отдельных текстов - по одному на каждый адрес - но для удобства мы склеили их конец к концу и относились к ним как единому тексту.
+<a class="reference external" href="http://www.nltk.org/book/ch01.html#chap-introduction">1.</a> также использовала различные предопределенные тексты, к которым мы получали доступ, набрав <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> nltk.book <span class="pysrc-keyword">import</span> *</span></tt>.  Тем не менее, так как мы хотим иметь возможность работать с другими текстами, в данном разделе рассматривается разнообразие текстовых корпусов. Мы увидим, как выбрать отдельные тексты и как с ними работать.</p>
+<div class="section" id="gutenberg-corpus">
+<h2>1.1 Корпус Гутенберга</h2>
+<p>NLTK включает в себя небольшой набор текстов из электронного текстового архива Проекта Гутенберг, который содержит около 25.000 бесплатных электронных книг, размещенных на <tt class="doctest"><span class="pre">http://www.gutenberg.org/</span></tt>.  Мы начинаем указания интерпретатору Python загрузить пакет NLTK, затем просим посмотреть <tt class="doctest"><span class="pre">nltk.corpus.gutenberg.fileids()</span></tt>, идентификаторы файлов в этом корпусе:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; import nltk
+&gt;&gt;&gt; nltk.corpus.gutenberg.fileids()
+['austen-emma.txt', 'austen-persuasion.txt', 'austen-sense.txt', 'bible-kjv.txt',
+'blake-poems.txt', 'bryant-stories.txt', 'burgess-busterbrown.txt',
+'carroll-alice.txt', 'chesterton-ball.txt', 'chesterton-brown.txt',
+'chesterton-thursday.txt', 'edgeworth-parents.txt', 'melville-moby_dick.txt',
+'milton-paradise.txt', 'shakespeare-caesar.txt', 'shakespeare-hamlet.txt',
+'shakespeare-macbeth.txt', 'whitman-leaves.txt']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте возьмем первый из этих текстов - <em>Эмма</em> Джейна Остина - и дадим ему короткое имя, <tt class="doctest"><span class="pre">emma,</span></tt> затем выясним, сколько слов он содержит:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; emma = nltk.corpus.gutenberg.words('austen-emma.txt')
+&gt;&gt;&gt; len(emma)
+192427</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a> мы показали, как вы могли бы выполнить конкорданс текста, такого как <tt class="doctest"><span class="pre">text1</span></tt> с помощью команды <tt class="doctest"><span class="pre">text1.concordance()</span></tt>. Однако это предполагает, что вы используете один из девяти текстов, полученных в результате выполнения <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> nltk.book <span class="pysrc-keyword">import</span> *</span></tt>. Теперь, когда вы приступили к изучению данных из <tt class="doctest"><span class="pre">nltk.corpus</span></tt>, как и в предыдущем примере, вы должны использовать следующую пару выражений для выполнения конкорданса и других задач из <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; emma = nltk.Text(nltk.corpus.gutenberg.words('austen-emma.txt'))
+&gt;&gt;&gt; emma.concordance("surprize")</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<p>Когда мы определили <tt class="doctest"><span class="pre">emme</span></tt>, мы вызвали <tt class="doctest"><span class="pre">words()</span></tt> function объекта <tt class="doctest"><span class="pre">gutenberg</span></tt> в пакете NLTK <tt class="doctest"><span class="pre">corpus</span></tt>.
+Но так как набирать такие длинные имена все время очень громоздко, Python предоставляет еще одну версию<tt class="doctest"><span class="pre"><span class="pysrc-keyword">import</span></span></tt> выражения, а именно:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import gutenberg
+&gt;&gt;&gt; gutenberg.fileids()
+['austen-emma.txt', 'austen-persuasion.txt', 'austen-sense.txt', ...]
+&gt;&gt;&gt; emma = gutenberg.words('austen-emma.txt')</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте напишем короткую программу, чтобы отобразить другую информацию о каждом тексте, перебирая все значения <tt class="doctest"><span class="pre">fileid</span></tt>, соответствующие идентификаторам файла <tt class="doctest"><span class="pre">gutenberg</span></tt>, перечисленным выше, а затем вычисляя статистику для каждого текста.  Для компактного отображения результата, мы округлим каждое число до ближайшего целого числа, используя <tt class="doctest"><span class="pre">round()</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for fileid in gutenberg.fileids():
+...     num_chars = len(gutenberg.raw(fileid)) 
+...     num_words = len(gutenberg.words(fileid))
+...     num_sents = len(gutenberg.sents(fileid))
+...     num_vocab = len(set(w.lower() for w in gutenberg.words(fileid)))
+...     print(round(num_chars/num_words), round(num_words/num_sents), round(num_words/num_vocab), fileid)
+...
+&gt;&gt;&gt; for fileid in gutenberg.fileids():
+...     num_chars = len(gutenberg.raw(fileid)) 
+...     num_words = len(gutenberg.words(fileid))
+...     num_sents = len(gutenberg.sents(fileid))
+...     num_vocab = len(set(w.lower() for w in gutenberg.words(fileid)))
+...     print(round(num_chars/num_words), round(num_words/num_sents), round(num_words/num_vocab), fileid)
+...</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Эта программа отображает три статистических показателя для каждого текста: средняя длина слова, средняя длина предложения и сколько раз каждый элемент словаря появляется в тексте в среднем (наша оценка лексического разнообразия).
+Заметим, что средняя длина слова является общим свойством английского языка, так как этот показатель имеет характерное значение <tt class="doctest"><span class="pre">4</span></tt>.  (На самом деле, средняя длина слова в действительности <tt class="doctest"><span class="pre">3</span></tt>, а не <tt class="doctest"><span class="pre">4</span></tt>, так как переменная <tt class="doctest"><span class="pre">num_chars</span></tt> подсчитывает символы пробела.)
+В отличие первого средняя длина предложения и лексическое разнообразие являются характеристиками конкретных авторов.</p>
+<p>Предыдущий пример также показал, как мы можем получить доступ к "сырому" тексту книги <a class="reference internal" href="http://www.nltk.org/book/ch02.html#raw-access"><span id="ref-raw-access"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, не разделенному на токены.  Функция <tt class="doctest"><span class="pre">raw()</span></tt> дает нам содержимое файла без какой-либо лингвистической обработки.  Так, например, <tt class="doctest"><span class="pre">len(gutenberg.raw(<span class="pysrc-string">'Blake-poems.txt'</span>))</span></tt> говорит нам, сколько <em>букв</em> встречается в тексте, включая пробелы между словами.
+Функция <tt class="doctest"><span class="pre">sents()</span></tt> делит текст на предложения, где каждое предложение представляет собой список слов:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; macbeth_sentences = gutenberg.sents('shakespeare-macbeth.txt')
+&gt;&gt;&gt; macbeth_sentences
+[['[', 'The', 'Tragedie', 'of', 'Macbeth', 'by', 'William', 'Shakespeare',
+'1603', ']'], ['Actus', 'Primus', '.'], ...]
+&gt;&gt;&gt; macbeth_sentences[1116]
+['Double', ',', 'double', ',', 'toile', 'and', 'trouble', ';',
+'Fire', 'burne', ',', 'and', 'Cauldron', 'bubble']
+&gt;&gt;&gt; longest_len = max(len(s) for s in macbeth_sentences)
+&gt;&gt;&gt; [s for s in macbeth_sentences if len(s) == longest_len]
+[['Doubtfull', 'it', 'stood', ',', 'As', 'two', 'spent', 'Swimmers', ',', 'that',
+'doe', 'cling', 'together', ',', 'And', 'choake', 'their', 'Art', ':', 'The',
+'mercilesse', 'Macdonwald', ...]]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Большинство ридеров NLTK включают в себя различные методы доступа, кроме <tt class="doctest"><span class="pre">words()</span></tt>, <tt class="doctest"><span class="pre">raw()</span></tt> и <tt class="doctest"><span class="pre">sents()</span></tt>.  Более богатый лингвистический контент доступен для некоторых корпусов, такой как теги частей речи, диалоговые метки, синтаксические деревья и так далее; мы увидим их в последующих главах.</p>
+</div>
+</div>
+<div class="section" id="web-and-chat-text">
+<h2>1.2 Веб- и чат-тексты</h2>
+<p>Хотя Проект Гутенберг содержит тысячи книг, он представляет собой печатную литературу.  Важно рассмотреть также менее формальный язык.  Небольшая коллекция веб-текстов NLTK включает в себя контент из дискуссионного форума Firefox, разговоры подслушанные в Нью-Йорке, сценарий фильма <em>Пираты Карибского моря</em>, личные объявления и обзоры вина:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import webtext
+&gt;&gt;&gt; for fileid in webtext.fileids():
+...     print(fileid, webtext.raw(fileid)[:65], '...')
+<span class="pysrc-more">...</span>
+<span class="pysrc-output">firefox.txt Cookie Manager: "Don't allow sites that set removed cookies to se...</span>
+<span class="pysrc-output">grail.txt SCENE 1: [wind] [clop clop clop] KING ARTHUR: Whoa there!  [clop...</span>
+<span class="pysrc-output">overheard.txt White guy: So, do you have any plans for this evening? Asian girl...</span>
+<span class="pysrc-output">pirates.txt PIRATES OF THE CARRIBEAN: DEAD MAN'S CHEST, by Ted Elliott &amp; Terr...</span>
+<span class="pysrc-output">singles.txt 25 SEXY MALE, seeks attrac older single lady, for discreet encoun...</span>
+<span class="pysrc-output">wine.txt Lovely delicate, fragrant Rhone wine. Polished leather and strawb...</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Существует также корпус сеансов обмена мгновенными сообщениями, первоначально собранный Военно-морской Аспирантурой для исследования автоматического обнаружения интернет-хищников.
+Корпус содержит более 10 000 сообщений, анонимизированных путем замены имен пользователей с родовыми названиями вида "UserNNN" и отредактированных вручную, чтобы удалить любую другую идентифицирующую информацию.
+Корпус организован в 15 файлов, где каждый файл содержит несколько сотен сообщений, собранных на определенную дату для определенной возрастной группы (подростки, 20-летние, 30-летние, 40-летние плюс общий для взрослых).  Имя файла содержит дату, возрастную группу, число сообщений; например, <tt class="doctest"><span class="pre">10-19-20s_706posts.xml</span></tt> содержит 706 сообщений, собранных для возрастной группы 20-летних 10/19/2006.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import nps_chat
+&gt;&gt;&gt; chatroom = nps_chat.posts('10-19-20s_706posts.xml')
+&gt;&gt;&gt; chatroom[123]
+['i', 'do', "n't", 'want', 'hot', 'pics', 'of', 'a', 'female', ',',
+'I', 'can', 'look', 'in', 'a', 'mirror', '.']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="brown-corpus">
+<h2>1.3 Браунский корпус</h2>
+<p>Браунский корпус - первый электронный корпус английского языка, содержавший один миллион слов, созданный в 1961 году в Университете Брауна.
+Этот корпус содержит тексты из 500 источников, эти источники были классифицированы по жанрам, такие как <em>новости</em>, <em>редакторские статьи</em> и так далее.
+<a class="reference internal" href="http://www.nltk.org/book/ch02.html#tab-brown-sources">1.1</a> дает пример каждого жанра (полный список см. <tt class="doctest"><span class="pre">http://icame.uib.no/brown/bcm-los.html</span></tt>).</p>
+<span class="target" id="tab-brown-sources"></span><table border="1" class="docutils" id="tab-brown-sources">
+<colgroup>
+<col width="3%">
+<col width="8%">
+<col width="15%">
+<col width="74%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">ID</th>
+<th class="head">Файл</th>
+<th class="head">Жанр</th>
+<th class="head">Описание</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>A16</td>
+<td><tt class="doctest"><span class="pre">ca16</span></tt></td>
+<td>новости</td>
+<td>Chicago Tribune: <em>Общественный репортаж</em></td>
+</tr>
+<tr><td>B02</td>
+<td><tt class="doctest"><span class="pre">cb02</span></tt></td>
+<td>редакционный</td>
+<td>Christian Science Monitor: <em>Передовицы</em></td>
+</tr>
+<tr><td>C17</td>
+<td><tt class="doctest"><span class="pre">cc17</span></tt></td>
+<td>отзывы</td>
+<td>Time Magazine: <em>Обзоры</em></td>
+</tr>
+<tr><td>D12</td>
+<td><tt class="doctest"><span class="pre">cd12</span></tt></td>
+<td>религия</td>
+<td>Underwood: <em>Расследование этики риелторов</em></td>
+</tr>
+<tr><td>E36</td>
+<td><tt class="doctest"><span class="pre">ce36</span></tt></td>
+<td>увлечения</td>
+<td>Norling: <em>Аренда автомобиля в Европе</em></td>
+</tr>
+<tr><td>F25</td>
+<td><tt class="doctest"><span class="pre">cf25</span></tt></td>
+<td>профессиональные знания</td>
+<td>Boroff: <em>Еврейский подростковая культура</em></td>
+</tr>
+<tr><td>G22</td>
+<td><tt class="doctest"><span class="pre">cg22</span></tt></td>
+<td>беллетристика</td>
+<td>Reiner: <em>Погоня за ускользающей технологией</em></td>
+</tr>
+<tr><td>H15</td>
+<td><tt class="doctest"><span class="pre">ch15</span></tt></td>
+<td>правительство</td>
+<td>US Office of Civil and Defence Mobilization: <em>Семейное убежище от радиоактивных осадков</em></td>
+</tr>
+<tr><td>J17</td>
+<td><tt class="doctest"><span class="pre">cj19</span></tt></td>
+<td>научился</td>
+<td>Mosteller: <em>Вероятность со статистическими приложениями</em></td>
+</tr>
+<tr><td>K04</td>
+<td><tt class="doctest"><span class="pre">ck04</span></tt></td>
+<td>фантастика</td>
+<td>W.E.B. Du Bois: <em>Миры цвета</em></td>
+</tr>
+<tr><td>L13</td>
+<td><tt class="doctest"><span class="pre">cl13</span></tt></td>
+<td>мистика</td>
+<td>Hitchens: <em>Шаги в ночи</em></td>
+</tr>
+<tr><td>M01</td>
+<td><tt class="doctest"><span class="pre">cm01</span></tt></td>
+<td>научная фантастика</td>
+<td>Heinlein: <em>Чужак в чужой стране</em></td>
+</tr>
+<tr><td>N14</td>
+<td><tt class="doctest"><span class="pre">cn15</span></tt></td>
+<td>приключение</td>
+<td>Field: <em>Хребет гремучей змеи</em></td>
+</tr>
+<tr><td>P12</td>
+<td><tt class="doctest"><span class="pre">cp12</span></tt></td>
+<td>романтика</td>
+<td>Field: <em>Страсть в Риме</em></td>
+</tr>
+<tr><td>R06</td>
+<td><tt class="doctest"><span class="pre">cr06</span></tt></td>
+<td>юмор</td>
+<td>Thurber: <em>Будущее комедии, если таковое имеется</em></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 1.1:</span> <p>Пример документа для каждой секции Браунского корпуса</p>
+</p>
+</td></table>
+<p>Мы можем получить доступ к корпусу как списку слов или списку предложений (где каждое предложение само является просто списком слов).  Мы можем дополнительно указать конкретные категории или файлы:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; brown.categories()
+['adventure', 'belles_lettres', 'editorial', 'fiction', 'government', 'hobbies',
+'humor', 'learned', 'lore', 'mystery', 'news', 'religion', 'reviews', 'romance',
+'science_fiction']
+&gt;&gt;&gt; brown.words(categories='news')
+['The', 'Fulton', 'County', 'Grand', 'Jury', 'said', ...]
+&gt;&gt;&gt; brown.words(fileids=['cg22'])
+['Does', 'our', 'society', 'have', 'a', 'runaway', ',', ...]
+&gt;&gt;&gt; brown.sents(categories=['news', 'editorial', 'reviews'])
+[['The', 'Fulton', 'County'...], ['The', 'jury', 'further'...], ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Браунский корпус представляет собой удобный ресурс для изучения систематических различий между жанрами, род лингвистического исследования известный как <a name="stylistics_index_term"></a><span class="termdef">стилистика</span>.
+Давайте сравним жанры в их использовании модальных глаголов.  Первый шаг состоит в том, чтобы произвести подсчет для определенного жанра.  Не забудьте <tt class="doctest"><span class="pre"><span class="pysrc-keyword">import</span> nltk</span></tt>, прежде чем делать следующее:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; news_text = brown.words(categories='news')
+&gt;&gt;&gt; fdist = nltk.FreqDist(w.lower() for w in news_text)
+&gt;&gt;&gt; modals = ['can', 'could', 'may', 'might', 'must', 'will']
+&gt;&gt;&gt; for m in modals:
+...     print(m + ':', fdist[m], end=' ')
+...
+<span class="pysrc-output">can: 94 could: 87 may: 93 might: 38 must: 53 will: 389</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Мы должны включить <tt class="doctest"><span class="pre">end = <span class="pysrc-string">' '</span></span></tt> для того, чтобы функция print вывела свой результат на одной строке.</p>
+</div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong>
+Выберите другой раздел Браунского корпус и измените предыдущий пример, чтобы он подсчитал выборку <span class="example">wh</span>-слов, например, таких как <span class="example">what</span>, <span class="example">when</span>, <span class="example">where</span>, <span class="example">who</span> и <span class="example">why</span>.</p>
+</div>
+<p>Далее нам необходимо получить результаты для каждого жанра.  Мы будем использовать средства NLTK для расчета условных распределений частот. Они представлены систематически в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#sec-conditional-frequency-distributions">2</a>, где мы также разберем следующий код строку за строкой. На данный момент вы можете игнорировать детали и просто сосредоточиться на результате.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...           (genre, word)
+...           for genre in brown.categories()
+...           for word in brown.words(categories=genre))
+&gt;&gt;&gt; genres = ['news', 'religion', 'hobbies', 'science_fiction', 'romance', 'humor']
+&gt;&gt;&gt; modals = ['can', 'could', 'may', 'might', 'must', 'will']
+&gt;&gt;&gt; cfd.tabulate(conditions=genres, samples=modals)
+                 can could  may might must will
+           news   93   86   66   38   50  389
+       religion   82   59   78   12   54   71
+        hobbies  268   58  131   22   83  264
+science_fiction   16   49    4   12    8   16
+        romance   74  193   11   51   45   43
+          humor   16   30    8    8    9   13</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Заметим, что наиболее часто встречаемый модальный глагол в новостном жанре это <span class="example">will</span>, в то время как наиболее часто встречаемый модальный глагол в романтическом жанре это <span class="example">could</span>.
+Вы бы могли предсказать это?  Вопрос о том, что подсчет слов может различать жанры, будет поднят снова в <a class="reference external" href="http://www.nltk.org/book/ch06.html#chap-data-intensive">  chap-data-intensive</a>.</p>
+<!-- XXX xref isn&#39;t being handled? -->
+</div>
+<div class="section" id="reuters-corpus">
+<h2>1.4 Корпус Рейтерс</h2>
+<p>Корпус Рейтерс содержит 10.788 новостных документов, насчитывающих в совокупности 1,3 миллиона слов.
+Документы были разделены на 90 тематических разделов и сгруппированы в два набора - "тренировочный" и "тестовый"; таким образом, текст с идентификатором файла <tt class="doctest"><span class="pre"><span class="pysrc-string">'test/14826'</span></span></tt> представляет собой документ из тестового набора. Это разделение необходимо для тренировочных и тестовых алгоритмов, которые автоматически определяют тему документа, которые мы увидим в <a class="reference external" href="http://www.nltk.org/book/ch06.html#chap-data-intensive">chap-data-intensive</a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import reuters
+&gt;&gt;&gt; reuters.fileids()
+['test/14826', 'test/14828', 'test/14829', 'test/14832', ...]
+
+&gt;&gt;&gt; reuters.categories()
+['acq', 'alum', 'barley', 'bop', 'carcass', 'castor-oil', 'cocoa',
+'coconut', 'coconut-oil', 'coffee', 'copper', 'copra-cake', 'corn',
+'cotton', 'cotton-oil', 'cpi', 'cpu', 'crude', 'dfl', 'dlr', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В отличие от Браунского корпуса, категории в корпусе Рейтерс перекрываются друг с другом просто потому, что новость часто охватывает несколько тем.
+Мы можем запросить темы, освещаемые одним или несколькими документами, или документы, включенные в одну или несколько категорий. Для удобства методы корпуса принимают один идентификатор или список идентификаторов файлов.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; reuters.categories('training/9865')
+['barley', 'corn', 'grain', 'wheat']
+&gt;&gt;&gt; reuters.categories(['training/9865', 'training/9880'])
+['barley', 'corn', 'grain', 'money-fx', 'wheat']
+&gt;&gt;&gt; reuters.fileids('barley')
+['test/15618', 'test/15649', 'test/15676', 'test/15728', 'test/15871', ...]
+&gt;&gt;&gt; reuters.fileids(['barley', 'corn'])
+['test/14832', 'test/14858', 'test/15033', 'test/15043', 'test/15106',
+'test/15287', 'test/15341', 'test/15618', 'test/15648', 'test/15649', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Точно так же мы можем указать слова или предложения, которые мы хотим, в терминах файлов или категорий. Первые несколько слов в каждом из этих текстов являются названием, которые в соответствии с соглашением, хранятся в верхнем регистре.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; reuters.words('training/9865')[:14]
+['FRENCH', 'FREE', 'MARKET', 'CEREAL', 'EXPORT', 'BIDS',
+'DETAILED', 'French', 'operators', 'have', 'requested', 'licences', 'to', 'export']
+&gt;&gt;&gt; reuters.words(['training/9865', 'training/9880'])
+['FRENCH', 'FREE', 'MARKET', 'CEREAL', 'EXPORT', ...]
+&gt;&gt;&gt; reuters.words(categories='barley')
+['FRENCH', 'FREE', 'MARKET', 'CEREAL', 'EXPORT', ...]
+&gt;&gt;&gt; reuters.words(categories=['barley', 'corn'])
+['THAI', 'TRADE', 'DEFICIT', 'WIDENS', 'IN', 'FIRST', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="inaugural-address-corpus">
+<h2>1.5 Корпус инаугурационных адресов</h2>
+<!-- XXX fig-inaugural_ isn&#39;t being handled correctly in the output -->
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a>, мы обращались к Корпусу инаугурационных адресов, но рассматривали его как единый текст.  График в <a class="reference external" href="http://www.nltk.org/book/ch01.html#fig-inaugural">fig-inaugural</a> использовал "смещение слова" в качестве одной из осей; это числовой индекс слова в корпусе, считая от первого слова первого адреса.
+Тем не менее, этот корпус на самом деле - это коллекция из 55 текстов, по одному для каждого президентского адреса.
+Интересным свойством этой коллекции является измерение времени:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import inaugural
+&gt;&gt;&gt; inaugural.fileids()
+['1789-Washington.txt', '1793-Washington.txt', '1797-Adams.txt', ...]
+&gt;&gt;&gt; [fileid[:4] for fileid in inaugural.fileids()]
+['1789', '1793', '1797', '1801', '1805', '1809', '1813', '1817', '1821', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание на то, что год каждого текста появляется в его имени файла.  Чтобы получить год из файла, мы извлекли первые четыре символа, используя <tt class="doctest"><span class="pre">FILEID [: 4].</span></tt></p>
+<p>Давайте посмотрим на то, как употребление слов <span class="example">America</span> и <span class="example">citizen</span> менялось со временем.
+Следующий код переводит слова инаугурационного корпуса в нижний регистр с использованием <tt class="doctest"><span class="pre">w.lower()</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch02.html#lowercase-startswith"><span id="ref-lowercase-startswith"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, затем проверяет, начинаются ли они с одной из «мишеней»: <tt class="doctest"><span class="pre">america</span></tt> или <tt class="doctest"><span class="pre">citizen</span></tt> с использованием <tt class="doctest"><span class="pre">startswith()</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch02.html#lowercase-startswith"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></a>.
+Таким образом, он будет считать такие слова, как <span class="example">American's</span> и <span class="example">Citizens</span>.
+Мы узнаем об условных распределениях частот в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#sec-conditional-frequency-distributions">2</a>; сейчас просто рассмотрим вывод, показанный на <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-inaugural2">1.1</a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...           (target, fileid[:4])
+...           for fileid in inaugural.fileids()
+...           for w in inaugural.words(fileid)
+...           for target in ['america', 'citizen']
+...           if w.lower().startswith(target)) 
+&gt;&gt;&gt; cfd.plot()</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<span class="target" id="fig-inaugural2"></span><div class="figure" id="fig-inaugural2">
+<img alt="../images/inaugural2.png" src="http://www.nltk.org/images/inaugural2.png" style="width:646.74px;height:292.32px">
+<p class="caption"><span class="caption-label">Рисунок 1.1:</span> График условного распределения частот: все слова в Корпусе инаугурационных адресов, начинающиеся с <tt class="doctest"><span class="pre">america</span></tt> или <tt class="doctest"><span class="pre">citizen</span></tt> подсчитываются; отдельные счетчики ведутся для каждого адреса; они отображены на графике таким образом, что можно наблюдать тенденции употребления с течением времени; подсчет не нормализован по длине документа.</p>
+</div>
+</div>
+<div class="section" id="annotated-text-corpora">
+<h2>1.6 Корпусы аннотированных текстов</h2>
+<p>Многие текстовые корпусы содержат лингвистические аннотации, представляющие собой указания на части речи, именованные объекты, синтаксические структуры, семантические роли и так далее.  NLTK предоставляет удобные способы получить доступ к нескольким из этих корпусов, а также имеет пакеты данных, содержащие корпусы и образцы корпусов, доступные для свободного скачивания в целях обучения и исследования.
+В <a class="reference internal" href="http://www.nltk.org/book/ch02.html#tab-corpora">1.2</a> перечислены некоторые из этих корпусов.  Для получения информации об их скачивании см. <tt class="doctest"><span class="pre">http://nltk.org/data</span></tt>. Для получение дополнительных примеров того, как получить доступ к корпусам NLTK, пожалуйста, обратитесь к Corpus HOWTO по адресу <tt class="doctest"><span class="pre">http://nltk.org/howto</span></tt>.</p>
+<span class="target" id="tab-corpora"></span><table border="1" class="docutils" id="tab-corpora">
+<colgroup>
+<col width="31%">
+<col width="18%">
+<col width="51%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">корпус</th>
+<th class="head">составитель</th>
+<th class="head">содержание</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>Brown Corpus</td>
+<td>Francis, Kucera</td>
+<td>15 жанров, 1,15М слов, с метками, классифицированный</td>
+</tr>
+<tr><td>CESS Treebanks</td>
+<td>CLiC-UB</td>
+<td>1M слов, помеченных и разобранных (каталонский, испанский)</td>
+</tr>
+<tr><td>Chat-80 Data Files</td>
+<td>Pereira &amp; Warren</td>
+<td>Всемирная географическая база данных</td>
+</tr>
+<tr><td>CMU Pronouncing Dictionary</td>
+<td>CMU</td>
+<td>127K записей</td>
+</tr>
+<tr><td>CoNLL 2000 Chunking Data</td>
+<td>CoNLL</td>
+<td>270K слов, помеченных и фрагментированных</td>
+</tr>
+<tr><td>CoNLL 2002 Named Entity</td>
+<td>CoNLL</td>
+<td>700k слов, помечены части речи и именованные объекты (голландский, испанский)</td>
+</tr>
+<tr><td>CoNLL 2007 Dependency Treebanks (sel)</td>
+<td>CoNLL</td>
+<td>150К слов, разобраны зависимости (баскский, каталанский)</td>
+</tr>
+<tr><td>Dependency Treebank</td>
+<td>Narad</td>
+<td>Версия образца Penn Treebank корпуса с разобранными зависимостями</td>
+</tr>
+<tr><td>FrameNet</td>
+<td>Fillmore, Baker и др.</td>
+<td>Значения 10k слов, 170K вручную аннотированных предложений</td>
+</tr>
+<tr><td>Floresta Treebank</td>
+<td>Diana Santos и др.</td>
+<td>9k предложений, помеченных и разобранных (Португальский)</td>
+</tr>
+<tr><td>Gazetteer Lists</td>
+<td>Различные</td>
+<td>Списки городов и стран</td>
+</tr>
+<tr><td>Genesis Corpus</td>
+<td>Разл. веб-источники</td>
+<td>6 текстов, 200k слов, 6 языков</td>
+</tr>
+<tr><td>Gutenberg (selections)</td>
+<td>Hart, Newby и др.</td>
+<td>18 текстов, 2M слова</td>
+</tr>
+<tr><td>Inaugural Address Corpus</td>
+<td>CSpan</td>
+<td>Инаугурационные адреса президентов США (1789 - настоящее время)</td>
+</tr>
+<tr><td>Indian POS-Tagged Corpus</td>
+<td>Kumaran et al</td>
+<td>60k слов, помеченных (бенгальский, хинди, маратхи, телугу)</td>
+</tr>
+<tr><td>MacMorpho Corpus</td>
+<td>NILC, USP, Brazil</td>
+<td>1M слов, помеченных (бразильский португальский)</td>
+</tr>
+<tr><td>Movie Reviews</td>
+<td>Pang, Lee</td>
+<td>2k обзоров фильмов с классификацией оценок</td>
+</tr>
+<tr><td>Names Corpus</td>
+<td>Kantrowitz, Ross</td>
+<td>8k мужских и женских имен</td>
+</tr>
+<tr><td>NIST 1999 Info Extr (selections)</td>
+<td>Garofolo</td>
+<td>63K слов, лента новостей, SGML разметка именованных объектов</td>
+</tr>
+<tr><td>Nombank</td>
+<td>Meyers</td>
+<td>115K предложений, 1400 рамок существительных</td>
+</tr>
+<tr><td>NPS Chat Corpus</td>
+<td>Forsyth, Martell</td>
+<td>10k мгновенных сообщений, с помеченными частями речи и диалогами</td>
+</tr>
+<tr><td>Open Multilingual WordNet</td>
+<td>Bond и др</td>
+<td>15 языков, выровнен на английский WordNet</td>
+</tr>
+<tr><td>PP Attachment Corpus</td>
+<td>Ratnaparkhi</td>
+<td>28K предложных форм, помеченных как модификаторы существительных или глаголов</td>
+</tr>
+<tr><td>Proposition Bank</td>
+<td>Palmer</td>
+<td>113K предложений, 3300 глагольных рамок</td>
+</tr>
+<tr><td>Question Classification</td>
+<td>Li, Roth</td>
+<td>6k вопросов, классифицированный</td>
+</tr>
+<tr><td>Reuters Corpus</td>
+<td>Reuters</td>
+<td>1.3M слов, 10k новостных документов, классифицированный</td>
+</tr>
+<tr><td>Roget's Thesaurus</td>
+<td>Project Gutenberg</td>
+<td>200k слова, форматированный текст</td>
+</tr>
+<tr><td>RTE Textual Entailment</td>
+<td>Dagan и др</td>
+<td>8k пар предложений, классифицированный</td>
+</tr>
+<tr><td>SEMCOR</td>
+<td>Rus, Mihalcea</td>
+<td>880k слов, помечены части речи и значение</td>
+</tr>
+<tr><td>Senseval 2 Корпус</td>
+<td>Pedersen</td>
+<td>600K слов, помечены части речи и значение</td>
+</tr>
+<tr><td>SentiWordNet</td>
+<td>Esuli, Sebastiani</td>
+<td>подсчет оценок для 145K наборов синонимов Wordnet</td>
+</tr>
+<tr><td>Shakespeare texts (selections)</td>
+<td>Bosak</td>
+<td>8 книг в формате XML</td>
+</tr>
+<tr><td>State of the Union Corpus</td>
+<td>CSPAN</td>
+<td>485k слов, форматированный текст</td>
+</tr>
+<tr><td>Stopwords Corpus</td>
+<td>Porter и др</td>
+<td>2.400 игнорируемых слов для 11 языков</td>
+</tr>
+<tr><td>Swadesh Corpus</td>
+<td>Wiktionary</td>
+<td>Сравнительные списки слов на 24 языках</td>
+</tr>
+<tr><td>Switchboard Corpus (selections)</td>
+<td>LDC</td>
+<td>36 телефонных разговоров, записанных, разобранных</td>
+</tr>
+<tr><td>Univ Decl of Human Rights</td>
+<td>United Nations</td>
+<td>480K слов, 300+ языков</td>
+</tr>
+<tr><td>Penn Treebank (selections)</td>
+<td>LDC</td>
+<td>40k слов, помеченных и разобранных</td>
+</tr>
+<tr><td>TIMIT Corpus (selections)</td>
+<td>NIST / LDC</td>
+<td>аудио файлы и стенограммы для 16 говорящих</td>
+</tr>
+<tr><td>VerbNet 2.1</td>
+<td>Palmer и др</td>
+<td>5k глаголов, иерархически организованных, связанных с WordNet</td>
+</tr>
+<tr><td>Wordlist Corpus</td>
+<td>OpenOffice.org и др</td>
+<td>960k слов и 20k аффиксов на 8 языках</td>
+</tr>
+<tr><td>WordNet 3.0 (English)</td>
+<td>Miller, Fellbaum</td>
+<td>145К наборов синонимов</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 1.2:</span> <p>Некоторые корпусы и образцы корпусов, которые распространяются с NLTK: Для получения информации об их загрузке и использовании, пожалуйста, обратитесь к веб-сайту NLTK.</p>
+</p>
+</td></table>
+</div>
+<div class="section" id="corpora-in-other-languages">
+<h2>1.7 Корпусы на других языках</h2>
+<p>NLTK поставляется с корпусами на многих языках, хотя в некоторых случаях вам нужно будет научиться работать кодировками в Python, прежде чем использовать эти корпусы (см <a class="reference external" href="http://www.nltk.org/book/ch03.html#sec-unicode">3.3</a>).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.corpus.cess_esp.words()
+['El', 'grupo', 'estatal', 'Electricit\xe9_de_France', ...]
+&gt;&gt;&gt; nltk.corpus.floresta.words()
+['Um', 'revivalismo', 'refrescante', 'O', '7_e_Meio', ...]
+&gt;&gt;&gt; nltk.corpus.indian.words('hindi.pos')
+['पूर्ण', 'प्रतिबंध', 'हटाओ', ':', 'इराक', 'संयुक्त', ...]
+&gt;&gt;&gt; nltk.corpus.udhr.fileids()
+['Abkhaz-Cyrillic+Abkh', 'Abkhaz-UTF8', 'Achehnese-Latin1', 'Achuar-Shiwiar-Latin1',
+'Adja-UTF8', 'Afaan_Oromo_Oromiffa-Latin1', 'Afrikaans-Latin1', 'Aguaruna-Latin1',
+'Akuapem_Twi-UTF8', 'Albanian_Shqip-Latin1', 'Amahuaca', 'Amahuaca-Latin1', ...]
+&gt;&gt;&gt; nltk.corpus.udhr.words('Javanese-Latin1')[11:]
+['Saben', 'umat', 'manungsa', 'lair', 'kanthi', 'hak', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Последний из этих корпусов, <tt class="doctest"><span class="pre">udhr</span></tt>, содержит Всеобщую декларацию прав человека на более чем 300 языках.  В fileids для этого корпуса включают в себя информацию о кодировке символов, используемых в файле, как например <tt class="doctest"><span class="pre">UTF8</span></tt> или <tt class="doctest"><span class="pre">Latin1</span></tt>.
+Давайте воспользуемся условным распределением частот для изучения различий в длинах слов для набора языков, включенных в корпус <tt class="doctest"><span class="pre">udhr</span></tt>.
+Вывод показан на <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-word-len-dist">1.2</a> (запустите программу, чтобы увидеть цветной график).
+Обратите внимание , что <tt class="doctest"><span class="pre">True</span></tt> и <tt class="doctest"><span class="pre">False</span></tt> - это встроенные логические значения языка Python.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import udhr
+&gt;&gt;&gt; languages = ['Chickasaw', 'English', 'German_Deutsch',
+...    'Greenlandic_Inuktikut', 'Hungarian_Magyar', 'Ibibio_Efik']
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...           (lang, len(word))
+...           for lang in languages
+...           for word in udhr.words(lang + '-Latin1'))
+&gt;&gt;&gt; cfd.plot(cumulative=True)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<span class="target" id="fig-word-len-dist"></span><div class="figure" id="fig-word-len-dist">
+<img alt="../images/word-len-dist.png" src="http://www.nltk.org/images/word-len-dist.png" style="width:613.0px;height:463.0px">
+<p class="caption"><span class="caption-label">Рисунок 1.2:</span> Накопленное распределение длин слов: Обработано Шесть переводов Всеобщей декларации прав человека; Этот график показывает, что слова, имеющие 5 или меньше букв составляют около 80% от текста на Ibibio, 60% текста на немецком языке и 25% текста на Inuktitut.</p>
+</div>
+<!-- XXX In the following, nltk.FreqDist got wrapped weirdly (as FreqD-ist) -->
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Выберите язык из <tt class="doctest"><span class="pre">udhr.fileids(),</span></tt> и определите переменную <tt class="doctest"><span class="pre">raw_text = udhr.raw<em><tt class="doctest"><span class="pre">(Language-Latin1)</span></tt></em></span></tt>.  Теперь постройте график распределения частот букв текста с использованием <tt class="doctest"><span class="pre">nltk.FreqDist(raw_text).plot()</span></tt>.</p>
+</div>
+<p>К сожалению, для многих языков существенные корпусы еще не доступны.  Часто существует недостаточное государственная или индустриальная поддержка для развития языковых ресурсов, а индивидуальные усилия штучны и их трудно обнаружить или повторно использовать.  Некоторые языки не имеют никакой установленной системы письма или находятся под угрозой исчезновения.  (См. в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#sec-further-reading-corpora">7</a> предложения о том, как найти языковые ресурсы).</p>
+</div>
+<div class="section" id="text-corpus-structure">
+<h2>1.8 Структура текстового корпуса</h2>
+<p>Мы уже увидели множество структур текстовых корпусов; они приведены в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-text-corpus-structure">1.3</a> .
+Самый простой вид не имеет какой-либо структуры: это просто набор текстов.
+Часто тексты сгруппированы по категориям, которые могут соответствовать жанру, источнику, автору, языку и т.д. Иногда эти категории пересекаются, в частности, в случае тематических категорий, так как текст может иметь отношение к более чем одной теме.  Иногда текстовые коллекции имеют временную структуру, новостные коллекции являются наиболее распространенным примером.</p>
+<span class="target" id="fig-text-corpus-structure"></span><div class="figure" id="fig-text-corpus-structure">
+<img alt="../images/text-corpus-structure.png" src="http://www.nltk.org/images/text-corpus-structure.png" style="width:607.1999999999999px;height:129.6px">
+<p class="caption"><span class="caption-label">Рисунок 1.3:</span> общие структуры для текстовых корпусов: Самый простой вид корпуса представляет собой набор отдельных текстов, не имеющих конкретной организации; некоторые корпусы структурированы в такие категории, как жанр (Brown Corpus); некоторые категоризации перекрывают друг друга, такие как тематические категории (Reuters Corpus); другие корпусы представляют использование языка во времени (Корпус инаугурационных адресов).</p>
+</div>
+<span class="target" id="tab-corpus"></span><table border="1" class="docutils" id="tab-corpus">
+<colgroup>
+<col width="35%">
+<col width="65%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Пример</th>
+<th class="head">Описание</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">fileids()</span></tt></td>
+<td>файлы корпуса</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fileids([categories])</span></tt></td>
+<td>файлы в деянии, соответствующие этим категориям</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">categories()</span></tt></td>
+<td>категории свода</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">categories([fileids])</span></tt></td>
+<td>категории корпусе, соответствующие этим файлам</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">raw()</span></tt></td>
+<td>сырьевая содержание корпуса</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">raw(fileids=[f1,f2,f3])</span></tt></td>
+<td>сырьевая содержание указанных файлов</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">raw(categories=[c1,c2])</span></tt></td>
+<td>сырьевая содержание указанных категорий</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">words()</span></tt></td>
+<td>слова целого комплекса</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">words(fileids=[f1,f2,f3])</span></tt></td>
+<td>слова указанных fileids</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">words(categories=[c1,c2])</span></tt></td>
+<td>слова указанных категорий</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">sents()</span></tt></td>
+<td>приговоры весь корпус</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">sents(fileids=[f1,f2,f3])</span></tt></td>
+<td>приговоры указанных fileids</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">sents(categories=[c1,c2])</span></tt></td>
+<td>приговоры указанных категорий</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">abspath(fileid)</span></tt></td>
+<td>расположение данного файла на диске</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">encoding(fileid)</span></tt></td>
+<td>кодировка файла (если известно)</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">open(fileid)</span></tt></td>
+<td>открыть поток для чтения данного файла желтое</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">root</span></tt></td>
+<td>если путь к корню локально установленного корпуса</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">readme()</span></tt></td>
+<td>содержимое README файла из корпуса</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 1.3:</span> <p>Основная функциональность Corpus, определенная в NLTK: больше документации можно найти, используя <tt class="doctest"><span class="pre">help(nltk.corpus.reader)</span></tt> и читая онлайн HOWTO по Corpus на <tt class="doctest"><span class="pre">http://nltk.org/howto</span></tt>.</p>
+</p>
+</td></table>
+<p>Ридеры корпусов NLTK поддерживают эффективный доступ к целому ряду корпусов, и могут быть использованы для работы с новыми корпусами.  В <a class="reference internal" href="http://www.nltk.org/book/ch02.html#tab-corpus">1.3</a> приведены функциональные возможности, предоставляемые ридерами корпусов.  Мы иллюстрируем различие между некоторыми методами доступа к корпусам ниже:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; raw = gutenberg.raw("burgess-busterbrown.txt")
+&gt;&gt;&gt; raw[1:20]
+'The Adventures of B'
+&gt;&gt;&gt; words = gutenberg.words("burgess-busterbrown.txt")
+&gt;&gt;&gt; words[1:20]
+['The', 'Adventures', 'of', 'Buster', 'Bear', 'by', 'Thornton', 'W', '.',
+'Burgess', '1920', ']', 'I', 'BUSTER', 'BEAR', 'GOES', 'FISHING', 'Buster',
+'Bear']
+&gt;&gt;&gt; sents = gutenberg.sents("burgess-busterbrown.txt")
+&gt;&gt;&gt; sents[1:20]
+[['I'], ['BUSTER', 'BEAR', 'GOES', 'FISHING'], ['Buster', 'Bear', 'yawned', 'as',
+'he', 'lay', 'on', 'his', 'comfortable', 'bed', 'of', 'leaves', 'and', 'watched',
+'the', 'first', 'early', 'morning', 'sunbeams', 'creeping', 'through', ...], ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="loading-your-own-corpus">
+<h2>1.9 Загрузка вашего собственного Корпуса</h2>
+<p>Если у вас есть свой собственный набор текстовых файлов, к которым вы хотели бы получить доступ с помощью вышеперечисленных методов, вы можете легко загрузить их с помощью <tt class="doctest"><span class="pre">PlaintextCorpusReader</span></tt>, входящего в NLTK. Проверьте расположение файлов в файловой системе; в следующем примере это будет каталог <tt class="doctest"><span class="pre">/usr/share/dict</span></tt>. Вне зависимости от расположения, установите его в качестве значения переменной <tt class="doctest"><span class="pre">corpus_root</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch02.html#corpus-root-dict"><span id="ref-corpus-root-dict"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.
+Второй параметр инициализатора <tt class="doctest"><span class="pre">PlaintextCorpusReader</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch02.html#corpus-reader"><span id="ref-corpus-reader"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a> может быть списком fileids, как <tt class="doctest"><span class="pre">[<span class="pysrc-string">'a.txt'</span>, <span class="pysrc-string">'test/b.txt'</span>]</span></tt>, или шаблон, который соответствует всем fileids, как <tt class="doctest"><span class="pre"><span class="pysrc-string">'[abc]/.*\.txt'</span></span></tt> (см. <a class="reference external" href="http://www.nltk.org/book/ch03.html#sec-regular-expressions-word-patterns">3.4</a> для получения информации о регулярных выражениях).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import PlaintextCorpusReader
+&gt;&gt;&gt; corpus_root = '/usr/share/dict' 
+&gt;&gt;&gt; wordlists = PlaintextCorpusReader(corpus_root, '.*') 
+&gt;&gt;&gt; wordlists.fileids()
+['README', 'connectives', 'propernames', 'web2', 'web2a', 'words']
+&gt;&gt;&gt; wordlists.words('connectives')
+['the', 'of', 'and', 'to', 'a', 'in', 'that', 'is', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В качестве другого примера предположим, что у вас есть своя собственная локальная копия Penn Treebank (выпуск 3) в <tt class="doctest"><span class="pre">C:\corpora</span></tt>.  Мы можем использовать <tt class="doctest"><span class="pre">BracketParseCorpusReader</span></tt>, чтобы получить доступ к корпусу.  Мы указываем, что <tt class="doctest"><span class="pre">corpus_root</span></tt> является расположением разобранного компонента Wall Street Journal корпуса<a class="reference internal" href="http://www.nltk.org/book/ch02.html#corpus-root-treebank"><span id="ref-corpus-root-treebank"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a> и даем <tt class="doctest"><span class="pre">file_pattern</span></tt>, который соответствует файлам, содержащимся в ее подпапках <a class="reference internal" href="http://www.nltk.org/book/ch02.html#file-pattern"><span id="ref-file-pattern"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a> (используя прямые косые черты).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import BracketParseCorpusReader
+&gt;&gt;&gt; corpus_root = r"C:\corpora\penntreebank\parsed\mrg\wsj" 
+&gt;&gt;&gt; file_pattern = r".*/wsj_.*\.mrg" 
+&gt;&gt;&gt; ptb = BracketParseCorpusReader(corpus_root, file_pattern)
+&gt;&gt;&gt; ptb.fileids()
+['00/wsj_0001.mrg', '00/wsj_0002.mrg', '00/wsj_0003.mrg', '00/wsj_0004.mrg', ...]
+&gt;&gt;&gt; len(ptb.sents())
+49208
+&gt;&gt;&gt; ptb.sents(fileids='20/wsj_2013.mrg')[19]
+['The', '55-year-old', 'Mr.', 'Noriega', 'is', "n't", 'as', 'smooth', 'as', 'the',
+'shah', 'of', 'Iran', ',', 'as', 'well-born', 'as', 'Nicaragua', "'s", 'Anastasio',
+'Somoza', ',', 'as', 'imperial', 'as', 'Ferdinand', 'Marcos', 'of', 'the', 'Philippines',
+'or', 'as', 'bloody', 'as', 'Haiti', "'s", 'Baby', Doc', 'Duvalier', '.']</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+</div>
+<div class="section" id="conditional-frequency-distributions">
+<span id="sec-conditional-frequency-distributions"></span><h1>2 Условные распределения частот</h1>
+<p>Мы представили распределение частот в <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-simple-statistics">3</a>.
+Мы увидели, что имея некоторый список <tt class="doctest"><span class="pre">mylist</span></tt> слов или других элементов, <tt class="doctest"><span class="pre">FreqDist(mylist)</span></tt> вычислит число вхождений каждого элемента в список.  Здесь мы обобщим эту идею.</p>
+<p>Когда тексты свода делятся на несколько категорий, по жанру, теме, автору, и т.д., мы можем вести отдельные распределения частот для каждой категории.  Это позволит нам изучить систематические различия между категориями.  В предыдущем разделе мы достигли этого, используя тип данных NLTK  <tt class="doctest"><span class="pre">ConditionalFreqDist</span></tt>.  <a name="conditional_frequency_distribution_index_term"></a><span class="termdef">Условное распределение частот</span> представляет собой совокупность распределений частот, каждая для своего "состояния".  Условием часто будет категория текста.  <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-tally2">2.1</a> показывает фрагмент условного распределения частот, имея только два условия - одно для новостных и одно для романтических текстов.</p>
+<span class="target" id="fig-tally2"></span><div class="figure" id="fig-tally2">
+<img alt="../images/tally2.png" src="http://www.nltk.org/images/tally2.png" style="width:412.29999999999995px;height:130.2px">
+<p class="caption"><span class="caption-label">Рисунок 2.1:</span> Подсчет числа слов в коллекции текстов (условное распределение частот)</p>
+</div>
+<div class="section" id="conditions-and-events">
+<h2>2.1 Условия и события</h2>
+<p>Распределение частот считает наблюдаемые события, такие как появление слов в тексте.  Условное распределение частот должно связать каждое событие с условием.
+Таким образом, вместо того, чтобы обрабатывать последовательность слов <a class="reference internal" href="http://www.nltk.org/book/ch02.html#seq-words"><span id="ref-seq-words"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, мы должны обработать последовательность пар <a class="reference internal" href="http://www.nltk.org/book/ch02.html#seq-pairs"><span id="ref-seq-pairs"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a> :</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text = ['The', 'Fulton', 'County', 'Grand', 'Jury', 'said', ...] <a name="seq-words"></a> <a href="http://www.nltk.org/book/ch02.html#ref-seq-words"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></a>
+&gt;&gt;&gt; pairs = [('news', 'The'), ('news', 'Fulton'), ('news', 'County'), ...] <a name="seq-pairs"></a><a href="http://www.nltk.org/book/ch02.html#ref-seq-pairs"><img src="http://www.nltk.org/book/callouts/callout2.gif" alt="[2]" class="callout"></a></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Каждая пара имеет вид <tt class="doctest"><span class="pre">(условие, событие)</span></tt>.  Если бы мы обрабатывали весь Браунский корпус по жанру, то было бы 15 условий (по одному на каждый жанр) и 1.161.192 события (по одному на каждое слово).</p>
+</div>
+<div class="section" id="counting-words-by-genre">
+<h2>2.2 Подсчет числа слов по жанру</h2>
+<p>В <a class="reference internal" href="http://www.nltk.org/book/ch02.html#sec-extracting-text-from-corpora">1</a> мы видели условное распределение частот, в котором условием был раздел Браунского корпуса, и для каждого условия мы считали слова. В то время как <tt class="doctest"><span class="pre">FreqDist()</span></tt> принимает простой список в качестве входных данных, <tt class="doctest"><span class="pre">ConditionalFreqDist()</span></tt> принимает список пар.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...           (genre, word)
+...           for genre in brown.categories()
+...           for word in brown.words(categories=genre))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте разберем это и возьмем только два жанра: новости и романтика.
+Для каждого жанра <a class="reference internal" href="http://www.nltk.org/book/ch02.html#each-genre"><span id="ref-each-genre"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, мы перебираем каждое слово в жанре <a class="reference internal" href="http://www.nltk.org/book/ch02.html#each-word"><span id="ref-each-word"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>, производя пары, состоящие из жанра и слова <a class="reference internal" href="http://www.nltk.org/book/ch02.html#genre-word-pairs"><span id="ref-genre-word-pairs"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; genre_word = [(genre, word) 
+...               for genre in ['news', 'romance'] 
+...               for word in brown.words(categories=genre)] 
+&gt;&gt;&gt; len(genre_word)
+170576</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Итак, как мы можем видеть ниже, пары в начале списка <tt class="doctest"><span class="pre">genre_word</span></tt> будут иметь вид (<tt class="doctest"><span class="pre"><span class="pysrc-string">'news'</span></span></tt>, <em>word</em>) <a class="reference internal" href="http://www.nltk.org/book/ch02.html#start-genre"><span id="ref-start-genre"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, в то время как в конце будут иметь вид (<tt class="doctest"><span class="pre"><span class="pysrc-string">'romance'</span></span></tt>, <em>word</em>) <a class="reference internal" href="http://www.nltk.org/book/ch02.html#end-genre"><span id="ref-end-genre"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; genre_word[:4]
+[('news', 'The'), ('news', 'Fulton'), ('news', 'County'), ('news', 'Grand')] # [_start-genre]
+&gt;&gt;&gt; genre_word[-4:]
+[('romance', 'afraid'), ('romance', 'not'), ('romance', "''"), ('romance', '.')] # [_end-genre]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь мы можем использовать этот список пар, чтобы создать <tt class="doctest"><span class="pre">ConditionalFreqDist</span></tt>, и сохранить его в переменной <tt class="doctest"><span class="pre">cfd</span></tt>.  Как обычно, мы можем ввести имя переменной, чтобы проинспектировать ее <a class="reference internal" href="http://www.nltk.org/book/ch02.html#inspect-cfd"><span id="ref-inspect-cfd"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a> и убедиться, что она имеет два условия <a class="reference internal" href="http://www.nltk.org/book/ch02.html#conditions-cfd"><span id="ref-conditions-cfd"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(genre_word)
+&gt;&gt;&gt; cfd 
+&lt;ConditionalFreqDist with 2 conditions&gt;
+&gt;&gt;&gt; cfd.conditions()
+['news', 'romance'] # [_conditions-cfd]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте обратимся к этим двум условиям и убедимся, что каждое из них - это лишь распределение частот:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(cfd['news'])
+&lt;FreqDist with 14394 samples and 100554 outcomes&gt;
+&gt;&gt;&gt; print(cfd['romance'])
+&lt;FreqDist with 8452 samples and 70022 outcomes&gt;
+&gt;&gt;&gt; cfd['romance'].most_common(20)
+[(',', 3899), ('.', 3736), ('the', 2758), ('and', 1776), ('to', 1502),
+('a', 1335), ('of', 1186), ('``', 1045), ("''", 1044), ('was', 993),
+('I', 951), ('in', 875), ('he', 702), ('had', 692), ('?', 690),
+('her', 651), ('that', 583), ('it', 573), ('his', 559), ('she', 496)]
+&gt;&gt;&gt; cfd['romance']['could']
+193</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="plotting-and-tabulating-distributions">
+<h2>2.3 Графическое и табличное отображение распределений</h2>
+<p>Помимо того, что <tt class="doctest"><span class="pre">ConditionalFreqDist</span></tt> объединяет два и более распределения частоты и легко инициализируется, оно предоставляет также некоторые полезные методы для построения таблиц и графиков.</p>
+<p>График в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-inaugural2">1.1</a> был основан на условном распределении частот воспроизводимом в коде ниже.
+Условием является любое из слов <span class="example">america</span> или <span class="example">citizen</span> <a class="reference internal" href="http://www.nltk.org/book/ch02.html#america-citizen"><span id="ref-america-citizen"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a> , а результаты, которые изображаются на графике, показывают сколько раз данное слово появилось в той или иной речи.
+Здесь используется тот факт, что имя файла для каждой речи, например, <tt class="doctest"><span class="pre">1865-Lincoln.txt</span></tt> содержит год в качестве первых четырех символов <a class="reference internal" href="http://www.nltk.org/book/ch02.html#first-four-chars"><span id="ref-first-four-chars"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.
+Этот код генерирует пару <tt class="doctest"><span class="pre">(<span class="pysrc-string">'america'</span>, <span class="pysrc-string">'1865'</span>)</span></tt> для каждого экземпляра слова, которое в нижнем регистре начинается с <span class="example">america</span>, как, например, <span class="example">Americans</span> в файле <tt class="doctest"><span class="pre">1865-Lincoln.txt</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import inaugural
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...           (target, fileid[:4]) 
+...           for fileid in inaugural.fileids()
+...           for w in inaugural.words(fileid)
+...           for target in ['america', 'citizen'] 
+...           if w.lower().startswith(target))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>График на рисунке <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-word-len-dist">1.2</a> был также основан на условном распределении частот, воспроизводимом ниже.  На этот раз условием является название языка, а результаты, которые изображаются на графике, являются производными от длин слов <a class="reference internal" href="http://www.nltk.org/book/ch02.html#lang-len-word"><span id="ref-lang-len-word"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.
+Здесь используется тот факт, что имя файла для каждого языка представляет собой название языка с последующим <tt class="doctest"><span class="pre"><span class="pysrc-string">'-Latin1'</span></span></tt> (указанием на кодировку символов).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+ 	
+&gt;&gt;&gt; from nltk.corpus import udhr
+&gt;&gt;&gt; languages = ['Chickasaw', 'English', 'German_Deutsch',
+...     'Greenlandic_Inuktikut', 'Hungarian_Magyar', 'Ibibio_Efik']
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...           (lang, len(word)) 
+...           for lang in languages
+...           for word in udhr.words(lang + '-Latin1'))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Для методов <tt class="doctest"><span class="pre">plot()</span></tt> и <tt class="doctest"><span class="pre">tabulate()</span></tt>, мы можем дополнительно указать, какие условия отображать, с помощью параметра <tt class="doctest"><span class="pre">conditions=</span></tt>.
+Когда мы его опускаем, мы получаем все условия.  Точно так же мы можем ограничить образцы для отображения с помощью параметра <tt class="doctest"><span class="pre">samples=</span></tt>.  Это позволяет загрузить большое количество данных в условное распределение частот, а затем изучать его путем построения графиков или таблиц для выбранных условий и образцов.  Это также дает нам полный контроль над порядком условий и образцов в любых отображениях.
+Например, мы можем построить таблицу по данным о накопленной частоте только для двух языков, и для слов длиной менее 10 символов, как показано ниже.
+Последняя ячейка в верхнем ряду показывает, что 1638 слов английского текста имеют 9 или меньше букв.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd.tabulate(conditions=['English', 'German_Deutsch'],
+...              samples=range(10), cumulative=True)
+                  0    1    2    3    4    5    6    7    8    9
+       English    0  185  525  883  997 1166 1283 1440 1558 1638
+German_Deutsch    0  171  263  614  717  894 1013 1110 1213 127</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong>
+Работая с жанрами новости и романтика из Браунского корпуса, выясните, какие дни недели являются наиболее ценными для новостей, а какие являются наиболее романтичными.
+Определите переменную <tt class="doctest"><span class="pre">days</span></tt>, содержащую список дней недели, то есть <tt class="doctest"><span class="pre">[<span class="pysrc-string">'Monday'</span>, ...]</span></tt>.  Теперь представьте в табличной форме результаты для этих слов, используя <tt class="doctest"><span class="pre">cfd.tabulate(samples=days)</span></tt>.  Теперь попробуйте то же самое, используя <tt class="doctest"><span class="pre">plot</span></tt> вместо <tt class="doctest"><span class="pre">tabulate</span></tt>.
+Вы можете контролировать порядок вывода дней с помощью дополнительного параметра: <tt class="doctest"><span class="pre">samples=[<span class="pysrc-string">'Monday'</span>,...]</span></tt>.</p>
+</div>
+<p>Вы можете заметить, что многострочные выражения, которые мы используем с распределениями условных частот, выглядят как списковые включения, но без квадратных скобок.  В общем, когда мы используем списковое включение в качестве параметра функции, как, например, <tt class="doctest"><span class="pre">set([w.lower() <span class="pysrc-keyword">for</span> w  in t])</span></tt>, нам разрешено опускать квадратные скобки и просто писать: <tt class="doctest"><span class="pre">set(w.lower() <span class="pysrc-keyword">for</span> w <span class="pysrc-keyword">in</span> t)</span></tt>.
+(Смотрите обсуждение "Выражения с генераторами" в <a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-sequences">4.2</a>, чтобы узнать больше об этом).</p>
+</div>
+<div class="section" id="generating-random-text-with-bigrams">
+<h2>2.4 Создание случайных текстов с биграммами</h2>
+<p>Мы можем использовать условное распределение частот, чтобы создать таблицу биграммов (пар слов). (Мы представили биграммы в <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-simple-statistics">3</a>.)
+Функция <tt class="doctest"><span class="pre">bigrams()</span></tt> принимает список слов и создает список последовательных пар слов.
+Помните, что для того, чтобы увидеть результат, а не зашифрованный "generator object", мы должны использовать функцию <tt class="doctest"><span class="pre">list()</span></tt>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent = ['In', 'the', 'beginning', 'God', 'created', 'the', 'heaven',
+...   'and', 'the', 'earth', '.']
+&gt;&gt;&gt; sent = ['In', 'the', 'beginning', 'God', 'created', 'the', 'heaven',
+...   'and', 'the', 'earth', '.']
+&gt;&gt;&gt; list(nltk.bigrams(sent))
+[('In', 'the'), ('the', 'beginning'), ('beginning', 'God'), ('God', 'created'),
+('created', 'the'), ('the', 'heaven'), ('heaven', 'and'), ('and', 'the'),
+('the', 'earth'), ('earth', '.')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В <a class="reference internal" href="http://www.nltk.org/book/ch02.html#code-random-text">2.2</a> мы рассматриваем каждое слово как условие, и для каждого из них мы фактически создаем распределение частот по следующим словам.  Функция <tt class="doctest"><span class="pre">generate_model()</span></tt> содержит простой цикл для генерации текста. Когда мы вызываем функцию, мы выбираем слово (например, <tt class="doctest"><span class="pre"><span class="pysrc-string">'living'</span></span></tt>) в качестве нашего исходного контекста, затем, как только мы оказались внутри цикла, мы выводим текущее значение переменной <tt class="doctest"><span class="pre">word</span></tt> и переустанавливаем значение переменной <tt class="doctest"><span class="pre">word</span></tt> так, чтобы в нем хранилось наиболее вероятный токен в этом контексте (с использованием <tt class="doctest"><span class="pre">max()</span></tt>); в следующий раз проходя цикл, мы используем это слово как наш новый контекст.  Как вы можете увидеть, проверив вывод, этот простой подход к созданию текста имеет тенденцию застревать в циклах; другой способ заключается в том, чтобы случайным образом выбрать следующее слово из числа доступных слов.</p>
+<span class="target" id="code-random-text"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def generate_model(cfdist, word, num=15):
+    for i in range(num):
+        print(word, end=' ')
+        word = cfdist[word].max()
+
+text = nltk.corpus.genesis.words('english-kjv.txt')
+bigrams = nltk.bigrams(text)
+cfd = nltk.ConditionalFreqDist(bigrams) <a name="bigram-condition"></a><a href="http://www.nltk.org/book/ch02.html#ref-bigram-condition"><img src="http://www.nltk.org/book/callouts/callout1.gif" alt="[1]" class="callout"></a></pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd['living']
+FreqDist({'creature': 7, 'thing': 4, 'substance': 2, ',': 1, '.': 1, 'soul': 1})
+&gt;&gt;&gt; generate_model(cfd, 'living')
+living creature that he said , and the land of the land of the land</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_random_text.py" type="text/x-python"><span class="caption-label">Пример 2.2 (code_random_text.py)</span></a>: <span class="caption-label">Рисунок 2.2</span>: Создание случайных текстов: эта программа получает все биграммы из текста книги Бытия, затем создает условное распределение частот для записи того, какие слова с наибольшей вероятностью следоуют за данным словлм; например, после слова <span class="example">living</span> наиболее вероятно слово <span class="example">creature</span>; функция <tt class="doctest"><span class="pre">generate_model()</span></tt> использует эти данные и порождающее слово, чтобы создать случайный текст.</p></td></tr>
+</table></div>
+<p>Условные распределения частоты являются полезной структурой данных для решения многих задач NLP.
+Их часто используемые методы собраны в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#tab-conditionalfreqdist">2.1</a>.</p>
+<span class="target" id="tab-conditionalfreqdist"></span><table border="1" class="docutils" id="tab-conditionalfreqdist">
+<colgroup>
+<col width="36%">
+<col width="64%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Пример</th>
+<th class="head">Описание</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">cfdist = ConditionalFreqDist(pairs)</span></tt></td>
+<td>Создание условного распределения частот из списка пар</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist.conditions()</span></tt></td>
+<td>условия</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist[condition]</span></tt></td>
+<td>распределение частот для этого условия</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist[condition][sample]</span></tt></td>
+<td>частота для данного образца для этого условия</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist.tabulate()</span></tt></td>
+<td>Построение таблицы для данного условного распределения частот</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist.tabulate(samples, conditions)</span></tt></td>
+<td>Построение таблицы ограничивается указанными образцами и условиями</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist.plot()</span></tt></td>
+<td>Графическая зависимость условного распределения частот</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist.plot(samples, conditions)</span></tt></td>
+<td>Графическая зависимость ограничена указанными образцами и условиями</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">cfdist1 &lt; cfdist2</span></tt></td>
+<td>Проверка: появляются ли samples в <tt class="doctest"><span class="pre">cfdist1</span></tt> реже, чем в <tt class="doctest"><span class="pre">cfdist2</span></tt></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 2.1:</span> <p>Условные распределения частот NLTK: часто используемые методы и идиомы для определения, доступа и визуализации условного распределения частоты счетчиков.</p>
+</p>
+</td></table>
+</div>
+</div>
+<div class="section" id="more-python-reusing-code">
+<span id="sec-reusing-code"></span><h1>3 Еще Python: повторное использование кода</h1>
+<p>К этому времени вы, вероятно, набрали и перепечатали много кода в интерактивном интерпретаторе Python.  Если вы запутались, когда перепечатывали сложный пример, вы должны ввести его снова.  Использование клавиш со стрелками, чтобы получить и изменить предыдущие команды, помогает только до определенной степени.  В этом разделе мы увидим два важных способа повторного использования кода: текстовые редакторы и функции Python.</p>
+<div class="section" id="creating-programs-with-a-text-editor">
+<h2>3.1 Создание программ с помощью текстового редактора</h2>
+<p>Интерактивный интерпретатор Python выполняет ваши инструкции, как только вы их набираете.  Часто лучше составить многострочную программу с помощью текстового редактора, а затем попросить Python запустить всю программу сразу.  Используя IDLE, вы можете сделать это, перейдя в меню <tt class="doctest"><span class="pre">Файл</span></tt> и открыв новое окно.  Попробуйте это сделать сейчас и введите следующую программу, состоящую из одной строки:</p>
+<pre class="literal-block">
+print('Monty Python')
+</pre>
+<p>Сохраните эту программу в файле с именем <tt class="doctest"><span class="pre">monty.py</span></tt>, а затем перейдите в меню <tt class="doctest"><span class="pre">Run</span></tt> и выберите команду <tt class="doctest"><span class="pre">Run Module</span></tt>.
+(Мы узнаем, что такое модули в ближайшее время.)
+Результате в главном окне IDLE должен выглядеть следующим образом:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; ================================ RESTART ================================
+&gt;&gt;&gt;
+Monty Python
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Можно также набрать <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> monty <span class="pysrc-keyword">import</span> *</span></tt> и он сделает то же самое.</p>
+<p>С этого момента у вас есть выбор использовать интерактивный интерпретатор или текстовый редактор для создания программ.  Часто бывает удобно проверить свои идеи с помощью интерпретатора, пересматривая строки кода, пока он не будет делать то, что вы ожидаете.
+После того, как вы будете готовы, вы можете вставить код (за минусом всех <tt class="doctest"><span class="pre"><span class="pysrc-prompt">&gt;&gt;&gt;</span></span></tt> или <tt class="doctest"><span class="pre"><span class="pysrc-more">...</span></span></tt> подсказок) в текстовый редактор, продолжить расширять его и, наконец, сохранить программу в файле, чтобы вам не пришлось вводить ее снова позже.
+Дайте файлу краткое, но содержательное имя, используя все строчные буквы и разделяя слова подчеркиванием, в качестве расширения имени файла используйте <tt class="doctest"><span class="pre">.py</span></tt>, например, <tt class="doctest"><span class="pre">monty_python.py</span></tt>.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Важно:</strong> 
+Наши примеры кода включают в себя <tt class="doctest"><span class="pre"><span class="pysrc-more">...</span></span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-prompt">&gt;&gt;&gt;</span></span></tt> подсказки, как если бы мы взаимодействовали непосредственно с интерпретатором.  Поскольку они становятся более сложными, вы должны вместо этого вводить их в редакторе, без подсказок и запускать их из редактора, как показано выше.  Когда мы будем приводить более длинные программы в этой книге, мы оставим подсказки, чтобы напомнить вам, что их необходимо набирать в файл, а не в интерпретаторе.  Вы можете увидеть это уже в листинге <a class="reference internal" href="http://www.nltk.org/book/ch02.html#code-random-text">2,2</a> выше.
+Обратите внимание, что он по-прежнему включает в себя пару строк с приглашением Python; это интерактивная часть задачи, где вы проверяете некоторые данные и вызываете функцию.
+Помните, что все примеры кода, как, например, <a class="reference internal" href="http://www.nltk.org/book/ch02.html#code-random-text">2.2</a>, можно загрузить с <tt class="doctest"><span class="pre">http://nltk.org/</span></tt>.</p>
+</div>
+</div>
+<div class="section" id="functions">
+<h2>3.2 Функции</h2>
+<p>Предположим, что вы работаете над анализом текста, который включает в себя различные формы одного и того же слова, и что часть вашей программы должна найти форму множественного числа для данного существительного единственного числа.  Предположим, что он должен выполнить эту работу в двух местах, один раз, когда он обрабатывает некоторые тексты, и другой раз, когда он обрабатывает пользовательский ввод.</p>
+<p>Вместо того, чтобы повторять один и тот же код несколько раз, более эффективно и надежно локализовать эту работу внутри <a name="function_index_term"></a><span class="termdef">функции</span>.
+Функция - это просто именованный блок кода, который выполняет некоторую вполне определенную задачу, как мы видели в <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a>.
+Функция обычно определяется, чтобы принимать некоторые входы, используя специальные переменные, известные как <a name="parameters_index_term"></a><span class="termdef">параметры</span>, и может производить результат, также известный как <a name="return_value_index_term"></a><span class="termdef">возвратное значение</span>.
+Мы определяем функцию с помощью ключевого слова <tt class="doctest"><span class="pre">def</span></tt>, за которым следует имя функции и любые входные параметры, за которыми следует тело функции.  Вот функция, которую мы видели в <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a> (включая <tt class="doctest"><span class="pre"><span class="pysrc-keyword">import</span></span></tt> предложение, которое необходимо для Python 2 для того, чтобы деление вело себя, как ожидается):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from __future__ import division
+&gt;&gt;&gt; def lexical_diversity(text):
+...     return len(text) / len(set(text))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы используем ключевое слово <tt class="doctest"><span class="pre">return</span></tt>, чтобы указать значение, которое выводится в качестве результат выполнения функции.  В приведенном выше примере, вся работа функции осуществляется в предложении <tt class="doctest"><span class="pre">return</span></tt>.
+Вот эквивалентное определение, которое выполняет ту же работу, используя несколько строк кода.  Мы поменяем имя параметра с <tt class="doctest"><span class="pre">text</span></tt>  на <tt class="doctest"><span class="pre">my_text_data</span></tt>, чтобы напомнить вам, что это произвольный выбор:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def lexical_diversity(my_text_data):
+...     word_count = len(my_text_data)
+...     vocab_size = len(set(my_text_data))
+...     diversity_score = vocab_size / word_count
+...     return diversity_score</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание на то, что мы создали некоторые новые переменные внутри тела функции.
+Это <a name="local_variables_index_term"></a> <span class="termdef">локальные переменные</span>, и они не доступны за пределами функции.
+Итак, мы определили функцию с именем <tt class="doctest"><span class="pre">lexical_diversity</span></tt>. Но само определение не произведет никакого результата!
+Функции ничего не делают, пока они не "вызываются":</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import genesis
+&gt;&gt;&gt; kjv = genesis.words('english-kjv.txt')
+&gt;&gt;&gt; lexical_diversity(kjv)
+0.06230453042623537</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте вернемся к нашему предыдущему сценарию и на самом деле определим простую функцию, которая должна находить английское множественное число.  Функция <tt class="doctest"><span class="pre">plural()</span></tt> в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#code-plural">3.1</a> принимает существительное в единственном числе и генерирует форму множественного числа, хотя она не всегда корректна.  (Мы обсудим функции более подробно в <a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-functions">4.4</a>.)</p>
+<span class="target" id="code-plural"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def plural(word):
+    if word.endswith('y'):
+        return word[:-1] + 'ies'
+    elif word[-1] in 'sx' or word[-2:] in ['sh', 'ch']:
+        return word + 'es'
+    elif word.endswith('an'):
+        return word[:-2] + 'en'
+    else:
+        return word + 's'</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; plural('fairy')
+'fairies'
+&gt;&gt;&gt; plural('woman')
+'women'</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_plural.py" type="text/x-python"><span class="caption-label">Пример 3.1 (code_plural.py)</span></a>: <span class="caption-label">Рисунок 3.1</span>: Функция Python: эта функция пытается найти форму множественного числа любого английского существительного; за ключевым словом <tt class="doctest"><span class="pre">def</span></tt> (определением) следует имя функции, затем параметр внутри скобок и двоеточие; тело функции - это блок кода с отступом; он пытается распознавать паттерны в слове и обработать слово соответствующим образом; например, если слово оканчивается на <span class="example">y</span>, удалить <span class="example">y</span> и добавить <span class="example">ies</span>.</p></td></tr>
+</table></div>
+<p>Функция <tt class="doctest"><span class="pre">endswith()</span></tt> всегда связана со строковым объектом (например, <tt class="doctest"><span class="pre">word</span></tt> в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#code-plural">3.1</a>).  Для того, чтобы вызвать такую функцию, мы набираем имя объекта, точку, а затем имя функции.
+Эти функции, как правило, известны как <a name="methods_index_term"></a> <span class="termdef">методы</span>.</p>
+</div>
+<div class="section" id="modules">
+<h2>3.3 Модули</h2>
+<p>Со временем вы обнаружите, что вы создаете множество полезных маленьких функций обработки текста, и в результате вы копируете их из старых программ в новые.  Какой файл содержит последнюю версию функции, которую вы хотите использовать?
+Жизнь становится намного проще, если вы можете собрать вашу работу в одном месте и обращаться к ранее определенным функциям без создания копий.</p>
+<p>Чтобы сделать это, сохраните свою функцию(и) в файле с именем (скажем) <tt class="doctest"><span class="pre">text_proc.py</span></tt>.
+Теперь вы можете получить доступ к вашей функции, просто импортировав ее из файла:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from text_proc import plural
+&gt;&gt;&gt; plural('wish')
+wishes
+&gt;&gt;&gt; plural('fan')
+fen</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Наша функция множественного числа, очевидно, содержит ошибку, так как множественное число от <span class="example">fan</span> будет <span class="example">fans</span>.
+Вместо того, чтобы набирать новую версию функции, мы можем просто отредактировать существующую.  Таким образом, на каждом этапе, есть только одна версия нашей функции множественного числа и никакой путаницы по поводу того, какая версия используется.</p>
+<p>Совокупность переменных и определений функций в файле называется <a name="module_index_term"></a> <span class="termdef">модулем</span> Python.  Набор связанных модулей называется <a name="package_index_term"></a> <span class="termdef">пакет</span>.
+Код NLTK для обработки Браунского корпуса представляет собой пример модуля, а коллекция кода для обработки всех различных корпусы является примером пакета.  Сам NLTK представляет собой набор пакетов, который иногда называют <a name="library_index_term"></a> <span class="termdef">библиотекой</span>.</p>
+<div class="caution">
+<p class="first admonition-title">Внимание!</p>
+<p class="last">Если вы создаете файл для хранения некоторого вашего кода Python, <em>не</em> называйте ваш файл <tt class="doctest"><span class="pre">nltk.py</span></tt>: он может импортироваться вместо "настоящего" NLTK пакета.  Когда Python импортирует модули, он сначала ищет в текущей директории (папке).</p>
+</div>
+</div>
+</div>
+<div class="section" id="lexical-resources">
+<span id="sec-lexical-resources"></span><h1>4 Лексические ресурсы</h1>
+<p>Лексикон, или лексический ресурс, представляет собой набор слов и/или словосочетаний вместе с сопутствующей информацией, такой как часть речи и определение значения.
+Лексические ресурсы являются вторичными по отношению к текстам, и, как правило, создаются и обогащается с помощью текстов.  Например, если мы определили текст <tt class="doctest"><span class="pre">my_text</span></tt>, тогда <tt class="doctest"><span class="pre">vocab =  sorted(set(my_text))</span></tt> строит словарь для <tt class="doctest"><span class="pre">my_text</span></tt>, а <tt class="doctest"><span class="pre">word_freq = FreqDist(my_text)</span></tt> подсчитывает частоту каждого слова в тексте.  Оба <tt class="doctest"><span class="pre">Vocab</span></tt> и <tt class="doctest"><span class="pre">word_freq</span></tt> простые лексические ресурсы.  Точно так же, конкорданс, как тот, который мы видели в <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a> дает нам информацию об использовании слова, которая могла бы помочь в подготовке словаря.  Стандартная терминология для лексиконов проиллюстрирована на <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-lexicon">4.1</a>.
+<a name="lexical_entry_index_term"></a> <span class="termdef">Лексическая запись</span> состоит из <a name="headword_index_term"></a> <span class="termdef">головного слова</span> (также известного как <a name="lemma_index_term"></a> <span class="termdef">лемма</span>) вместе с дополнительной информацией, такой как часть речи и определение смысла.  Два различных слова, имеющие одинаковое написание, называются <a name="homonyms_index_term"></a> <span class="termdef">омонимы</span>.</p>
+<span class="target" id="fig-lexicon"></span><div class="figure" id="fig-lexicon">
+<img alt="../images/lexicon.png" src="http://www.nltk.org/images/lexicon.png" style="width:504.0px;height:223.20000000000002px">
+<p class="caption"><span class="caption-label">Рисунок 4.1:</span> Терминология лексикона: лексические записи для двух лемм, имеющих одинаковое написание (омонимы), предоставляющие информацию о части речи и толкование.</p>
+</div>
+<p>Самый простой вид лексикон является не более, чем отсортированный список слов.
+Сложные лексиконы включают сложную структуру внутри и между отдельными записями.  В этом разделе мы рассмотрим некоторые лексические ресурсы, включенные в NLTK.</p>
+<div class="section" id="wordlist-corpora">
+<h2>4.1 Корпусы списков слов</h2>
+<!-- XXX There&#39;s a useful opportunity here to link back to the discussion of what words
+characterize a text found in ch01. -->
+<p>NLTK включает в себя некоторые корпусы, которые являются не более чем списками слов.
+Корпус слов является <tt class="doctest"><span class="pre">/usr/share/dict/words</span></tt> файлом из Unix, используемым некоторыми программами проверки орфографии.  Мы можем использовать его, чтобы найти необычные или неправильно написанные слова в текстовом корпусе, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#code-unusual">4.2</a>.</p>
+<span class="target" id="code-unusual"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def unusual_words(text):
+    text_vocab = set(w.lower() for w in text if w.isalpha())
+    english_vocab = set(w.lower() for w in nltk.corpus.words.words())
+    unusual = text_vocab - english_vocab
+    return sorted(unusual)
+
+&gt;&gt;&gt; unusual_words(nltk.corpus.gutenberg.words('austen-sense.txt'))
+['abbeyland', 'abhorred', 'abilities', 'abounded', 'abridgement', 'abused', 'abuses',
+'accents', 'accepting', 'accommodations', 'accompanied', 'accounted', 'accounts',
+'accustomary', 'aches', 'acknowledging', 'acknowledgment', 'acknowledgments', ...]
+&gt;&gt;&gt; unusual_words(nltk.corpus.nps_chat.words())
+['aaaaaaaaaaaaaaaaa', 'aaahhhh', 'abortions', 'abou', 'abourted', 'abs', 'ack',
+'acros', 'actualy', 'adams', 'adds', 'adduser', 'adjusts', 'adoted', 'adreniline',
+'ads', 'adults', 'afe', 'affairs', 'affari', 'affects', 'afk', 'agaibn', 'ages', ...]</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_unusual.py" type="text/x-python"><span class="caption-label">Пример 4.2 (code_unusual.py)</span></a> : <span class="caption-label">Рисунок 4.2:</span> Фильтрация текста: эта программа составляет словарь текста, затем удаляет все элементы, которые имеются в существующем словаре, оставляя только необычные или неправильно написанные слова.</p></td></tr>
+</table></div>
+<p>Существует также корпус <a name="stopwords_index_term"></a> <span class="termdef">игнорируемых слов</span>, то есть список высокочастотных слов, таких как <span class="example">the</span>, <span class="example">to</span> и <span class="example">also</span>, которые мы иногда хотим убрать из документа перед дальнейшей обработкой. Игнорируемые слова обычно имеют небольшое лексическое содержание, и их присутствие в тексте не в состоянии отличить его от других текстов.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import stopwords
+&gt;&gt;&gt; stopwords.words('english')
+['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
+'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers',
+'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
+'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are',
+'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does',
+'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until',
+'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into',
+'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down',
+'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here',
+'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
+'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте определим функцию, чтобы вычислять, какая часть слов в тексте <em>не</em> в списке игнорируемых слов:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def content_fraction(text):
+...     stopwords = nltk.corpus.stopwords.words('english')
+...     content = [w for w in text if w.lower() not in stopwords]
+...     return len(content) / len(text)
+...
+&gt;&gt;&gt; content_fraction(nltk.corpus.reuters.words())
+0.7364374824583169</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Таким образом, с помощью игнорируемых слов мы убрали более четверти слов из текста.
+Обратите внимание, что мы объединили два различных вида корпуса здесь, используя лексический ресурс для фильтрации содержимого текстового корпуса.</p>
+<span class="target" id="fig-target"></span><div class="figure" id="fig-target">
+<img alt="../images/target.png" src="http://www.nltk.org/images/target.png" style="width:652.5px;height:133.79999999999998px">
+<p class="caption"><span class="caption-label">Рисунок 4.3:</span> Словарная головоломка: сетка из случайно выбранных букв с правилами для создания слова из букв; эта головоломка известна как "Target".</p>
+</div>
+<p>Список слов полезен для решения словарных головоломок, таких, как головоломка на рисунке <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-target">4.3</a>.
+Наша программа перебирает каждое слово и для каждого из них проверяет, удовлетворяет ли оно условиям.  Легко проверить обязательную букву <a class="reference internal" href="http://www.nltk.org/book/ch02.html#obligatory-letter"><span id="ref-obligatory-letter"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a> и ограничения длины <a class="reference internal" href="http://www.nltk.org/book/ch02.html#length-constraint"><span id="ref-length-constraint"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a> (и мы будем искать только слова с шестью или более буквами здесь).
+Сложнее проверить, что кандидаты используют только сочетания предложенных букв, тем более, что некоторые из предложенных букв появляется дважды (здесь буква <span class="example">v</span>).
+Метод сравнения <tt class="doctest"><span class="pre">FreqDist</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch02.html#freqdist-compare"><span id="ref-freqdist-compare"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a> позволяет проверить , что частота каждой <em>буквы</em> слова кандидата меньше или равна частоте соответствующей буквы в головоломке.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; puzzle_letters = nltk.FreqDist('egivrvonl')
+&gt;&gt;&gt; obligatory = 'r'
+&gt;&gt;&gt; wordlist = nltk.corpus.words.words()
+&gt;&gt;&gt; [w for w in wordlist if len(w) &gt;= 6 
+...                      and obligatory in w 
+...                      and nltk.FreqDist(w) &lt;= puzzle_letters] 
+['glover', 'gorlin', 'govern', 'grovel', 'ignore', 'involver', 'lienor',
+'linger', 'longer', 'lovering', 'noiler', 'overling', 'region', 'renvoi',
+'revolving', 'ringle', 'roving', 'violer', 'virole']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Еще один словарный корпус - это Корпус имен, содержащий 8.000 имен, разделенных по признаку пола.
+Мужские и женские имена хранятся в отдельных файлах.  Давайте найдем имена, которые появляются в обоих файлах, то есть имена, которые неоднозначны с точки зрения пола:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; names = nltk.corpus.names
+&gt;&gt;&gt; names.fileids()
+['female.txt', 'male.txt']
+&gt;&gt;&gt; male_names = names.words('male.txt')
+&gt;&gt;&gt; female_names = names.words('female.txt')
+&gt;&gt;&gt; [w for w in male_names if w in female_names]
+['Abbey', 'Abbie', 'Abby', 'Addie', 'Adrian', 'Adrien', 'Ajay', 'Alex', 'Alexis',
+'Alfie', 'Ali', 'Alix', 'Allie', 'Allyn', 'Andie', 'Andrea', 'Andy', 'Angel',
+'Angie', 'Ariel', 'Ashley', 'Aubrey', 'Augustine', 'Austin', 'Averil', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Хорошо известно, что имена, заканчивающиеся на буквы <span class="example">а</span> почти всегда женщины.
+Мы можем видеть этот и некоторые другие паттерны на графике <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-cfd-gender">4.4</a>, который производится следующим кодом.  Запомните, что <tt class="doctest"><span class="pre">name[-1]</span></tt> - это последняя буква <tt class="doctest"><span class="pre">name</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...           (fileid, name[-1])
+...           for fileid in names.fileids()
+...           for name in names.words(fileid))
+&gt;&gt;&gt; cfd.plot()</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<span class="target" id="fig-cfd-gender"></span><div class="figure" id="fig-cfd-gender">
+<img alt="../images/cfd-gender.png" src="http://www.nltk.org/images/cfd-gender.png" style="width:613.0px;height:463.0px">
+<p class="caption"><span class="caption-label">Рисунок 4.4:</span> условное распределение частот: эта зависимость показывает количество женских и мужских имен, оканчивающихся на каждую букву алфавита; большинство имен, оканчивающихся на <span class="example">a</span>, <span class="example">e</span> или <span class="example">i</span> женские; имена, заканчивающиеся на <span class="example">h</span> и <span class="example">l</span> с одинаковой вероятностью могут быть мужскими или женскими; имена, оканчивающиеся на <span class="example">k</span>, <span class="example">o</span>, <span class="example">r</span>, <span class="example">s</span> и <span class="example">t</span> чаще всего мужские.</p>
+</div>
+</div>
+<div class="section" id="a-pronouncing-dictionary">
+<h2>4.2 Словарь произношения</h2>
+<p>Немного более богатым видом лексического ресурса является таблица, содержащая слово плюс некоторые свойства в каждой строке.  NLTK включает CMU Pronouncing Dictionary для американского английского, который был разработан для использования синтезаторами речи.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; entries = nltk.corpus.cmudict.entries()
+&gt;&gt;&gt; len(entries)
+133737
+&gt;&gt;&gt; for entry in entries[42371:42379]:
+...     print(entry)
+...
+('fir', ['F', 'ER1'])
+('fire', ['F', 'AY1', 'ER0'])
+('fire', ['F', 'AY1', 'R'])
+('firearm', ['F', 'AY1', 'ER0', 'AA2', 'R', 'M'])
+('firearm', ['F', 'AY1', 'R', 'AA2', 'R', 'M'])
+('firearms', ['F', 'AY1', 'ER0', 'AA2', 'R', 'M', 'Z'])
+('firearms', ['F', 'AY1', 'R', 'AA2', 'R', 'M', 'Z'])
+('fireball', ['F', 'AY1', 'ER0', 'B', 'AO2', 'L'])</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Для каждого слова, этот лексикон предоставляет список фонетических кодов - отличительные метки для каждого сопоставительного звука - известных как <span class="example">фоны</span>.  Заметим , что <span class="example">fire</span> имеет два произношения (в американском английском): односложное <tt class="doctest"><span class="pre">F AY1 R</span></tt> и двусложное <tt class="doctest"><span class="pre">F AY1 ER0</span></tt>.
+Символы в CMU Pronouncing Dictionary заимствованы из <em>Arpabet</em>, который более подробно описан на странице <tt class="doctest"><span class="pre">http://en.wikipedia.org/wiki/Arpabet</span></tt></p>
+<!-- XXX Hmm - - would it be better to first explain tuple assignment outside the
+context of a for loop?  (not sure how to fix this; can&#39;t use the word "tuple" yet) -->
+<p>Каждая запись состоит из двух частей, и мы можем обработать их по отдельности, используя более сложный вариант предложения <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt>.
+Вместо того, чтобы писать <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span> entry <span class="pysrc-keyword">in</span> entries</span></tt>: мы заменим <tt class="doctest"><span class="pre">entry</span></tt> <em>двумя</em> переменными: <tt class="doctest"><span class="pre">word, pron</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch02.html#word-pron"><span id="ref-word-pron"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.
+Теперь, каждый раз проходя цикл, переменной <tt class="doctest"><span class="pre">word</span></tt> присваивается первая часть записи, а <tt class="doctest"><span class="pre">pron</span></tt> присваивается вторая часть записи:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for word, pron in entries: 
+...     if len(pron) == 3: 
+...         ph1, ph2, ph3 = pron 
+...         if ph1 == 'P' and ph3 == 'T':
+...             print(word, ph2, end=' ')
+...
+pait EY1 pat AE1 pate EY1 patt AE1 peart ER1 peat IY1 peet IY1 peete IY1 pert ER1
+pet EH1 pete IY1 pett EH1 piet IY1 piette IY1 pit IH1 pitt IH1 pot AA1 pote OW1
+pott AA1 pout AW1 puett UW1 purt ER1 put UH1 putt AH1</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Вышеприведенная программа сканирует лексикон, ища записи, в которых произношение состоит из трех фон<a class="reference internal" href="http://www.nltk.org/book/ch02.html#len-pron-three"><span id="ref-len-pron-three"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.  Если условие истинно, она присваивает содержимые <tt class="doctest"><span class="pre">pron</span></tt> трем новым переменным <tt class="doctest"><span class="pre">ph1</span></tt>, <tt class="doctest"><span class="pre">ph2</span></tt> и <tt class="doctest"><span class="pre">ph3</span></tt>.  Обратите внимание на необычную форму предложения, которая делает эту работу <a class="reference internal" href="http://www.nltk.org/book/ch02.html#tuple-assignment"><span id="ref-tuple-assignment"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a> .</p>
+<p>Вот еще один пример того же <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt> предложения, на этот раз использованного внутри спискового включения.  Эта программа находит все слова, у которых произношение заканчивается на слог, который звучит как <span class="example">nicks</span>.  Вы можете использовать этот метод, чтобы найти рифмующиеся слова.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; syllable = ['N', 'IH0', 'K', 'S']
+&gt;&gt;&gt; [word for word, pron in entries if pron[-4:] == syllable]
+["atlantic's", 'audiotronics', 'avionics', 'beatniks', 'calisthenics', 'centronics',
+'chamonix', 'chetniks', "clinic's", 'clinics', 'conics', 'conics', 'cryogenics',
+'cynics', 'diasonics', "dominic's", 'ebonics', 'electronics', "electronics'", ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание на то, что одно произношение пишется несколькими способами: <span class="example">nics</span>, <span class="example">niks</span>, <span class="example">nix</span>, даже <span class="example">ntic's</span> с непроизносимой <span class="example">t</span> для слова <span class="example">atlantic's</span>.  Давайте посмотрим на некоторые другие несоответствия между произношением и написанием.  Вы можете суммировать цель следующих примеров и объяснить, как они работают?</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; [w for w, pron in entries if pron[-1] == 'M' and w[-1] == 'n']
+['autumn', 'column', 'condemn', 'damn', 'goddamn', 'hymn', 'solemn']
+&gt;&gt;&gt; sorted(set(w[:2] for w, pron in entries if pron[0] == 'N' and w[0] != 'n'))
+['gn', 'kn', 'mn', 'pn']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Фоны содержат цифры, чтобы показать основное ударение<tt class="doctest"><span class="pre">(1)</span></tt>, второстепенное ударение <tt class="doctest"><span class="pre">(2)</span></tt> и никакого ударения <tt class="doctest"><span class="pre">(0)</span></tt>.
+В нашем последнем примере мы определяем функцию для извлечения цифр, характеризующих ударение, а затем сканируем наш лексикон, чтобы найти слова, имеющие определенный паттерн ударений.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def stress(pron):
+...     return [char for phone in pron for char in phone if char.isdigit()]
+&gt;&gt;&gt; [w for w, pron in entries if stress(pron) == ['0', '1', '0', '2', '0']]
+['abbreviated', 'abbreviated', 'abbreviating', 'accelerated', 'accelerating',
+'accelerator', 'accelerators', 'accentuated', 'accentuating', 'accommodated',
+'accommodating', 'accommodative', 'accumulated', 'accumulating', 'accumulative', ...]
+&gt;&gt;&gt; [w for w, pron in entries if stress(pron) == ['0', '2', '0', '1', '0']]
+['abbreviation', 'abbreviations', 'abomination', 'abortifacient', 'abortifacients',
+'academicians', 'accommodation', 'accommodations', 'accreditation', 'accreditations',
+'accumulation', 'accumulations', 'acetylcholine', 'acetylcholine', 'adjudication', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Нюансом вышеуказанной программы является то, что наша определенная пользователем функция <tt class="doctest"><span class="pre">stress()</span></tt> вызывается внутри условия спискового включения.  Существует также дважды вложенный цикл <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt>.
+Здесь много чего происходит, и вы, возможно, захотите вернуться к этому, когда у вас будет больше опыта в использовании списковых включений.</p>
+</div>
+<p>Мы можем использовать условное распределение частот, чтобы найти минимально-контрастные наборы слов.  Здесь мы находим все <span class="example">p</span>-слова, состоящие из трех звуков <a class="reference internal" href="http://www.nltk.org/book/ch02.html#p3-words"><span id="ref-p3-words"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, и группируем их в соответствии с их первым и последним звуком <a class="reference internal" href="http://www.nltk.org/book/ch02.html#group-first-last"><span id="ref-group-first-last"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; p3 = [(pron[0]+'-'+pron[2], word) 
+...       for (word, pron) in entries
+...       if pron[0] == 'P' and len(pron) == 3] 
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(p3)
+&gt;&gt;&gt; for template in sorted(cfd.conditions()):
+...     if len(cfd[template]) &gt; 10:
+...         words = sorted(cfd[template])
+...         wordstring = ' '.join(words)
+...         print(template, wordstring[:70] + "...")
+...
+<span class="pysrc-output">P-CH patch pautsch peach perch petsch petsche piche piech pietsch pitch pit...</span>
+<span class="pysrc-output">P-K pac pack paek paik pak pake paque peak peake pech peck peek perc perk ...</span>
+<span class="pysrc-output">P-L pahl pail paille pal pale pall paul paule paull peal peale pearl pearl...</span>
+<span class="pysrc-output">P-N paign pain paine pan pane pawn payne peine pen penh penn pin pine pinn...</span>
+<span class="pysrc-output">P-P paap paape pap pape papp paup peep pep pip pipe pipp poop pop pope pop...</span>
+<span class="pysrc-output">P-R paar pair par pare parr pear peer pier poor poore por pore porr pour...</span>
+<span class="pysrc-output">P-S pace pass pasts peace pearse pease perce pers perse pesce piece piss p...</span>
+<span class="pysrc-output">P-T pait pat pate patt peart peat peet peete pert pet pete pett piet piett...</span>
+<span class="pysrc-output">P-UW1 peru peugh pew plew plue prew pru prue prugh pshew pugh...</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Вместо того, чтобы перебирает весь словарь, мы можем также получить доступ к нему, ища конкретные слова.  Мы будем использовать словарь как структуру данных языка Python, который мы изучим систематически в <a class="reference external" href="http://www.nltk.org/book/ch05.html#sec-dictionaries">3</a>.
+Мы делаем выборку из словаря, вводя его имя, за которым следует <a name="key_index_term"></a><span class="termdef">ключ</span> (например, слово <tt class="doctest"><span class="pre"><span class="pysrc-string">'fire'</span></span></tt>) внутри квадратных скобок <a class="reference internal" href="http://www.nltk.org/book/ch02.html#dict-key"><span id="ref-dict-key"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; prondict = nltk.corpus.cmudict.dict()
+&gt;&gt;&gt; prondict['fire'] 
+[['F', 'AY1', 'ER0'], ['F', 'AY1', 'R']]
+&gt;&gt;&gt; prondict['blog'] 
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+KeyError: 'blog'
+&gt;&gt;&gt; prondict['blog'] = [['B', 'L', 'AA1', 'G']] 
+&gt;&gt;&gt; prondict['blog']
+[['B', 'L', 'AA1', 'G']]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Если мы попытаемся посмотреть несуществующий ключ <a class="reference internal" href="http://www.nltk.org/book/ch02.html#dict-key-error"><span id="ref-dict-key-error"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, мы получим <tt class="doctest"><span class="pre">KeyError</span></tt>.
+Это похоже на то, что происходит, когда мы делаем выборку из списка по слишком большому индексу, производя <tt class="doctest"><span class="pre">IndexError</span></tt>.
+Слово <span class="example">blog</span> отсутствует в словаре произношения, поэтому мы подправим нашу версию путем присвоения значения для данного ключа <a class="reference internal" href="http://www.nltk.org/book/ch02.html#dict-assign"><span id="ref-dict-assign"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a> (это не имеет никакого влияния на корпус NLTK; в следующий раз, когда мы к нему обратимся, <span class="example">blog</span> опять будет отсутствовать).</p>
+<p>Мы можем использовать любой лексический ресурс для обработки текста, например, чтобы отфильтровать слова, имеющие некоторое лексическое свойство (например, существительные), или найти соответствие для каждого слова текста.
+Например, следующая функция преобразования текста в речь ищет каждое слово текста в словаре произношения.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text = ['natural', 'language', 'processing']
+&gt;&gt;&gt; [ph for w in text for ph in prondict[w][0]]
+['N', 'AE1', 'CH', 'ER0', 'AH0', 'L', 'L', 'AE1', 'NG', 'G', 'W', 'AH0', 'JH',
+'P', 'R', 'AA1', 'S', 'EH0', 'S', 'IH0', 'NG']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- [Summary of tabular lexicons; forward reference to discussion about processing CSV files] -->
+</div>
+<div class="section" id="comparative-wordlists">
+<h2>4.3 Сравнительные списки слов</h2>
+<p>Другим примером табличного лексикона является <a name="comparative_wordlist_index_term"></a><span class="termdef">сравнительный словник</span>.
+NLTK включает в себя так называемые <a name="swadesh_wordlists_index_term"></a> <span class="termdef">Списки слов Swadesh</span> - списки около 200 общих слов на нескольких языках.  Языки идентифицированы с помощью двухбуквенного кода ISO 639.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import swadesh
+&gt;&gt;&gt; swadesh.fileids()
+['be', 'bg', 'bs', 'ca', 'cs', 'cu', 'de', 'en', 'es', 'fr', 'hr', 'it', 'la', 'mk',
+'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sr', 'sw', 'uk']
+&gt;&gt;&gt; swadesh.words('en')
+['I', 'you (singular), thou', 'he', 'we', 'you (plural)', 'they', 'this', 'that',
+'here', 'there', 'who', 'what', 'where', 'when', 'how', 'not', 'all', 'many', 'some',
+'few', 'other', 'one', 'two', 'three', 'four', 'five', 'big', 'long', 'wide', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем получить доступ к эквивалентам слова на разных языках с помощью метода <tt class="doctest"><span class="pre">entries()</span></tt>, указывая список языков.  Сделав еще один шаг мы можем преобразовать это в простой словарь (мы узнаем о функции <tt class="doctest"><span class="pre">dict()</span></tt> в <a class="reference external" href="http://www.nltk.org/book/ch05.html#sec-dictionaries">3</a>).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fr2en = swadesh.entries(['fr', 'en'])
+&gt;&gt;&gt; fr2en
+[('je', 'I'), ('tu, vous', 'you (singular), thou'), ('il', 'he'), ...]
+&gt;&gt;&gt; translate = dict(fr2en)
+&gt;&gt;&gt; translate['chien']
+'dog'
+&gt;&gt;&gt; translate['jeter']
+'throw'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем сделать наш простой переводчик более полезным путем добавления других языков источников.
+Давайте возьмем немецко-английские и испанско-английские пары, конвертируем каждую в словарь с помощью <tt class="doctest"><span class="pre">dict()</span></tt>, а затем <em>обновим</em> наш первоначальный словарь <tt class="doctest"><span class="pre">translate</span></tt> этими дополнительными соответствиями:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; de2en = swadesh.entries(['de', 'en'])    # German-English
+&gt;&gt;&gt; es2en = swadesh.entries(['es', 'en'])    # Spanish-English
+&gt;&gt;&gt; translate.update(dict(de2en))
+&gt;&gt;&gt; translate.update(dict(es2en))
+&gt;&gt;&gt; translate['Hund']
+'dog'
+&gt;&gt;&gt; translate['perro']
+'dog'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем сравнивать слова в различных германских и романских языках:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; languages = ['en', 'de', 'nl', 'es', 'fr', 'pt', 'la']
+&gt;&gt;&gt; for i in [139, 140, 141, 142]:
+...     print(swadesh.entries(languages)[i])
+...
+('say', 'sagen', 'zeggen', 'decir', 'dire', 'dizer', 'dicere')
+('sing', 'singen', 'zingen', 'cantar', 'chanter', 'cantar', 'canere')
+('play', 'spielen', 'spelen', 'jugar', 'jouer', 'jogar, brincar', 'ludere')
+('float', 'schweben', 'zweven', 'flotar', 'flotter', 'flutuar, boiar', 'fluctuare')</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="shoebox-and-toolbox-lexicons">
+<h2>4.4 Обувная коробка и ящик с инструментами лексиконов</h2>
+<p>Пожалуй, наиболее популярным инструментом, используемым лингвистами для управления данными является <em>Ящик с инструментами (Toolbox)</em>, ранее известный как <em>Обувная коробка (Shoebox)</em>, поскольку он заменяет традиционную для полевого лингвиста обувную коробку с картотекой.
+Toolbox можно свободно скачать с <tt class="doctest"><span class="pre">http://www.sil.org/computing/toolbox/</span></tt>.</p>
+<p>Файл Toolbox состоит из набора записей, где каждая запись состоит из одного или нескольких полей.
+Большинство полей являются необязательными или повторяемыми, что означает, что этот вид лексического ресурса не может рассматриваться в качестве таблицы.</p>
+<p>Вот словарь для языка Rotokas.  Мы видим только первую запись - для слова <span class="example">kaa</span> означающего "затыкать рот":</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import toolbox
+&gt;&gt;&gt; toolbox.entries('rotokas.dic')
+[('kaa', [('ps', 'V'), ('pt', 'A'), ('ge', 'gag'), ('tkp', 'nek i pas'),
+('dcsv', 'true'), ('vx', '1'), ('sc', '???'), ('dt', '29/Oct/2005'),
+('ex', 'Apoka ira kaaroi aioa-ia reoreopaoro.'),
+('xp', 'Kaikai i pas long nek bilong Apoka bikos em i kaikai na toktok.'),
+('xe', 'Apoka is gagging from food while talking.')]), ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Записи состоят из ряда пар атрибут-значение, как, например, <tt class="doctest"><span class="pre">(<span class="pysrc-string">'ps'</span>, <span class="pysrc-string">'V'</span>)</span></tt>, чтобы указать, что часть речи <tt class="doctest"><span class="pre"><span class="pysrc-string">'v'</span></span></tt> (глагол), и <tt class="doctest"><span class="pre">(<span class="pysrc-string">'ge'</span>, <span class="pysrc-string">'gag'</span>)</span></tt>, чтобы указать что переводом на английский язык является <tt class="doctest"><span class="pre"><span class="pysrc-string">"gag"</span></span></tt>.
+Последние три пары содержат пример предложения на Rotokas и его переводы на Tok Pisin и английский язык.</p>
+<p>Свободная структура файлов Toolbox не позволяет нам сделать с ними нечто большее на данном этапе.  XML обеспечивает мощный способ обработки такого рода корпусов, и мы вернемся к этой теме в <a class="reference external" href="http://www.nltk.org/book/ch11.html#chap-data">11.</a>.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">На языке Rotokas говорят на острове Бугенвиль Папуа-Новой Гвинеи.
+Этот словарь является вкладом Стюарта Робинсона в NLTK.
+Rotokas замечателен тем, что имеет в запасе всего 12 фонем (контрастных звуков), <tt class="doctest"><span class="pre">http://en.wikipedia.org/wiki/Rotokas_language</span></tt></p>
+</div>
+</div>
+</div>
+<div class="section" id="wordnet">
+<span id="sec-wordnet"></span><h1>5 WordNet</h1>
+<!-- XXX Can we do a better job of explaining what&#39;s going on in WordNet? Trying to
+process the combination of WN&#39;s unfamiliar organization and datastructures, plus
+the notation, plus the NLTK interface, imposes a very heavy cognitive load.
+E.g. this whole WN  notion is pretty bizarre in some ways: "entity ``car.n.01`` is called a `synset`:dt:," -->
+<p><a name="wordnet_index_term"></a><span class="term">WordNet</span> является семантически-ориентированным словарем английского языка, он подобен традиционному тезаурусу, но с более богатой структурой.
+NLTK включает английский WordNet с 155.287 словами и 117.659 наборов синонимов.  Мы начнем с рассмотрения синонимов и того, как к ним обращаются в WordNet.</p>
+<div class="section" id="senses-and-synonyms">
+<h2>5.1 Значения и синонимы</h2>
+<!-- senses in order of decreasing frequency? -->
+<!-- how to access frequency? -->
+<p>Рассмотрим предложение в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#ex-car1">(1а)</a>.
+Если мы заменим слово <span class="example">motorcar</span> в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#ex-car1">(1а)</a> на <span class="example">автомобиль</span>, чтобы получить <a class="reference internal" href="http://www.nltk.org/book/ch02.html#ex-car2">(1b)</a>, то смысл предложения останется в значительной степени таким же:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">=</td><td width="15"></td><td><span class="target" id="ex-car1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Бенцу приписывают изобретение мотокара.</td></tr></table></p>
+<span class="target" id="ex-car2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Бенцу приписывают изобретение автомобиля.</td></tr></table></p>
+</td></tr></table></p>
+<p>Так как все остальное в предложении остается неизменным, мы можем сделать вывод, что слова <span class="example">мотокар</span> и <span class="example">автомобиль</span> имеют одинаковое значение, то есть они <a name="synonyms_index_term"></a><span class="termdef">синонимы</span>.  Мы можем исследовать эти слова с помощью WordNet:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import wordnet as wn
+&gt;&gt;&gt; wn.synsets('motorcar')
+[Synset('car.n.01')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Таким образом, <span class="example">мотокар</span> имеет только один возможный смысл и он идентифицируется как <tt class="doctest"><span class="pre">car.n.01,</span></tt> первое значение - существительное слова <span class="example">car</span>.  Объект <tt class="doctest"><span class="pre">car.n.01</span></tt> называется <a name="synset_index_term"></a><span class="termdef">синсет</span>, или "набор синонимов", коллекция синонимичных слов (или "лемм"):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.synset('car.n.01').lemma_names()
+['car', 'auto', 'automobile', 'machine', 'motorcar']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Каждое слово из synset может иметь несколько значений, например, <span class="example">car</span> может также означать train carriage, gondola или elevator car.  Тем не менее, мы заинтересованы только в одном смысле, который является общим для всех слов выше указанного синсета.  Синсеты также поставляются с прозаическим определением и несколькими примерами предложений:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.synset('car.n.01').definition()
+'a motor vehicle with four wheels; usually propelled by an internal combustion engine'
+&gt;&gt;&gt; wn.synset('car.n.01').examples()
+['he needs a car to get to work']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Хотя определения помогают людям понять смысл синсета, <span class="emphasis">слова</span> синсета часто более полезны для наших программ.
+Для устранения неоднозначности, мы будем определять эти слова как <tt class="doctest"><span class="pre">car.n.01.automobile</span></tt>, <tt class="doctest"><span class="pre">car.n.01.motorcar</span></tt>, и так далее.
+Это объединение синсета со словом называется леммой.
+Мы можем получить все леммы для данного синсет <a class="reference internal" href="http://www.nltk.org/book/ch02.html#get-lemmas"><span id="ref-get-lemmas"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, искать конкретную лемму <a class="reference internal" href="http://www.nltk.org/book/ch02.html#lookup-lemma"><span id="ref-lookup-lemma"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, получить синсет, соответствующий лемме <a class="reference internal" href="http://www.nltk.org/book/ch02.html#get-synset"><span id="ref-get-synset"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>, и получить "имя" леммы <a class="reference internal" href="http://www.nltk.org/book/ch02.html#get-name"><span id="ref-get-name"><img class="callout" alt="[4]" src="http://www.nltk.org/book/callouts/callout4.gif"></span></a> :</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.synset('car.n.01').lemmas() 
+[Lemma('car.n.01.car'), Lemma('car.n.01.auto'), Lemma('car.n.01.automobile'),
+Lemma('car.n.01.machine'), Lemma('car.n.01.motorcar')]
+&gt;&gt;&gt; wn.lemma('car.n.01.automobile') 
+Lemma('car.n.01.automobile')
+&gt;&gt;&gt; wn.lemma('car.n.01.automobile').synset() 
+Synset('car.n.01')
+&gt;&gt;&gt; wn.lemma('car.n.01.automobile').name() 
+'automobile'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В отличие от слова <span class="example">motocar</span>, которое однозначно и имеет один synset, слово {0car неоднозначное, имеющее пять синсетов:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.synsets('car')
+[Synset('car.n.01'), Synset('car.n.02'), Synset('car.n.03'), Synset('car.n.04'),
+Synset('cable_car.n.01')]
+&gt;&gt;&gt; for synset in wn.synsets('car'):
+...     print(synset.lemma_names())
+...
+['car', 'auto', 'automobile', 'machine', 'motorcar']
+['car', 'railcar', 'railway_car', 'railroad_car']
+['car', 'gondola']
+['car', 'elevator_car']
+['cable_car', 'car']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Для удобства мы можем получить доступ ко всем леммам со словом <span class="example">car</span> следующим образом.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.lemmas('car')
+[Lemma('car.n.01.car'), Lemma('car.n.02.car'), Lemma('car.n.03.car'),
+Lemma('car.n.04.car'), Lemma('cable_car.n.01.car')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>: 
+Запишите все значения слова <span class="example">dish</span>, которое вы можете придумать.  Теперь исследуйте это слово с помощью WordNet, используя те же операции, которые мы использовали выше.</p>
+</div>
+</div>
+<div class="section" id="the-wordnet-hierarchy">
+<h2>5.2 Иерархия WordNet</h2>
+<p>WordNet синсеты соответствуют абстрактным понятиям, и они не всегда имеют соответствующие слова в английском языке.  Эти понятия связаны между собой в иерархии.
+Некоторые понятия носят весьма общий характер, такие как <em>Entity</em>, <em>State</em>, <em>Event</em> - они называются <a name="unique_beginners_index_term"></a> <span class="termdef">уникальные начала </span> или корневые синсеты.  Другие, такие как <em>gas guzzler</em> и <em>hatchback</em>, гораздо более конкретны. Небольшая часть понятийной иерархии проиллюстрирована на <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-wn-hierarchy">5.1</a>.</p>
+<span class="target" id="fig-wn-hierarchy"></span><div class="figure" id="fig-wn-hierarchy">
+<img alt="../images/wordnet-hierarchy.png" src="http://www.nltk.org/images/wordnet-hierarchy.png" style="width:451.25px;height:245.0px">
+<p class="caption"><span class="caption-label">Рисунок 5.1:</span> Фрагмент понятийной иерархии WordNet: узлы соответствуют синсетам; ребра указывают на гиперним-гипоним отношение, то есть отношение между вышестоящим и нижестоящим понятием.</p>
+</div>
+<p>WordNet позволяет легко перемещаться между понятиями.
+Например, взяв такое понятие, как <em>motorcar</em>, мы можем увидеть понятия, которые являются более конкретными; <a name="hyponyms_index_term"></a> <span class="termdef">(непосредственные) гипонимы</span>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; motorcar = wn.synset('car.n.01')
+&gt;&gt;&gt; types_of_motorcar = motorcar.hyponyms()
+&gt;&gt;&gt; types_of_motorcar[0]
+Synset('ambulance.n.01')
+&gt;&gt;&gt; sorted(lemma.name() for synset in types_of_motorcar for lemma in synset.lemmas())
+['Model_T', 'S.U.V.', 'SUV', 'Stanley_Steamer', 'ambulance', 'beach_waggon',
+'beach_wagon', 'bus', 'cab', 'compact', 'compact_car', 'convertible',
+'coupe', 'cruiser', 'electric', 'electric_automobile', 'electric_car',
+'estate_car', 'gas_guzzler', 'hack', 'hardtop', 'hatchback', 'heap',
+'horseless_carriage', 'hot-rod', 'hot_rod', 'jalopy', 'jeep', 'landrover',
+'limo', 'limousine', 'loaner', 'minicar', 'minivan', 'pace_car', 'patrol_car',
+'phaeton', 'police_car', 'police_cruiser', 'prowl_car', 'race_car', 'racer',
+'racing_car', 'roadster', 'runabout', 'saloon', 'secondhand_car', 'sedan',
+'sport_car', 'sport_utility', 'sport_utility_vehicle', 'sports_car', 'squad_car',
+'station_waggon', 'station_wagon', 'stock_car', 'subcompact', 'subcompact_car',
+'taxi', 'taxicab', 'tourer', 'touring_car', 'two-seater', 'used-car', 'waggon',
+'wagon']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы также можем перемещаться вверх по иерархии, переходя к гипернимам.  К некоторым словам ведут множественные маршруты, потому что они могут быть классифицированы более чем одним способом.
+Между <tt class="doctest"><span class="pre">car.n.01</span></tt> и <tt class="doctest"><span class="pre">entity.n.01</span></tt> два маршрута, потому что <tt class="doctest"><span class="pre">wheeled_vehicle.n.01</span></tt> может быть классифицирован и как транспортное средство, и как контейнер.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; motorcar.hypernyms()
+[Synset('motor_vehicle.n.01')]
+&gt;&gt;&gt; paths = motorcar.hypernym_paths()
+&gt;&gt;&gt; len(paths)
+2
+&gt;&gt;&gt; [synset.name() for synset in paths[0]]
+['entity.n.01', 'physical_entity.n.01', 'object.n.01', 'whole.n.02', 'artifact.n.01',
+'instrumentality.n.03', 'container.n.01', 'wheeled_vehicle.n.01',
+'self-propelled_vehicle.n.01', 'motor_vehicle.n.01', 'car.n.01']
+&gt;&gt;&gt; [synset.name() for synset in paths[1]]
+['entity.n.01', 'physical_entity.n.01', 'object.n.01', 'whole.n.02', 'artifact.n.01',
+'instrumentality.n.03', 'conveyance.n.03', 'vehicle.n.01', 'wheeled_vehicle.n.01',
+'self-propelled_vehicle.n.01', 'motor_vehicle.n.01', 'car.n.01']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем получить наиболее общие гипернимы (или корневые гипернимы) синсета следующим образом:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; motorcar.root_hypernyms()
+[Synset('entity.n.01')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong>
+Попробуйте входящий в  NLTK удобный графический браузер WordNet: <tt class="doctest"><span class="pre">nltk.app.wordnet ()</span></tt>.
+Исследуйте иерархию WordNet, следуя ссылкам на гипернимы и гипонимы.</p>
+</div>
+</div>
+<div class="section" id="more-lexical-relations">
+<h2>5.3 Больше лексических отношений</h2>
+<p>Гипернимы и гипонимы называются <a name="lexical_relations_index_term"></a> <span class="termdef">лексическими отношениями</span>, поскольку они соотносят один синсет с другим.  Эти два отношения позволяют перемещаться вверх и вниз по "А является разновидностью Б" иерархии.
+Другим важным способом навигации по сети WordNet является перемещение от элементов к их компонентам (<a name="meronyms_index_term"></a><span class="termdef">меронимам</span>) или к вещам, в которых они содержатся (<a name="holonyms_index_term"></a><span class="termdef">холонимам</span>).
+Например, части <span class="example">дерева</span> - это его <span class="example">ствол</span>, <span class="example">крона</span> и так далее; функция <tt class="doctest"><span class="pre">part_meronyms()</span></tt>.
+<em>Вещество</em>, из которого состоит дерево, включает в себя <span class="example">сердцевину</span> и <span class="example">заболонь</span>; функция <tt class="doctest"><span class="pre">substance_meronyms()</span></tt>.
+Совокупность деревьев образует <span class="example">лес</span>; функция <tt class="doctest"><span class="pre">member_holonyms()</span></tt>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.synset('tree.n.01').part_meronyms()
+[Synset('burl.n.02'), Synset('crown.n.07'), Synset('limb.n.02'),
+Synset('stump.n.01'), Synset('trunk.n.01')]
+&gt;&gt;&gt; wn.synset('tree.n.01').substance_meronyms()
+[Synset('heartwood.n.01'), Synset('sapwood.n.01')]
+&gt;&gt;&gt; wn.synset('tree.n.01').member_holonyms()
+[Synset('forest.n.01')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Для того, чтобы увидеть, насколько запутанными могут становиться вещи, рассмотрите слово <span class="example">мята</span>, которое имеет несколько тесно связанных значений.  Мы можем видеть, что <tt class="doctest"><span class="pre">mint.n.04</span></tt> является частью <tt class="doctest"><span class="pre">mint.n.02</span></tt> и веществом, из которого сделан <tt class="doctest"><span class="pre">mint.n.05</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for synset in wn.synsets('mint', wn.NOUN):
+...     print(synset.name() + ':', synset.definition())
+...
+batch.n.02: (often followed by `of') a large number or amount or extent
+mint.n.02: any north temperate plant of the genus Mentha with aromatic leaves and
+           small mauve flowers
+mint.n.03: any member of the mint family of plants
+mint.n.04: the leaves of a mint plant used fresh or candied
+mint.n.05: a candy that is flavored with a mint oil
+mint.n.06: a plant where money is coined by authority of the government
+&gt;&gt;&gt; wn.synset('mint.n.04').part_holonyms()
+[Synset('mint.n.02')]
+&gt;&gt;&gt; wn.synset('mint.n.04').substance_holonyms()
+[Synset('mint.n.05')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Есть также отношения между глаголами.  Например, акт <span class="example">ходьбы</span> включает акт <span class="example">шагания</span>, так что ходьба <a name="entails_index_term"></a><span class="termdef">влечет за собой</span> шагание.  Некоторые глаголы имеют несколько связанных действий:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.synset('walk.v.01').entailments()
+[Synset('step.v.01')]
+&gt;&gt;&gt; wn.synset('eat.v.01').entailments()
+[Synset('chew.v.01'), Synset('swallow.v.01')]
+&gt;&gt;&gt; wn.synset('tease.v.03').entailments()
+[Synset('arouse.v.07'), Synset('disappoint.v.01')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Некоторые лексические отношения устанавливаются между леммами, например, <a name="antonymy_index_term"></a><span class="termdef">антонимия</span>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.lemma('supply.n.02.supply').antonyms()
+[Lemma('demand.n.02.demand')]
+&gt;&gt;&gt; wn.lemma('rush.v.01.rush').antonyms()
+[Lemma('linger.v.04.linger')]
+&gt;&gt;&gt; wn.lemma('horizontal.a.01.horizontal').antonyms()
+[Lemma('inclined.a.02.inclined'), Lemma('vertical.a.01.vertical')]
+&gt;&gt;&gt; wn.lemma('staccato.r.01.staccato').antonyms()
+[Lemma('legato.r.01.legato')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Вы можете увидеть лексические отношения, а также другие методы, определенные для синсета, используя <tt class="doctest"><span class="pre">dir()</span></tt>, например: <tt class="doctest"><span class="pre">dir(wn.synset(<span class="pysrc-string">'harmony.n.02'</span>)</span></tt>).</p>
+</div>
+<div class="section" id="semantic-similarity">
+<h2>5.4 Семантическое сходство</h2>
+<!-- TODO: discuss WSD, mention Semcor, give pine cone example -->
+<p>Мы видели, что синсеты связаны между собой сложной сетью лексических отношений.  Взяв определенный синсет, мы можем пройти через сеть WordNet, чтобы найти синсеты со связанными значениями.
+Знание того, какие слова семантически связаны, полезно для индексации набора текстов, чтобы поиск общего термина, как, например, <span class="example">транспортное средство</span>, выдавал документы, содержащие конкретные термины, как, например, <span class="example">лимузин</span>.</p>
+<p>Вспомните, что каждый синсет имеет один или несколько путей, связывающих его с корневым гипернимом, таким как <tt class="doctest"><span class="pre">entity.n.01</span></tt>.
+Два синсета, связанных с тем же корнем, могут иметь несколько общих гипернимов (cf <a class="reference internal" href="http://www.nltk.org/book/ch02.html#fig-wn-hierarchy">5.1</a>).
+Если два синсета разделяют очень конкретный гиперним - тот, который находится в самом низу иерархии гипернимов - они должны быть тесно связаны между собой.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; right = wn.synset('right_whale.n.01')
+&gt;&gt;&gt; orca = wn.synset('orca.n.01')
+&gt;&gt;&gt; minke = wn.synset('minke_whale.n.01')
+&gt;&gt;&gt; tortoise = wn.synset('tortoise.n.01')
+&gt;&gt;&gt; novel = wn.synset('novel.n.01')
+&gt;&gt;&gt; right.lowest_common_hypernyms(minke)
+[Synset('baleen_whale.n.01')]
+&gt;&gt;&gt; right.lowest_common_hypernyms(orca)
+[Synset('whale.n.02')]
+&gt;&gt;&gt; right.lowest_common_hypernyms(tortoise)
+[Synset('vertebrate.n.01')]
+&gt;&gt;&gt; right.lowest_common_hypernyms(novel)
+[Synset('entity.n.01')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Конечно, мы знаем, что понятие <span class="example">кит</span> весьма конкретное (а <span class="example">усатый кит</span> еще более конкретное), в то время как <span class="example">позвоночное</span> является более общим понятием, а <span class="example">сущность</span> - совершенно общее.
+Мы можем количественно оценить эту концепцию общности, найдя глубину каждого синсета:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wn.synset('baleen_whale.n.01').min_depth()
+14
+&gt;&gt;&gt; wn.synset('whale.n.02').min_depth()
+13
+&gt;&gt;&gt; wn.synset('vertebrate.n.01').min_depth()
+8
+&gt;&gt;&gt; wn.synset('entity.n.01').min_depth()
+0</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Показатели подобия, которые инкорпорируют выше указанное понимание сходства, были определены для совокупности синсетов Wordnet.  Например, <tt class="doctest"><span class="pre">path_similarity</span></tt> присваивает балл в диапазоне <tt class="doctest"><span class="pre">0</span></tt> - <tt class="doctest"><span class="pre">1</span></tt> на основе кратчайшего пути, который соединяет понятия в иерархии гипернимов (<tt class="doctest"><span class="pre">-1</span></tt> возвращается в тех случаях, когда путь не может быть найден).  Сравнение синсета с самим собой будет возвращать <tt class="doctest"><span class="pre">1</span></tt>.
+Рассмотрим следующие оценки подобия, относящие <span class="example">южного кита</span> к <span class="example">малому полосатику</span>, <span class="example">косатке</span>, <span class="example">черепахе</span> и <span class="example">роману</span>.
+Хотя цифры не будут значить много, они уменьшаются по мере продвижения от семантического пространства морских существ к неодушевленным предметам.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; right.path_similarity(minke)
+0.25
+&gt;&gt;&gt; right.path_similarity(orca)
+0.16666666666666666
+&gt;&gt;&gt; right.path_similarity(tortoise)
+0.07692307692307693
+&gt;&gt;&gt; right.path_similarity(novel)
+0.043478260869565216</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Имеется также несколько других показателей подобия; вы можете ввести <tt class="doctest"><span class="pre">help(wn)</span></tt> для получения дополнительной информации.  NLTK также включает VerbNet, а иерархический лексикон глаголов, связанный с WordNet. Доступ к нему осуществляется с помощью <tt class="doctest"><span class="pre">nltk.corpus.verbnet</span></tt>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="summary">
+<h1>6 Резюме</h1>
+<ul class="simple">
+<li>Текстовый корпус - это большой, структурированный сборник текстов.  NLTK поставляется с большим количеством корпусов, например, Браунский корпус, <tt class="doctest"><span class="pre">nltk.corpus.brown</span></tt>.</li>
+<li>Некоторые текстовые корпусы классифицированы, например, по жанру или теме; иногда категории свода накладываются друг на друга.</li>
+<li>Условное распределение частот представляет собой совокупность распределений частот, каждое для определенного условия.  Они могут быть использованы для подсчета частот слов для данного контекста или жанра.</li>
+<li>Программы Python длиной более чем несколько строк следует вводить с помощью текстового редактора, сохранять в файле с расширением <tt class="doctest"><span class="pre">.py</span></tt> вызывать, используя предложение <tt class="doctest"><span class="pre"><span class="pysrc-keyword">import</span></span></tt>.</li>
+<li>Функции Python позволяют связать имя с определенным блоком кода и повторно использовать этот код по мере необходимости.</li>
+<li>Некоторые функции, известные как "методы", связаны с объектом, тогда мы вводим имя объекта, за которым следует точка, за которой следует функция, следующим образом: <tt class="doctest"><span class="pre">x.funct(у)</span></tt>, например, <tt class="doctest"><span class="pre">word.isalpha()</span></tt>.</li>
+<li>Чтобы узнать о какой-либо переменной <tt class="doctest"><span class="pre">v</span></tt>, наберите <tt class="doctest"><span class="pre">help(v)</span></tt> в интерактивном интерпретаторе Python, чтобы прочитать запись справки для такого рода объекта.</li>
+<li>WordNet - это семантически-ориентированный словарь английского языка, состоящий из множества синонимов, или синсетов, организованных в сеть.</li>
+<li>Некоторые функции не будут доступны по умолчанию, к ним необходимо обращаться, используя предложение <tt class="doctest"><span class="pre"><span class="pysrc-keyword">import</span></span></tt>.</li>
+</ul>
+</div>
+<div class="section" id="further-reading">
+<span id="sec-further-reading-corpora"></span><h1>7 Дополнительные материалы</h1>
+<p>Дополнительные материалы для этой главы размещены на странице <tt class="doctest"><span class="pre">http://nltk.org/,</span></tt> в том числе ссылки на свободно доступные ресурсы в сети.  Методы корпусов представлены в Corpus HOWTO на странице <tt class="doctest"><span class="pre">http://nltk.org/howto</span></tt> и широко документированы в онлайн документации по API.</p>
+<p>Значительными источниками опубликованных корпусов являются <span class="example">Консорциум лингвистический данных</span> (LDC) и <span class="example">Европейское агентство языковых ресурсов</span> (ELRA).  Сотни аннотированных текстовых и речевых корпусов доступны на десятках языков.  Некоммерческие лицензии позволяют использовать данные для преподавания и исследований.  Для некоторых корпусов, коммерческие лицензии также доступны (но за более высокую плату).</p>
+<p>Хорошим инструментом для создания аннотированных текстовых корпусов является <span class="emphasis">Brat</span>, он доступен на странице <tt class="doctest"><span class="pre">http://brat.nlplab.org/</span></tt>.</p>
+<p>Эти и многие другие языковые ресурсы были документированы с использованием OLAC Metadata и по ним можно осуществлять поиск через домашнюю страницу OLAC по адресу <tt class="doctest"><span class="pre">http://www.language-archives.org/</span></tt>.  <span class="emphasis">Corpora List</span> - это список рассылки для обсуждения корпусов, и вы можете найти ресурсы путем поиска в его архивах или публикации сообщения в нем.
+Наиболее полным собранием языков мира является <em>Этнология</em> на сайте <tt class="doctest"><span class="pre">http://www.ethnologue.com/</span></tt>. Из 7000 языков только несколько десятков имеют значительные цифровые ресурсы пригодные для использования в NLP.</p>
+<p>В этой главе мы коснулись области <a name="corpus_linguistics_index_term"></a><span class="termdef">Лингвистики корпуса</span>.  Другие полезные книги в этой области включают в себя <a class="reference external" href="http://www.nltk.org/book/bibliography.html#biber1998" id="id1">(Biber, Conrad, &amp; Reppen, 1998)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#mcenery2006" id="id2">(McEnery, 2006)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#meyer2002" id="id3">(Meyer, 2002)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#sampson2005" id="id4">(Sampson &amp; McCarthy, 2005)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#scott2006" id="id5">(Scott &amp; Tribble, 2006)</a>.
+Дополнительные материалы по количественному анализу данных в лингвистике: <a class="reference external" href="http://www.nltk.org/book/bibliography.html#baayen2008" id="id6">(Baayen, 2008)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#gries2009" id="id7">(Gries, 2009)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#woods1986" id="id8">(Woods, Fletcher, &amp; Hughes, 1986)</a>.</p>
+<p>Оригинальное описание WordNet <a class="reference external" href="http://www.nltk.org/book/bibliography.html#fellbaum1998" id="id9">(Fellbaum, 1998)</a>.
+Хотя WordNet первоначально был разработан для исследований в области психолингвистики, в настоящее время он широко используется в NLP и Information Retrieval.
+Словари WordNet разрабатываются для многих других языков, как задокументировано на сайте <tt class="doctest"><span class="pre">http://www.globalwordnet.org/</span></tt>. Для изучения показателей сходства Wordnet см. <a class="reference external" href="http://www.nltk.org/book/bibliography.html#budanitsky2006ewb" id="id10">(Budanitsky &amp; Hirst, 2006)</a>.</p>
+<p>Другими темами, затронутыми в этой главе, были фонетика и лексическая семантика, и мы отсылаем читателей к 7 и 20 главе <a class="reference external" href="http://www.nltk.org/book/bibliography.html#jurafskymartin2008" id="id11">(Jurafsky &amp; Martin, 2008)</a>.</p>
+</div>
+<div class="section" id="exercises">
+<h1>8 Упражнения</h1>
+<ol class="arabic simple">
+<li>☼ Создайте переменную <tt class="doctest"><span class="pre">фразу</span></tt> , содержащую список слов.
+Обзор операций, описанных в предыдущей главе, включая сложение, умножение, индексирование, нарезка и сортировкой.</li>
+<li>☼ Используйте модуль для изучения желтое <tt class="doctest"><span class="pre">Остен-persuasion.txt.</span></tt>
+Сколько слов жетоны делает эта книга есть?  Сколько типов слов?</li>
+<li>☼ Используйте читателя корпус <tt class="doctest"><span class="pre">nltk.corpus.brown.words</span></tt> Brown <tt class="doctest"><span class="pre">()</span></tt> или считыватель веб - текста корпуса <tt class="doctest"><span class="pre">nltk.corpus.webtext.words ()</span></tt> для доступа к некоторым образец текста в двух разных жанрах.</li>
+<li>☼ Прочитайте в текстах <em>государства</em> адресов <em>Союза,</em> используя читателя <tt class="doctest"><span class="pre">state_union</span></tt> корпус.  Количество вхождений <tt class="doctest"><span class="pre">мужчин,</span></tt> <tt class="doctest"><span class="pre">женщин</span></tt> и <tt class="doctest"><span class="pre">людей</span></tt> в каждом документе.  Что случилось с использованием этих слов с течением времени?</li>
+<li>☼ Исследовать holonym-meronym соотношения для некоторых существительных.
+Помните , что есть три вида holonym-meronym отношения, так что вам нужно использовать: <tt class="doctest"><span class="pre">member_meronyms (),</span></tt> <tt class="doctest"><span class="pre">part_meronyms (),</span></tt> <tt class="doctest"><span class="pre">substance_meronyms (),</span></tt> <tt class="doctest"><span class="pre">member_holonyms (),</span></tt> <tt class="doctest"><span class="pre">part_holonyms ()</span></tt> и <tt class="doctest"><span class="pre">substance_holonyms ().</span></tt></li>
+<li>☼ При обсуждении сравнительных Словарные, мы создали объект , называемый <tt class="doctest"><span class="pre">перевод</span></tt> , который вы могли бы посмотреть , используя слова в немецком и испанском языках для того , чтобы получить соответствующие слова на английском языке.
+Какие проблемы могут возникнуть при таком подходе?
+Можете ли вы предложить способ избежать этой проблемы?</li>
+<li>☼ по <em>элементам</em> Strunk и Уайта <em>стиля,</em> словом, <span class="example">однако</span> используется в начале предложения, означает "любым способом" или "в любой степени", а не "все - таки".  Они дают этот пример правильного использования: <span class="example">Тем</span> не <span class="example">менее вы посоветовать ему,</span> что <span class="example">он, вероятно</span> , <span class="example">сделать</span> , <span class="example">как он считает нужным.</span> <tt class="doctest"><span class="pre">(Http://www.bartleby.com/141/strunk3.html)</span></tt> Используйте инструмент конкорданса для изучения фактического использования этого слова в различных текстах мы рассматривали.
+Смотрите также <em>LanguageLog</em> размещения "Ископаемый предрассудки о" однако "в <tt class="doctest"><span class="pre">http://itre.cis.upenn.edu/~myl/languagelog/archives/001913.html</span></tt></li>
+<li>◑ Определим условное распределение частот по названиям корпуса , что позволяет вам видеть , какие <em>начальные</em> буквы чаще для мужчин против женщин (ср =</li>
+<li>◑ Возьмите пару текстов и изучать различия между ними, с точки зрения лексики, словарного богатства, жанру и т.д.  Можете ли вы найти пары слов , которые имеют совершенно разные значения в двух различных текстов, таких как <span class="example">чудовищное</span> в <em>Моби Дика</em> и в <em>Разум и чувства?</em></li>
+<li>◑ Читать статью BBC News: <em>Великобритании Vicky Pollards "оставил"</em> <tt class="doctest"><span class="pre">http://news.bbc.co.uk/1/hi/education/6173441.stm.</span></tt> В статье приводятся следующие статистические данные о языке подростков: "топ-20 слов используются, в том числе, да, нет, но и как, составляют около трети всех слов." Сколько слов типов составляют треть всех лексем слов, для различных текстовых источников?  Что вы делаете вывод о этой статистики?
+Подробнее об этом читайте на <em>LanguageLog,</em> в <tt class="doctest"><span class="pre">http://itre.cis.upenn.edu/~myl/languagelog/archives/003993.html.</span></tt></li>
+<li>◑ Изучить таблицу модальных распределений и искать другие узоры.
+Постарайтесь объяснить их с точки зрения вашего собственного импрессионистической понимания различных жанров.  Можете ли вы найти другие замкнутые классы слов, которые демонстрируют существенные различия между разными жанрами?</li>
+<li>◑ КМУ Произнесение словарь содержит несколько произношения некоторых слов.  Сколько различных слов он содержит?  Какая часть слов в этом словаре есть более чем один из возможных вариантов произношения?</li>
+<li>◑ Какой процент существительных synsets нет гипонимов?
+Вы можете получить все существительное synsets используя <tt class="doctest"><span class="pre">wn.all_synsets ( <span class="pysrc-string">'п').</span></span></tt></li>
+<li>◑ Определим функцию <tt class="doctest"><span class="pre">supergloss (ы)</span></tt> , которая принимает synset <tt class="doctest"><span class="pre">S</span></tt> в качестве аргумента и возвращает строку , состоящую из конкатенации определения <tt class="doctest"><span class="pre">с,</span></tt> а определения всех hypernyms и гипонимов <tt class="doctest"><span class="pre">втор.</span></tt></li>
+<li>◑ Напишите программу, чтобы найти все слова, которые встречаются по крайней мере, три раза в Brown корпус.</li>
+<li>◑ Напишите программу для создания таблицы лексических оценки разнообразия (т.е. соотношений маркер / тип), как мы видели в <a class="reference external" href="http://www.nltk.org/book/ch01.html#tab-brown-types">1.1</a> .  Включить полный набор Brown Corpus жанров <tt class="doctest"><span class="pre">(nltk.corpus.brown.categories ()).</span></tt>
+Какой жанр имеет самый низкий разнообразие (наибольшее количество жетонов для каждого типа)?
+Является ли это то, что вы бы ожидали?</li>
+<li>◑ Написать функцию, которая находит 50 наиболее часто встречающихся слов из текста, которые не являются игнорируемых слов.</li>
+<li>◑ Напишите программу для печати 50 наиболее частых биграмм (пар смежных слов) из текста, опуская биграмм, которые содержат стоп-слова.</li>
+<li>◑ Напишите программу для создания таблицы частот слов по жанру, как приведенному в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#sec-extracting-text-from-corpora">1</a> для модальностей.
+Выберите свои собственные слова и попытаться найти слова, чье присутствие (или отсутствие) является типичным для жанра.  Обсудите свои выводы.</li>
+<li>◑ Написать функцию <tt class="doctest"><span class="pre">word_freq ()</span></tt> , которая принимает слово и название секции Браун корпус в качестве аргументов, и вычисляет частоту слова в той части корпуса.</li>
+<li>◑ Напишите программу, чтобы угадать число слогов, содержащихся в тексте, используя КМУ произнося словарь.</li>
+<li>◑ Определим функцию <tt class="doctest"><span class="pre">изгороди (текст)</span></tt> , который обрабатывает текст и создает новую версию со словом <tt class="doctest"><span class="pre"><span class="pysrc-string">"как"</span></span></tt> между каждым третьим словом.</li>
+<li>★ <strong>закон Ципфа:</strong> Пусть <em>F (w)</em> будет частота слова <em>ш</em> в свободном тексте. Предположим, что все слова текста ранжируются в соответствии с их частотой, с наиболее частым словом в первую очередь. Закон Ципфа утверждает , что частота слова типа обратно пропорциональна ее рангу (т.е. <em>F</em> × <em>г = к,</em> для некоторой константы <em>к).</em> Например, 50-наиболее распространенный тип слово должно происходить в три раза чаще, чем 150-й наиболее распространенный тип слова.<ol class="loweralpha">
+<li>Напишите функцию для обработки большого текста и сюжета частоты слово против слова ранга с помощью <tt class="doctest"><span class="pre">pylab.plot.</span></tt> Подтверждаете ли вы закон Ципфа? (Подсказка: это помогает использовать логарифмическую шкалу).
+Что происходит в крайних концах нарисованной линии?</li>
+<li>Генерация случайного выбора текста, например, с помощью <tt class="doctest"><span class="pre">random.choice ( <span class="pysrc-string">"АБВГДЕЖ"),</span></span></tt> следя за тем, чтобы включить символ пробела.  Вам нужно будет <tt class="doctest"><span class="pre"><span class="pysrc-keyword">импортировать</span> случайным</span></tt> образом в первую очередь.  Используйте оператор конкатенации накапливать символы в (очень) длинной строки.  Затем разметить эту строку, и генерировать сюжет Ципфа, как и раньше, и сравнить два участка.  Что вы делаете закона Ципфа в свете этого?</li>
+</ol>
+</li>
+<li>★ Изменить программу генерации текста в <a class="reference internal" href="http://www.nltk.org/book/ch02.html#code-random-text">2.2</a> далее, чтобы выполнить следующие задачи:<ol class="loweralpha">
+<li>Храните <em>п</em> наиболее вероятных слов в списке <tt class="doctest"><span class="pre">слов</span></tt> затем случайным образом выбрать слово из списка , используя <tt class="doctest"><span class="pre">random.choice ().</span></tt>  (Вам нужно будет <tt class="doctest"><span class="pre"><span class="pysrc-keyword">импортировать</span> случайным</span></tt> образом в первую очередь.)</li>
+<li>Выберите конкретный жанр, такие как секция Брауна корпус или генеза перевода, один из текстов Гутенберга, или один из веб-текстов.  Поезд модель на этом корпусе и получить его, чтобы генерировать случайный текст.  Вы, возможно, придется экспериментировать с различными стартовых слов. Как понятен текст?  Обсудите сильные и слабые стороны этого метода генерации случайного выбора текста.</li>
+<li>Теперь обучить систему с помощью двух различных жанров и экспериментировать с генерации текста в гибридном жанре.  Обсудите свои наблюдения.</li>
+</ol>
+</li>
+<li>★ Определим функцию <tt class="doctest"><span class="pre">find_language ()</span></tt> , которая принимает строку в качестве аргумента, и возвращает список языков , которые имеют эту строку как слово.  Используйте <tt class="doctest"><span class="pre">ВДПЧ</span></tt> корпус и ограничить область поиска файлов в кодировке Latin-1.</li>
+<li>★ Что такое коэффициент ветвления иерархии существительное hypernym?
+Т.е. для каждого существительного synset, который имеет гипонимов - или дети в иерархии hypernym - сколько у них в среднем?
+Вы можете получить все существительное synsets используя <tt class="doctest"><span class="pre">wn.all_synsets ( <span class="pysrc-string">'п').</span></span></tt></li>
+<li>★ Многозначность слова это число чувств у него есть.
+Используя WordNet, мы можем определить , что существительное <em>собака</em> имеет 7 чувства с: <tt class="doctest"><span class="pre">LEN (wn.synsets ( <span class="pysrc-string">'собака',</span> <span class="pysrc-string">'п')).</span></span></tt>
+Вычислить среднее многозначность существительных, глаголов, прилагательных и наречий в соответствии с WordNet.</li>
+<li>★ Используйте один из предопределенных мер сходства забивать сходство каждой из следующих пар слов.
+Позиция пары в порядке убывания сходства.
+Насколько близко ваш рейтинг в порядке , указанном здесь порядок , который был экспериментально установлено <a class="reference external" href="http://www.nltk.org/book/bibliography.html#millercharles1998" id="id12">(Miller &amp; Charles, 1998)</a> : автомобиль-автомобиль, гем-драгоценный камень, путешествие-рейса, мальчик-юноша, простирающийся от берега на берег, убежище-сумасшедший дом, маг-волшебник, полуденное-полдень, печь-плита, питание-фрукты, птица петух, птица-кран, инструмент реализации, брат-монах, парень брат, кран-реализации, путешествие автомобиль, монах-оракул, cemetery- Лесопарковая, пищевая петух, берег-холм, лес-кладбищем, берег-лесистой местности, монах-раб, берег-лес, парень-мастер, аккорд улыбка, стекло-волшебник, петух-путешествие, в полдень-нить.</li>
+</ol>
+<!-- Footer to be used in all chapters -->
+<div class="admonition-about-this-document admonition">
+<p class="first admonition-title">Об этом документе ...</p>
+<p>Обновлялся для NLTK 3.0.
+Это глава из книги <em>Обработка естественного языка с помощью Python</em> написанной <a class="reference external" href="http://estive.net/">Стивеном Бердом</a> , <a class="reference external" href="http://homepages.inf.ed.ac.uk/ewan/">Эваном Клайном</a> и <a class="reference external" href="http://ed.loper.org/">Эдвардом Лопером</a> , Copyright © 2014 авторов.
+Он распространяется с <em>Набором инструментов для естественного языка</em> <tt class="doctest"><span class="pre">[http://nltk.org/],</span></tt> версия 3.0 в соответствии с условиями <em>Creative Commons Attribution-Noncommercial-No Derivative Works 3.0 Лицензии Соединенных Штатов</em> [ <a class="reference external" href="http://creativecommons.org/licenses/by-nc-nd/3.0/us/">http://creativecommons.org/licenses/by-nc-nd/3.0/us/</a>].</p>
+<p class="last">Этот документ был построен на ср 1 июля 2015 12:30:05 AEST</p>
+</div>
+</div>
+</div>
+</body>
+</html>

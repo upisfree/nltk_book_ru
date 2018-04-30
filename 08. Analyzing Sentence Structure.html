@@ -1,0 +1,1401 @@
+﻿<html lang="ru" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ascii"></meta>
+<meta name="generator" content="Docutils 0.12: http://docutils.sourceforge.net/"></meta>
+<title>4,46%8 Анализ структуры предложения</title>
+<style type="text/css">/* :Author: Edward Loper, James Curran:Copyright: This stylesheet has been placed in the public domain.Stylesheet for use with Docutils.This stylesheet defines new css classes used by NLTK.It uses a Python syntax highlighting scheme that matchesthe colour scheme used by IDLE, which makes it easier forbeginners to check they are typing things in correctly. */
+/* Include the standard docutils stylesheet. */
+</style>
+</head>
+<body dir="ltr">
+<div class="document" id="analyzing-sentence-structure">
+<span id="chap-parse"></span>
+<h1 class="title">8. Анализ структуры предложения</h1>
+
+<!-- -*- mode: rst -*- -->
+<!-- -*- mode: rst -*- -->
+<!-- CAP abbreviations (map to small caps in LaTeX) -->
+<!-- Other candidates for global consistency -->
+<!-- PTB removed since it must be indexed -->
+<!-- WN removed since it must be indexed -->
+<!-- misc & punctuation -->
+<!-- cdots was unicode U+22EF but not working -->
+<!-- exercise meta-tags -->
+<!-- Unicode tests -->
+<!-- phonetic -->
+<!-- misc -->
+<!-- used in Unicode section -->
+<!-- arrows -->
+<!-- unification stuff -->
+<!-- Math & Logic -->
+<!-- sets -->
+<!-- Greek -->
+<!-- Chinese -->
+<!-- URLs -->
+<!-- Python example - a snippet of code in running text -->
+<!-- PlaceHolder example -  something that should be replaced by actual code -->
+<!-- Linguistic eXample - cited form in running text -->
+<!-- Emphasized (more declarative than just using *) -->
+<!-- Grammatical Category - e.g. NP and verb as technical terms
+.. role:: gc
+   :class: category -->
+<!-- Math expression - e.g. especially for variables -->
+<!-- Textual Math expression - for words &#39;inside&#39; a math environment -->
+<!-- Feature (or attribute) -->
+<!-- Raw LaTeX -->
+<!-- Raw HTML -->
+<!-- Feature-value -->
+<!-- Lexemes -->
+<!-- Replacements that rely on previous definitions :-) -->
+<!-- standard global imports
+
+>>> from __future__ import division
+>>> import nltk, re, pprint -->
+<!-- TODO: include overview of ContextFreeGrammar and Production in 8.4 -->
+<!-- TODO: make URLs clickable in the HTML version -->
+<!-- TODO: mention Chomsky Normal Form -->
+<!-- TODO: give an example of a text generated from bigrams, then talk the
+reader through constructing a simple grammar over this by talking
+about local contexts, and contrast this with the grammar -->
+<!-- TODO: update images in parser-problem table (NP -> NP PP replaced
+by Nom -> Nom PP -->
+<!-- TODO: find a different example of left-recursive rules -->
+<!-- TODO: Add discussion of non-projective dependency parsing -->
+<p>Предыдущие главы были сосредоточены на словах: как идентифицировать их, проанализировать их структуру, назначать их лексическим категориям, а также получить доступ к их значениям.
+Мы также видели, как определить закономерности в последовательности слов или n-граммы.
+Тем не менее эти методы только царапают поверхность сложных ограничений, которые регулируют предложения.
+Нам нужен способ работать с неоднозначностью, которой славится естественный язык.
+Мы также должны быть в состоянии справиться с тем фактом, что существует неограниченное число возможных предложений, а мы можем писать только конечные программы для анализа их структуры и раскрытия их смысла.</p>
+<p>Цель этой главы - ответить на следующие вопросы:</p>
+<ol class="arabic simple">
+<li>Как мы можем использовать формальную грамматику для описания структуры неограниченного множества предложений?</li>
+<li>Как мы представляем структуру предложений с использованием синтаксических деревьев?</li>
+<li>Как синтаксические анализаторы анализируют предложение и автоматически строят синтаксическое дерево?</li>
+</ol>
+<p>По ходу изложения мы рассмотрим основы английского синтаксиса и увидим, что существуют систематические аспекты смысла, которые гораздо легче схватить, как только мы определили структуру предложений.</p>
+<div class="section" id="some-grammatical-dilemmas">
+<span id="sec-dilemmas"></span><h1>1 Некоторые Грамматические Дилеммы</h1>
+<div class="section" id="linguistic-data-and-unlimited-possibilities">
+<h2>1.1 Лингвистические данные и неограниченные возможности</h2>
+<p>Предыдущие главы показали вам, как обрабатывать и анализировать текстовые корпусы, и мы выделили задачи NLP в работе с огромным количеством данных электронного языка, который растет с каждым днем. Рассмотрим эти данные более тесно и выполним мысленный эксперимент, предположив, что мы имеем гигантский корпус, состоящий из всего, что было произнесено или написано на английском языке в течение, скажем, последних 50 лет. Есть ли у нас основания называть этот корпус "Современный английский язык"? Есть целый ряд причин, по которым мы могли бы ответить: "Нет". Вспомните, что в <a class="reference external" href="http://www.nltk.org/book/ch03.html#chap-words">3</a>, мы попросили вас найти в Интернете экземпляры паттерна <span class="example">the of</span>.  Хотя в Интернете несложно найти примеры, содержащие эту последовательность слов, такие как <span class="example">New man at the of IMG</span> <tt class="doctest"><span class="pre">(http://www.telegraph.co.uk/sport/2387900/New-man-at-the-of-IMG.html)</span></tt>, носители английского языка скажут, что большинство таких примеров ошибочны и, следовательно, не являются частью английского языка.</p>
+<p>Соответственно мы можем утверждать, что "современный английский" не эквивалентен очень большому набору последовательностей слов в нашем воображаемом корпусе. Носители английского языка могут выносить суждения об этих последовательностях и отвергать некоторые из них как безграмотные.</p>
+<p>Точно так же, легко составить новое предложение и получить согласие носителей, что это вполне хороший английский.  Например, предложения имеют интересное свойство, что они могут быть внедрены в более крупные предложения.  Рассмотрим следующие предложения:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(1)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Usain Bolt broke the 100m record
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>The Jamaica Observer reported that Usain Bolt broke the 100m record
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>Andre said The Jamaica Observer reported that Usain Bolt broke the 100m record
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td>I think Andre said the Jamaica Observer reported that Usain Bolt broke the 100m record
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Если бы мы заменили целые предложения символом <tt class="doctest"><span class="pre">S</span></tt>, мы бы увидели такие модели, как <span class="example">Andre said</span> <tt class="doctest"><span class="pre">S</span></tt> и <span class="example">I think</span> <tt class="doctest"><span class="pre">S</span></tt>.  Это шаблоны, с помощью  которых можно взять предложение и построить большее предложение.  Есть и другие шаблоны, которые мы можем использовать, как <tt class="doctest"><span class="pre">S</span></tt> <span class="example">but</span> <tt class="doctest"><span class="pre">S</span></tt> и <tt class="doctest"><span class="pre">S</span></tt> <span class="example">when</span> <tt class="doctest"><span class="pre">S</span></tt>.  Немного изобретательности поможет нам построить некоторые действительно длинные предложения с помощью этих шаблонов.
+Вот впечатляющий пример из Истории Винни-Пуха А. А. Милна, <em>в которой Пятачок полностью окружен водой</em>:</p>
+<blockquote>
+[You can imagine Piglet's joy when at last the ship came in sight of
+him.] In after-years he liked to think that he had been in Very
+Great Danger during the Terrible Flood, but the only danger he had
+really been in was the last half-hour of his imprisonment, when
+Owl, who had just flown up, sat on a branch of his tree to comfort
+him, and told him a very long story about an aunt who had once laid
+a seagull's egg by mistake, and the story went on and on, rather
+like this sentence, until Piglet who was listening out of his
+window without much hope, went to sleep quietly and naturally,
+slipping slowly out of the window towards the water until he was
+only hanging on by his toes, at which moment, luckily, a sudden
+loud squawk from Owl, which was really part of the story, being
+what his aunt said, woke the Piglet up and just gave him time to
+jerk himself back into safety and say, "How interesting, and did
+she?" when — well, you can imagine his joy when at last he saw
+the good ship, Brain of Pooh (Captain, C. Robin; 1st Mate, P. Bear)
+coming over the sea to rescue him...</blockquote>
+<p>Это длинное предложение на самом деле имеет простую структуру, которая начинается с <span class="example">S but S when S</span>.  Мы можем увидеть из этого примера, что язык дает нам конструкции, которые, как представляется, позволяют распространять предложения бесконечно.  То, что мы можем понимать предложения произвольной длины, которые мы никогда раньше не слышали, также поразительно: не трудно придумать совершенно новое предложение, которое, вероятно, никогда ранее не использовалось в истории языка, но все носители языка поймут его.</p>
+<p>Цель грамматики дать явное описание языка. Но то, как мы мыслим грамматику, тесно переплетается с тем, что мы считаем языком. Является ли язык большим, но конечным множеством наблюдаемых высказываний и письменных текстов? Является ли он чем-то более абстрактным, как неявное знание, которым обладают компетентные носители о грамматических предложениях? Или это некоторое сочетание этих двух? Мы не будем занимать определенную позицию по этому вопросу, но вместо этого представим основные подходы.</p>
+<p>В этой главе мы будем применять формальные рамки "порождающей грамматики", в которой "язык" считается ни чем иным, как огромной совокупностью всех грамматических предложений, а грамматика является формальной системой, которая может быть использована для "генерации" членов этого набора.  Грамматики используют рекурсивные <a name="productions_index_term"></a><span class="termdef">модели</span> вида <tt class="doctest"><span class="pre">S</span></tt> → <tt class="doctest"><span class="pre">S</span></tt> <span class="example">and</span> <tt class="doctest"><span class="pre">S</span></tt>, как мы увидим в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#sec-context-free-grammar">3</a>.  В <a class="reference external" href="http://www.nltk.org/book/ch10.html#chap-semantics">10.</a> мы расширим это понимание, чтобы автоматически выстроить смысл предложения из значений его частей.</p>
+</div>
+<div class="section" id="ubiquitous-ambiguity">
+<h2>1.2 Вездесущая неоднозначность</h2>
+<p>Хорошо известный пример неоднозначности показан в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-marx-elephant">(2)</a>, из фильма Граучо Маркса, <em>Animal Crackers</em> (1930):</p>
+<!-- http://www.youtube.com/watch?v=NfN_gcjGoJo -->
+<span class="target" id="ex-marx-elephant"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(2)</td><td width="15"></td><td>While hunting in Africa, I shot an elephant in my pajamas.
+How he got into my pajamas, I don't know.</td></tr></table></p>
+<p>Давайте подробнее рассмотрим неоднозначности во фразе: <span class="example">я застрелил слона в моей пижаме</span>.  Во-первых, мы должны определить простую грамматику:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; groucho_grammar = nltk.CFG.fromstring("""
+... S -&gt; NP VP
+... PP -&gt; P NP
+... NP -&gt; Det N | Det N PP | 'I'
+... VP -&gt; V NP | VP PP
+... Det -&gt; 'an' | 'my'
+... N -&gt; 'elephant' | 'pajamas'
+... V -&gt; 'shot'
+... P -&gt; 'in'
+... """)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Эта грамматика допускает два способа проанализировать предложение, в зависимости от того, описывает ли предложная фраза <span class="example">в моей пижаме</span> слона или событие выстрела.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent = ['I', 'shot', 'an', 'elephant', 'in', 'my', 'pajamas']
+&gt;&gt;&gt; parser = nltk.ChartParser(groucho_grammar)
+&gt;&gt;&gt; for tree in parser.parse(sent):
+...     print(tree)
+...
+(S
+  (NP I)
+  (VP
+    (VP (V shot) (NP (Det an) (N elephant)))
+    (PP (P in) (NP (Det my) (N pajamas)))))
+(S
+  (NP I)
+  (VP
+    (V shot)
+    (NP (Det an) (N elephant) (PP (P in) (NP (Det my) (N pajamas))))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Программа производит две заключенные в квадратные скобки структуры, которые мы можем изобразить в виде деревьев, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-elephant">(3b)</a>:</p>
+<span class="target" id="ex-elephant"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(3)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-1.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-1.png" style="width:346.0px;height:225.0px"></td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-2.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-2.png" style="width:347.0px;height:265.0px"></td></tr></table></p>
+</td></tr></table></p>
+<p>Обратите внимание на то, что нет никакой двусмысленности относительно значения любого из слов; например, слово <span class="example">выстрел</span> не относится к акту использования пистолета в первом предложении и использования камеры во втором предложении.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Рассмотрите следующие предложения и попробуйте придумать две совершенно различные интерпретации: <span class="example">Fighting animals could be dangerous</span>.
+<span class="example">Visiting relatives can be tiresome.</span>  Виновата ли в этом многозначность отдельных слов?  Если нет, то что является причиной этой неоднозначности?</p>
+</div>
+<p>В этой главе представлены грамматики и синтаксический анализ как формальные и вычислительные методы для изучения и моделирования языковых явлений, которые мы обсуждали ранее.
+Как мы увидим, паттерны хорошой оформленности и плохой оформленности в последовательности слов могут быть поняты относительно структуры фразы и зависимостей внутри нее.  Мы можем разработать формальные модели этих структур с помощью грамматик и синтаксических анализаторов.
+Как и прежде, основной мотивацией является <em>понимание</em> естественного языка.  Насколько больше смысла текста мы можем использовать, когда мы умеем надежно распознавать языковые структуры, которые он содержит?  Прочитав ответ в тексте, может программа "понять" его достаточно, чтобы иметь возможность ответить на простые вопросы о том, "что случилось" или "кто что кому сделал"?  Кроме того, как и прежде, мы будем разрабатывать простые программы для обработки аннотированных корпусов и выполнения полезных задач.</p>
+</div>
+</div>
+<div class="section" id="what-s-the-use-of-syntax">
+<span id="sec-whats-the-use-of-syntax"></span><h1>2 Зачем нужен синтаксис?</h1>
+<div class="section" id="beyond-n-grams">
+<h2>2.1 За пределами n-грамм</h2>
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch02.html#chap-corpora">2.</a> мы дали пример того, как использовать информацию о частоте в биграммах для генерации текста , который кажется вполне приемлемым для небольших последовательностей слов, но быстро вырождается в бессмыслицу. Вот еще пара примеров, которые мы создали путем вычисления биграмм для текста рассказа для детей, <em>The Adventurs of Buster Brown</em><tt class="doctest"><span class="pre">(http://www.gutenberg.org/files/22816/22816.txt)</span></tt>:</p>
+<span class="target" id="ex-salad"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(4)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>He roared with me the pail slip down his back
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>The worst part and clumsy looking for whoever heard light</td></tr></table></p>
+</td></tr></table></p>
+<p>Вы интуитивно знаете, что эти последовательности "салат из слов", но вы, вероятно, с трудом можете сказать, что с ними случилось. Одним из преимуществ изучения грамматики является то, что она предоставляет концептуальные рамки и словарный запас для выражения этих интуиций. Давайте подробнее рассмотрим последовательность <span class="example">the worst part and clumsy looking</span>. Это выглядит как <a name="coordinate_structure_index_term"></a> <span class="termdef">сочиненная структура</span>, в которой две фразы объединены соединительным союзом, таким как <span class="example">и</span>, <span class="example">но</span> или <span class="example">или</span>. Вот неформальное (и упрощенный) определение того, как сочинение работает синтаксически:</p>
+<p>Сочиненная структура:</p>
+<blockquote>
+Если <em>v</em><sub>1</sub> и <em>v</em><sub>2</sub> являются обе фразами грамматической категории <em>X</em>, то <em>v</em><sub>1</sub> <span class="example">и</span> <em>v</em><sub>2</sub> также фраза категории <em>X</em>.</blockquote>
+<p>Вот несколько примеров. В первом из них две <tt class="doctest"><span class="pre">ИФ</span></tt> (именные фразы) были конъюгированы, чтобы получить <tt class="doctest"><span class="pre">ИФ</span></tt>, а во втором две <tt class="doctest"><span class="pre">ПФ</span></tt> (прилагательные фразы) были конъюгированы, чтобы получить <tt class="doctest"><span class="pre">AP</span></tt>.</p>
+<span class="target" id="ex-coord"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(5)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>The book's ending was (NP the worst part and the best part) for me.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>On land they are (AP slow and clumsy looking).
+</td></tr></table></p>
+</td></tr></table></p>
+<p>То, что мы <span class="emphasis">не можем</span> сделать, это объединить <tt class="doctest"><span class="pre">ИФ</span></tt> и <tt class="doctest"><span class="pre">ПФ</span></tt>, поэтому выражение <span class="example">the worst part and clumsy looking</span> безграмотно.
+Прежде чем мы сможем формализовать эти идеи, нам необходимо понять концепцию <a name="constituent_structure_index_term"></a><span class="termdef">конституирующей структуры</span>.</p>
+<p>Конституирующая структура основана на наблюдении, что слова сочетаются с другими словами, чтобы сформировать единства. Доказательство того, что последовательность слов образует такое единство дается через заменяемость - то есть последовательность слов в хорошо сформированном предложении можно заменить на более короткую последовательность не переводя предлоежние в плохо сформированные. Чтобы прояснить эту мысль, рассмотрим следующее предложение:</p>
+<span class="target" id="ex-bb0"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(6)</td><td width="15"></td><td>The little bear saw the fine fat trout in the brook.
+</td></tr></table></p>
+<p>Тот факт, что мы можем заменить <span class="example">The little bear</span> на <span class="example">He</span> указывает на то, что первая последовательность является единством. В отличие от нее мы не можем заменить <span class="example">littel bear saw</span> таким же образом.</p>
+<!-- explain * ? -->
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">4,46%</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>He saw the fine fat trout in the brook.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*The he the fine fat trout in the brook.
+</td></tr></table></p>
+</td></tr></table></p>
+<p>В <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-ic-diagram">2.1</a> мы систематически заменяем длинные последовательности на более короткие способом, который сохраняет грамматичность. Каждая последовательность, которая образует единство может быть на самом деле заменена одним словом, и мы в конечном итоге приходим только к двум элементам.</p>
+<span class="target" id="fig-ic-diagram"></span><div class="figure" id="fig-ic-diagram">
+<img alt="../images/ic_diagram.png" src="http://www.nltk.org/images/ic_diagram.png" style="width:463.75px;height:152.25px">
+<p class="caption"><span class="caption-label">Рисунок 2.1</span>: Замена последовательностей слов: начиная с верхнего ряда, мы можем заменить определенные последовательности слов <span class="example">(например, the brook)</span> отдельными словами (например , <span class="example">it</span>); повторяя этот процесс, мы приходим к грамматическому двухсловному предложению.</p>
+</div>
+<p>В <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-ic-diagram-labeled">2.2</a> мы добавили грамматические категории надписей для слов, которые мы видели на предыдущем рисунке.
+Метки <tt class="doctest"><span class="pre">NP</span></tt>, <tt class="doctest"><span class="pre">VP</span></tt> и <tt class="doctest"><span class="pre">PP</span></tt> обозначают <a name="noun_phrase_index_term"></a><span class="termdef">именную</span> <a name="verb_phrase_index_term"></a><span class="termdef">глагольную</span> и <a name="prepositional_phrase_index_term"></a><span class="termdef">предложную</span> фразу соответственно.</p>
+<span class="target" id="fig-ic-diagram-labeled"></span><div class="figure" id="fig-ic-diagram-labeled">
+<img alt="../images/ic_diagram_labeled.png" src="http://www.nltk.org/images/ic_diagram_labeled.png" style="width:463.75px;height:152.25px">
+<p class="caption"><span class="caption-label">Рисунок 2.2</span>: Замена последовательностей слов плюс грамматические категории: Эта диаграмма воспроизводит <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-ic-diagram">2.1</a> наряду с грамматическими категориями, соответствующими именным фразам <tt class="doctest"><span class="pre">(NP)</span></tt>, глагольным фразам <tt class="doctest"><span class="pre">(VP)</span></tt>, предложным фразам <tt class="doctest"><span class="pre">(PP)</span></tt> и номиналам <tt class="doctest"><span class="pre">(Nom)</span></tt>.</p>
+</div>
+<p>Если мы теперь уберем все слова, кроме самого верхнего ряда, добавим узел <tt class="doctest"><span class="pre">S</span></tt> и повернем фигуру, мы в конечном итоге получим стандартное дерево фразовой структуры, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-phrase-structure-tree">(8)</a>.
+Каждый узел в этом дереве (в том числе слова) называется <a name="constituent_index_term"></a><span class="termdef">составляющей (конституентом)</span>.  <a name="immediate_constituents_index_term"></a> <span class="termdef">Непосредственным составляющими</span> <tt class="doctest"><span class="pre">S</span></tt> являются <tt class="doctest"><span class="pre">NP</span></tt> и <tt class="doctest"><span class="pre">VP</span></tt>.</p>
+<span class="target" id="ex-phrase-structure-tree"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(8)</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-3.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-3.png" style="width:479.0px;height:265.0px"></td></tr></table></p>
+<p>Как мы увидим в следующем разделе, грамматика определяет, каким образом предложение может быть подразделено на непосредственные составляющие и каким образом последние могут быть дальше подразделены, пока мы не достигнем уровня отдельных слов.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Как мы видели в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#sec-dilemmas">1</a>, предложения могут иметь произвольную длину.
+Следовательно, деревья фразовой структуры могут иметь произвольную <span class="emphasis">глубину</span>.
+Каскадированные синтаксические анализаторы группировок, которые мы видели в <a class="reference external" href="http://www.nltk.org/book/ch07.html#sec-recursion-in-linguistic-structure">4</a> могут производить только структуры ограниченной глубины, поэтому методы группировки не применимы здесь.</p>
+</div>
+</div>
+</div>
+<div class="section" id="context-free-grammar">
+<span id="sec-context-free-grammar"></span><h1>3 Безконтекстная грамматика</h1>
+<div class="section" id="a-simple-grammar">
+<h2>3.1 Простая грамматика</h2>
+<!-- XXX say more about what "admitted by a grammar" means? -->
+<p>Давайте начнем с рассмотрения простой безконтекстной грамматики.  По соглашению левая сторона первого продуцирования является <a name="start_symbol_index_term"></a><span class="termdef">начальным символом</span> грамматики, как правило, <tt class="doctest"><span class="pre">S</span></tt>, и все хорошо сформированные деревья должны иметь этот символ в качестве корневой метки. В NLTK безконтекстные грамматики определены в модуле <tt class="doctest"><span class="pre">nltk.grammar</span></tt>.  В разделе <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-cfg1">3.1</a> мы определим грамматику и покажем, как разобрать простое предложение допускаемое грамматикой.</p>
+<span class="target" id="code-cfg1"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+grammar1 = nltk.CFG.fromstring("""
+  S -&gt; NP VP
+  VP -&gt; V NP | V NP PP
+  PP -&gt; P NP
+  V -&gt; "saw" | "ate" | "walked"
+  NP -&gt; "John" | "Mary" | "Bob" | Det N | Det N PP
+  Det -&gt; "a" | "an" | "the" | "my"
+  N -&gt; "man" | "dog" | "cat" | "telescope" | "park"
+  P -&gt; "in" | "on" | "by" | "with"
+  """)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent = "Mary saw Bob".split()
+&gt;&gt;&gt; rd_parser = nltk.RecursiveDescentParser(grammar1)
+&gt;&gt;&gt; for tree in rd_parser.parse(sent):
+...      print(tree)
+(S (NP Mary) (VP (V saw) (NP Bob)))</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_cfg1.py" type="text/x-python"><span class="caption-label">Пример 3.1 (code_cfg1.py)</span></a>: <span class="caption-label">Рисунок 3.1:</span> Простая безконтекстная грамматика</p></td></tr>
+</table></div>
+<p>Грамматика в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-cfg1">3.1</a> содержит продуцирования с участием различных синтаксических категорий, как изложено в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#tab-syncat">3.1</a>.</p>
+<span class="target" id="tab-syncat"></span><table border="1" class="docutils" id="tab-syncat">
+<colgroup>
+<col width="13%">
+<col width="42%">
+<col width="46%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Обозначения</th>
+<th class="head">Значение</th>
+<th class="head">Пример</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>S</td>
+<td>предложение</td>
+<td><span class="example">the man walked</span></td>
+</tr>
+<tr><td>NP</td>
+<td>именная фраза</td>
+<td><span class="example">a dog</span></td>
+</tr>
+<tr><td>VP</td>
+<td>глагольная фраза</td>
+<td><span class="example">saw a park</span></td>
+</tr>
+<tr><td>PP</td>
+<td>предложная фраза</td>
+<td><span class="example">with a telescope</span></td>
+</tr>
+<tr><td>Det</td>
+<td>определитель</td>
+<td><span class="example">the</span></td>
+</tr>
+<tr><td>N</td>
+<td>существительное (имя)</td>
+<td><span class="example">dog</span></td>
+</tr>
+<tr><td>V</td>
+<td>глагол</td>
+<td><span class="example">walked</span></td>
+</tr>
+<tr><td>P</td>
+<td>предлог</td>
+<td><span class="example">in</span></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 3.1</span>: <p>Синтаксические категории</p>
+</p>
+</td></table>
+<p>Продуцирование, как <tt class="doctest"><span class="pre">VP -&gt; V NP | V NP PP</span></tt>, имеет дизъюнкцию на правой стороне, показнную <tt class="doctest"><span class="pre">|</span></tt>, и такая запись является аббревиатурой для двух продуцирований <tt class="doctest"><span class="pre">VP -&gt; V NP</span></tt> и <tt class="doctest"><span class="pre">VP -&gt; V NP PP</span></tt>.</p>
+<span class="target" id="fig-parse-rdparsewindow"></span><div class="figure" id="fig-parse-rdparsewindow">
+<img alt="../images/parse_rdparsewindow.png" src="http://www.nltk.org/images/parse_rdparsewindow.png" style="width:475.0px;height:464.0px">
+<p class="caption"><span class="caption-label">Рисунок 3.2</span>: Recursive Descent Parser Demo: Этот инструмент позволяет следить за работой рекурсивно спускающегося синтаксического анализатора по мере того, как он создает дерево синтаксического разбора и наполняет его входными словами.</p>
+</div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Попробуйте разработать простую грамматику самостоятельно с помощью приложения recursive descent parser , <tt class="doctest"><span class="pre">nltk.app.rdparser()</span></tt>, показанного на Рисунке <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-parse-rdparsewindow">3.2</a>.
+Он поставляется с уже загруженным примером грамматики, но вы можете изменить его как вам будет угодно (с помощью меню <tt class="doctest"><span class="pre">Edit</span></tt>).
+Измените грамматику и предложение, которое должно быть проанализировано, и запустите анализатор с помощью кнопки <em>autostep</em>.</p>
+</div>
+<p>Если разобрать предложение <cite>The dog saw a man in the park</cite> с помощью грамматики, показанной в разделе <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-cfg1">3.1</a>, мы получим в конечном итоге два дерева похожих на те, которые мы видели для <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-elephant">(3b)</a>:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(9)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-4.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-4.png" style="width:336.0px;height:225.0px"></td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-5.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-5.png" style="width:336.0px;height:265.0px"></td></tr></table></p>
+</td></tr></table></p>
+<p>Так как наша грамматика допускает два дерева для этого предложения, предложение называется <a name="structurally_ambiguous_index_term"></a> <span class="termdef">структурно неоднозначным</span>.  Данная неоднозначность называется <a name="prepositional_phrase_attachment_ambiguity_index_term"></a> <span class="term">неоднозначность приложения предложной фразы</span>, как мы видели ранее в этой главе.
+Как вы, возможно, помните, это двусмысленность приложения, так как <tt class="doctest"><span class="pre">PP</span></tt> <span class="example">in the park</span> необходимо приложить к одному из двух мест в дереве: либо как ребенок <tt class="doctest"><span class="pre">VP</span></tt> или как ребенок <tt class="doctest"><span class="pre">NP</span></tt>.Когда <tt class="doctest"><span class="pre">PP</span></tt> приложена к <tt class="doctest"><span class="pre">VP</span></tt>, предполагаемая интерпретация заключается в том, что событие видения произошло в парке.  Однако если <tt class="doctest"><span class="pre">PP</span></tt> прилагается к <tt class="doctest"><span class="pre">NP</span></tt>, тогда в парке был человек, а агент видения (собака), возможно, сидела на балконе квартиры с видом на парк.</p>
+</div>
+<div class="section" id="writing-your-own-grammars">
+<h2>3.2 Написание ваших собственных грамматик</h2>
+<p>Если вы заинтересованы в экспериментировании с написанием безконтекстных грамматик (CFGs), вам будет удобно создавать и редактировать грамматики в текстовом файле, скажем, <tt class="doctest"><span class="pre">mygrammar.cfg</span></tt>. После этого вы можете загрузить ее в NLTK и осуществлять синтаксический разбор следующим образом:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; grammar1 = nltk.data.load('file:mygrammar.cfg')
+&gt;&gt;&gt; sent = "Mary saw Bob".split()
+&gt;&gt;&gt; rd_parser = nltk.RecursiveDescentParser(grammar1)
+&gt;&gt;&gt; for tree in rd_parser.parse(sent):
+...      print(tree)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Убедитесь, что вы присоединили <tt class="doctest"><span class="pre">.cfg</span></tt> суффикс к имени файла и что в строке <tt class="doctest"><span class="pre"><span class="pysrc-string">'file:mygrammar.cfg'</span></span></tt> нет пробелов. Если команда <tt class="doctest"><span class="pre"><span class="pysrc-keyword">print</span>(tree)</span></tt> не производит никакого вывода, это, вероятно, потому, что ваше предложение <tt class="doctest"><span class="pre">sent</span></tt> не допускается вашей грамматикой. В этом случае вызовите парсер с включенным отслеживанием: <tt class="doctest"><span class="pre">rd_parser = NLTK.RecursiveDescentParser(grammar1, trace = 2)</span></tt>. Вы также можете проверить, какие текущие продуцирования есть в грамматике с помощью команды <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span> p <span class="pysrc-keyword">in</span> grammar1.productions(): <span class="pysrc-keyword">print</span>(р)</span></tt>.</p>
+<p>Когда вы пишете CFGs для разбора в NLTK, вы не можете комбинировать грамматические категории с лексическими единицами на правой стороне одного и того же продуцирования. Таким образом, продуцирование, такое как <tt class="doctest"><span class="pre">PP -&gt; <span class="pysrc-string">'of'</span> NP</span></tt> запрещено. Кроме того, не разрешается размещать лексические единицы, состоящие из нескольких слов, на правой части продуцирования. Поэтому вместо того, чтобы писать <tt class="doctest"><span class="pre">NP -&gt; <span class="pysrc-string">'New'</span> <span class="pysrc-string">'York'</span></span></tt>, вы должны прибегнуть к чему-то вроде <tt class="doctest"><span class="pre">NP -&gt; <span class="pysrc-string">'New_York'</span></span></tt> вместо этого.</p>
+</div>
+<div class="section" id="recursion-in-syntactic-structure">
+<h2>3.3 Рекурсия в синтаксической структуре</h2>
+<p>Грамматика называется <a name="recursive_index_term"></a> <span class="termdef">рекурсивной</span>, если категория, возникающая на левой стороне продуцирования, также появляется и на правой его части, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-cfg2">3.3</a>.
+Продуцирование <tt class="doctest"><span class="pre">Nom -&gt; Adj Nom</span></tt> (где <tt class="doctest"><span class="pre">Nom</span></tt> это категория номиналов) влечет прямую рекурсию по категории <tt class="doctest"><span class="pre">Nom</span></tt>, тогда как непрямая рекурсия по <tt class="doctest"><span class="pre">S</span></tt> возникает из сочетания двух продуцирований, а именно : <tt class="doctest"><span class="pre">S -&gt; NP VP</span></tt> и <tt class="doctest"><span class="pre">VP -&gt; V S</span></tt>.</p>
+<span class="target" id="code-cfg2"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+grammar2 = nltk.CFG.fromstring("""
+  S  -&gt; NP VP
+  NP -&gt; Det Nom | PropN
+  Nom -&gt; Adj Nom | N
+  VP -&gt; V Adj | V NP | V S | V NP PP
+  PP -&gt; P NP
+  PropN -&gt; 'Buster' | 'Chatterer' | 'Joe'
+  Det -&gt; 'the' | 'a'
+  N -&gt; 'bear' | 'squirrel' | 'tree' | 'fish' | 'log'
+  Adj  -&gt; 'angry' | 'frightened' |  'little' | 'tall'
+  V -&gt;  'chased'  | 'saw' | 'said' | 'thought' | 'was' | 'put'
+  P -&gt; 'on'
+  """)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_cfg2.py" type="text/x-python"><span class="caption-label">Пример 3.3 (code_cfg2.py)</span></a>: <span class="caption-label">Листинг 3.3</span>: Рекурсивная безконтекстная грамматика</p></td></tr>
+</table></div>
+<p>Чтобы увидеть, как возникает рекурсия из этой грамматики, рассмотрим следующие деревья. <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-recnominals">(10a)</a> влечет вложенные именные фразы, а <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-recsentences">(10b)</a> содержит вложенные предложения.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(10)</td><td width="15"></td><td><span class="target" id="ex-recnominals"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-6.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-6.png" style="width:454.0px;height:265.0px"></td></tr></table></p>
+<span class="target" id="ex-recsentences"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-7.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-7.png" style="width:440.0px;height:346.0px"></td></tr></table></p>
+</td></tr></table></p>
+<p>Мы проиллюстрировали только два уровня рекурсии здесь, но нет никакого верхнего предела глубины.  Вы можете экспериментировать с разбором предложений, которые влекут более глубоко вложенные структуры.
+Обратите внимание, что <tt class="doctest"><span class="pre">RecursiveDescentParser</span></tt> не в состоянии справиться с <a name="left_recursive_index_term"></a><span class="termdef">левыми рекурсивными</span> продуцированиями вида <tt class="doctest"><span class="pre">X -&gt; XY</span></tt>; мы вернемся к этому в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#sec-parsing">4</a>.</p>
+</div>
+</div>
+<div class="section" id="parsing-with-context-free-grammar">
+<span id="sec-parsing"></span><h1>4 Синтаксический разбор с помощью безконтекстной грамматики</h1>
+<!-- >>> grammar1 = nltk.CFG.fromstring("""
+...     S -> NP VP
+...     VP -> V NP | V NP PP
+...     PP -> P NP
+...     V -> "saw" | "ate" | "walked"
+...     NP -> "John" | "Mary" | "Bob" | Det N | Det N PP
+...     Det -> "a" | "an" | "the" | "my"
+...     N -> "man" | "dog" | "cat" | "telescope" | "park"
+...     P -> "in" | "on" | "by" | "with"
+...     """)
+>>> groucho_grammar = nltk.CFG.fromstring("""
+... S -> NP VP
+... PP -> P NP
+... NP -> Det N | Det N PP | &#39;I&#39;
+... VP -> V NP | VP PP
+... Det -> &#39;an&#39; | &#39;my&#39;
+... N -> &#39;elephant&#39; | &#39;pajamas&#39;
+... V -> &#39;shot&#39;
+... P -> &#39;in&#39;
+... """) -->
+<p><a name="parser_index_term"></a><span class="termdef">Анализатор</span> обрабатывает входные предложения в соответствии с продуцированиями грамматики, а также создает одну или несколько составных структур, которые соответствуют грамматике.
+Грамматика является декларативной спецификацией хорошей оформленности - она, на самом деле, является только строкой, а не программой.
+Анализатор является процедурным толкованием грамматики.
+Он просматривает пространство деревьев, допускаемых грамматикой, чтобы найти то, которое может разместить требуемое предложение в своей кроне.</p>
+<!-- XXX does the following read as though our audience does not consist
+of people who want to do the tasks described in this chapter? -->
+<p>Анализатор позволяет оценить грамматику в отношении набора тестовых предложений, помогая лингвистам обнаружить ошибки в их грамматическом анализе.
+Анализатор может служить в качестве модели психолингвистической обработки, помогая объяснить трудности, которые люди испытывают при обработке некоторых синтаксических конструкций.
+Многие приложения естественного языка влекут синтаксический разбор на определенной стадии; например, можно было бы ожидать, что вопросы на естественном языке, задаваемые системе ответов на вопросы, пройдут синтаксический анализ в качестве первого шага обработки.</p>
+<p>В этом разделе мы видим два простых алгоритма синтаксического анализа: метод, идущий сверху вниз, называемый рекурсивно спускающийся синтаксический анализ, и восходящий метод, называемый синтаксическим анализом сокращения сдвига(?).
+Мы также видим некоторые более сложные алгоритмы: метод сверху вниз с фильтрацией снизу вверх под названием синтаксический анализ левого угла и метод динамического программирования, называемый синтаксическим анализом диаграмм.</p>
+<div class="section" id="recursive-descent-parsing">
+<h2>4.1 Рекурсивно спускающийся синтаксический разбор</h2>
+<p>Простейший вид анализатора интерпретирует грамматику как спецификацию того, как разбить цель высокого уровня на несколько подзадач более низкого уровня.
+Цель верхнего уровня - найти <tt class="doctest"><span class="pre">S</span></tt>.  Продуцирование <tt class="doctest"><span class="pre">S</span></tt> → <tt class="doctest"><span class="pre">NP VP</span></tt> позволяет анализатору заменить эту цель двумя подзадачами: найти <tt class="doctest"><span class="pre">NP</span></tt>, а затем найти <tt class="doctest"><span class="pre">VP</span></tt>.  Каждая из этих подзадач может быть заменена в свою очередь подподцелями с помощью продуцирований, которые имеют на левой стороне <tt class="doctest"><span class="pre">NP</span></tt> и <tt class="doctest"><span class="pre">VP</span></tt> соответственно.  В конце концов, этот процесс приводит к подзадачам, таким как: найти слово <span class="example">телескоп</span>.  Такие подзадачи можно сравнивать непосредственно с входной последовательностью, они являются успешными, если следующее слово найдено.  Если совпадения нет анализатор должен вернуться наверх и попробовать другую альтернативу.</p>
+<p>Метод рекурсивного спуска строит дерево разбора во время вышеописанного процесса.  С первоначальной целью (найти <tt class="doctest"><span class="pre">S</span></tt>) создается корневой узел <tt class="doctest"><span class="pre">S</span></tt>.  Поскольку описанный выше процесс рекурсивно расширяет свои цели, используя продуцирования грамматики, дерево разбора распространяется вниз (отсюда и название <em>рекурсивный спуск</em>).  Мы можем увидеть это в действии с помощью графической демонстрации <tt class="doctest"><span class="pre">nltk.app.rdparser()</span></tt>.
+Шесть этапов выполнения данного синтаксического анализа приведены на <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-rdparser1-6">4.1</a>.</p>
+<span class="target" id="fig-rdparser1-6"></span><div class="figure" id="fig-rdparser1-6">
+<img alt="../images/rdparser1-6.png" src="http://www.nltk.org/images/rdparser1-6.png" style="width:1062.5px;height:508.5px">
+<p class="caption"><span class="caption-label">Рисунок 4.1:</span> Шесть этапов метода рекурсивного спуска: анализатор начинает с дерева, состоящего из узла <tt class="doctest"><span class="pre">S</span></tt>; на каждом этапе он обращается к грамматике, чтобы найти продуцирование, которое может быть использовано для увеличения дерева; когда встречается лексическое продуцирование, его слово сравнивается с входом; после нахождения полного синтаксического разбора, анализатор ищет другие разборы.</p>
+</div>
+<p>Во время этого процесса анализатору часто приходится выбирать между несколькими возможными продуцированиями.  Например, при переходе от шага 3 к шагу 4, он пытается найти продуцирования с <tt class="doctest"><span class="pre">N</span></tt> на левой стороне.  Первым из них является <tt class="doctest"><span class="pre">N</span></tt> → <span class="example">человек</span>.  Когда это не срабатывает, он <a name="backtracks_index_term"></a><span class="term">откатывается</span> и пробует другие продуцирования <tt class="doctest"><span class="pre">N</span></tt> по порядку, пока не доберется до <tt class="doctest"><span class="pre">N</span></tt> → <span class="example">собака</span>, которое соответствует следующему слову во входном предложении.  Намного позже, как показано на шаге 5, он находит полный разбор.  Это дерево, которое охватывает все предложение без каких-либо оборванных краев.  После того, как синтаксический разбор был найден, мы можем использовать анализатор для поиска дополнительных разборов.  Опять же он будет возвращаться назад и исследовать другие варианты продуцирования на случай, если какой-нибудь из них приведет к разбору.</p>
+<p>NLTK предоставляет метод рекурсивного спуска:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; rd_parser = nltk.RecursiveDescentParser(grammar1)
+&gt;&gt;&gt; sent = 'Mary saw a dog'.split()
+&gt;&gt;&gt; for tree in rd_parser.parse(sent):
+...     print(tree)
+(S (NP Mary) (VP (V saw) (NP (Det a) (N dog))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><tt class="doctest"><span class="pre">RecursiveDescentParser()</span></tt> принимает необязательный параметр <tt class="doctest"><span class="pre">trace</span></tt>.
+Если <tt class="doctest"><span class="pre">trace</span></tt> больше нуля, то анализатор будет сообщать те шаги , которые он предпринимает в процессе того, как он разбирает текст.</p>
+</div>
+<p>Синтаксический анализа с помощью рекурсивного спуска имеет три основных недостатка.  Во- первых, левые рекурсивные продуцирования, как <tt class="doctest"><span class="pre">NP -&gt; NP PP</span></tt> отправляют его в бесконечный цикл.  Во-вторых, анализатор тратит уйму времени, рассматирвая слова и структуры, которые не соответствуют входному предложению.  В-третьих, процесс отката может сбросить уже разобранные компоненты, которые необходимо будет восстановить позже.  Например, откат с <tt class="doctest"><span class="pre">VP -&gt; V NP</span></tt> отбросит поддерево, созданное для <tt class="doctest"><span class="pre">NP</span></tt>.  Если анализатор затем продолжает с <tt class="doctest"><span class="pre">VP -&gt; V NP PP</span></tt>, то поддерево <tt class="doctest"><span class="pre">NP</span></tt> должно быть создано заново.</p>
+<p>Синтаксический анализ с помощью рекурсивного спуска является видом <a name="top_down_parsing_index_term"></a><span class="termdef"> синтаксического анализа сверху вниз</span>.
+Нисходящие анализаторы используют грамматику, чтобы <em>предсказывать</em>, какой будет вход до проверки входа!  Тем не менее, поскольку вход доступен для синтаксического анализатора все время, было бы более целесообразно рассмотреть входное предложение с самого начала.  Такой подход называется <a name="bottom_up_parsing_index_term"></a><span class="termdef">синтаксический анализ снизу вверх</span>, и мы увидим его пример в следующем разделе.</p>
+</div>
+<div class="section" id="shift-reduce-parsing">
+<h2>4.2 Синтаксический разбор помещения-сокращения</h2>
+<p>Простой вид синтаксического анализа снизу вверх является <a name="shift_reduce_parser_index_term"></a><span class="termdef">синтаксический анализатор помещения-сокращения</span>.
+Как и все анализаторы снизу вверх, анализатор помещения-сокращения пытается найти последовательности слов и фраз, которые соответствуют <em>правой стороне</em> продуцирования грамматики, и заменить их левой стороной, пока вся фраза не свернется в <tt class="doctest"><span class="pre">S</span></tt>.</p>
+<!-- XXX earlier section no longer talks about stacks.  Concepts of
+pushing and popping will need to be explained somewhere. -->
+<p>Анализатор неоднократно выталкивает следующее входное слово в стек (<a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-back-to-the-basics">4.1</a>); это операция называется <a name="shift_index_term"></a><span class="termdef">помещением</span>.
+Если верхние <em>n</em> элементов в стеке соответствуют <em>n</em> элементам на правой стороне какого-то продуцирования, то все они извлекаются из стека, а элемент на левой стороне продуцирования помещается в стек.  Эта замена верхних <em>n</em> элементов одним элементом является операцией <a name="reduce_index_term"></a><span class="termdef">сокращения</span>.
+Эта операция может быть применена только к верхней части стека; сокращение элементов, находящихся ниже в стеке, должно быть выполнено до помещения новых элементов в стек.  Анализатор заканчивает работу, когда весь вход использован и остается только один элемент в стеке - дерево разбора с узлом <tt class="doctest"><span class="pre">S</span></tt> в качестве корневого элемента.
+Анализатор помещения-сокращения строит дерево разбора во время вышеописанного процесса.
+Каждый раз, когда она сокращает <em>n</em> элементов из стека, он объединяет их в частичное дерево разбора и помещает обратно в стек.
+Мы можем увидеть в действии алгоритм синтаксического анализа помещения-сокращения с помощью графической демонстрации <tt class="doctest"><span class="pre">nltk.app.srparser()</span></tt>.
+Шесть этапов выполнения данного синтаксического анализатора приведены на Рисунке <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-srparser1-6">4.2</a>.</p>
+<span class="target" id="fig-srparser1-6"></span><div class="figure" id="fig-srparser1-6">
+<img alt="../images/srparser1-6.png" src="http://www.nltk.org/images/srparser1-6.png" style="width:1010.5px;height:598.0px">
+<p class="caption"><span class="caption-label">Рисунок 4.2:</span> Шесть этапов Анализатора помещения-сокращения: анализатор начинает путем помещения первого входного слова в свой стек; как только верхние элементы в стеке соответствуют правой стороне грамматического продуцирования, они могут быть заменены левой стороной того же продуцирования; синтаксический анализатор успешно завершает свою работу, как только весь вход потреблен и один элемент <tt class="doctest"><span class="pre">S</span></tt> остается в стеке.</p>
+</div>
+<p>NLTK предоставляет <tt class="doctest"><span class="pre">ShiftReduceParser()</span></tt>, простую реализацию анализатора помещения-сокращения.  Этот анализатор не выполняет каких-либо откатов, так что нахождение разбора текста, даже если таковой существует, не гарантируется.  Кроме того, он найдет не более одного разбора, даже если существует большее количество разборов.  Мы можем предоставить дополнительный параметр <tt class="doctest"><span class="pre">trace</span></tt>, который управляет тем, как пространно анализатор сообщает о своих шагах, которые он препринимает в процессе разбора текста:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sr_parser = nltk.ShiftReduceParser(grammar1)
+&gt;&gt;&gt; sent = 'Mary saw a dog'.split()
+&gt;&gt;&gt; for tree in sr_parser.parse(sent):
+...     print(tree)
+  (S (NP Mary) (VP (V saw) (NP (Det a) (N dog))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша Очередь:</strong> 
+Запустите вышеупомянутый анализатор в режиме трассировки, чтобы увидеть последовательность операций помещения и сокращения с помощью <tt class="doctest"><span class="pre">sr_parse = NLTK.ShiftReduceParser(grammar1, trace = 2)</span></tt></p>
+</div>
+<p>Анализатор помещения-сокращения может зайти в тупик и не найти ни одного разбора, даже если входное предложение хорошо сформировано в соответствии с грамматикой.
+Когда это происходит, весь вход потреблен, а стек содержит элементы, которые не могут быть сокращены до <tt class="doctest"><span class="pre">S</span></tt>.  Проблема возникает, потому что выбор, сделанный им ранее, не может быть отменен (хотя пользователи графической демонстрации могут отменить свои решения).
+Есть два вида решений, которые будут приняты анализатором: 
+(а) какое сокращение сделать, когда более чем одно возможно 
+(б) следует ли поместить или сократить, когда оба действия возможны.</p>
+<p>Анализатор помещения-сокращения может быть расширен для реализации политики разрешения подобных конфликтов.  Например, такая политика может пытаться разрешить конфликты между помещением и сокращением, помещая только тогда, когда никакие сокращения невозможны, и она может пытаться решить конфликты между сокращениями  выбором в пользу операции сокращения, которая удаляет самое большое число элементов из стека.  (Обобщение анализатора помещения-сокращения, "смотрящий вперед LR-анализатор", обычно используется в компиляторах языков программирования.)</p>
+<p>Преимущество анализаторов помещения-сокращения над рекурсивно спускающимися анализаторами заключается в том, что они строят только структуру, которая соответствует словам на входе.  Кроме того, они строят каждую подструктуру только один раз, например <tt class="doctest"><span class="pre">NP(Det(the), N(man))</span></tt> строится и помещается в стек только в один раз, независимо от того, будет ли он позже использоваться сокращением <tt class="doctest"><span class="pre">VP -&gt; V NP PP</span></tt> или сокращением <tt class="doctest"><span class="pre">NP -&gt; NP PP</span></tt>.</p>
+</div>
+<div class="section" id="the-left-corner-parser">
+<h2>4.3 Анализатор левого угла</h2>
+<p>Одна из проблем, связанных с рекурсивно спускающимся анализатором, заключается в том, что он уходит в бесконечный цикл, когда сталкивается с левосторонней рекурсией продуцирования.
+Это происходит потому, что он применяет грамматические продуцирования вслепую, без учета фактического входного предложения.
+Левоугольный анализатор представляет собой гибрид между подходами снизу вверх и сверху вниз, которые мы видели.</p>
+<p>Грамматика <tt class="doctest"><span class="pre">grammar1</span></tt> позволяет нам производить следующий разбор <span class="example">John saw Mary</span>:</p>
+<span class="target" id="ex-jmtree"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(11)</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-8.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-8.png" style="width:140.0px;height:144.0px"></td></tr></table></p>
+<p>Напомним, что грамматика (определенная в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-cfg2">3.3</a>) имеет следующие продуцирования для расширения <tt class="doctest"><span class="pre">NP</span></tt>:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(12)</td><td width="15"></td><td><span class="target" id="ex-r1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><tt class="doctest"><span class="pre">NP -&gt; Det N</span></tt></td></tr></table></p>
+<span class="target" id="ex-r2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><tt class="doctest"><span class="pre">NP -&gt; Det N PP</span></tt></td></tr></table></p>
+<span class="target" id="ex-r3"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td><tt class="doctest"><span class="pre">NP -&gt; <span class="pysrc-string">"John"</span> | <span class="pysrc-string">"Mary"</span> | <span class="pysrc-string">"Bob"</span></span></tt></td></tr></table></p>
+</td></tr></table></p>
+<!-- XXX Following notation with DoubleRightArrow wrongly assumes
+this relation has been defined. -->
+<p>Предположим, мы просим вас сначала посмотреть на дерево <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-jmtree">(11)</a>, а затем решить, какую из <tt class="doctest"><span class="pre">NP</span></tt> подстановок (продуцирований) вы хотите, чтобы метод рекурсивного спуска применил первой - очевидно, <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-r3">(12с)</a> является правильным выбором! Откуда вы знаете, что было бы бессмысленно применять сначала <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-r1">(12a)</a> или <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-r2">(12b)</a>? Потому что ни одна из этих двух подстановок (продуцирований) не выведет последовательность, первое слово которой <span class="example">John</span>.  То есть, мы можем легко сказать, что в успешном разборе предложения <span class="example">John saw Mary</span> анализатор должен расширить <tt class="doctest"><span class="pre">NP</span></tt> таким образом, чтобы <tt class="doctest"><span class="pre">NP</span></tt> давала последовательность <span class="example">John</span> α. В более общем плане мы говорим, что категория <span class="math">B</span> является <a name="left_corner_index_term"></a><span class="termdef">левым углом</span> дерева с корнем в <span class="math">А</span> , если <span class="math">A</span> ⇒ *<span class="math">B</span> α.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(13)</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-9.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-9.png" style="width:49.0px;height:64.0px"></td></tr></table></p>
+<p><a name="left_corner_parser_index_term"></a><span class="termdef">Левоугольный анализатор</span> - это анализатор сверху вниз с фильтрацией снизу вверх.
+В отличие от обычного метод рекурсивного спуска, он не попадает в ловушку в левой рекурсии подстановки.
+Перед началом своей работы, левоугольный анализатор выполняет предварительную обработку контекстно свободной грамматики для построения таблицы, где каждая строка содержит две ячейки, первая содержит неконечную, а вторая содержит набор возможных левых углов неконечной (подстановки?). Таблица <a class="reference internal" href="http://www.nltk.org/book/ch08.html#tab-lc">4.1</a> иллюстрирует это для грамматики из <tt class="doctest"><span class="pre">grammar2</span></tt>.</p>
+<span class="target" id="tab-lc"></span><table border="1" class="docutils" id="tab-lc">
+<colgroup>
+<col width="22%">
+<col width="78%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Категория</th>
+<th class="head">Левые углы (предварительные конечные)</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>S</td>
+<td>NP</td>
+</tr>
+<tr><td>NP</td>
+<td>Det, PropN</td>
+</tr>
+<tr><td>VP</td>
+<td>V</td>
+</tr>
+<tr><td>PP</td>
+<td>P</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.1</span>: <p>Левые углы в <tt class="doctest"><span class="pre">grammar2</span></tt></p>
+</p>
+</td></table>
+<p>Каждый раз, когда подстановка рассматривается анализатором, он проверяет, что следующее входное слово совместимо, по меньшей мере, с одной из предварительных конечных категорий в левоугольной таблице.</p>
+<!-- XXX explain how this effects the action of the parser, and why this solves the problem -->
+</div>
+<div class="section" id="well-formed-substring-tables">
+<h2>4.4 Таблица хорошо сформированных подстрок</h2>
+<p>Простые анализаторы, рассмотренные выше, страдают от ограничений как полноты, так и эффективности. Для того чтобы исправить это, мы будем применять для проектирования алгоритма синтаксического анализа технику <a name="dynamic_programming_index_term"></a><span class="term">динамического программирования</span>.  Как мы видели в <a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-algorithm-design">4.7</a>, динамическое программирование храниит промежуточные результаты и повторно использует их при необходимости, добиваясь значительного повышения эффективности. Этот метод может быть применен к синтаксическому разбору, позволяя нам хранить частичные решения задачи синтаксического анализа, а затем находить их по мере необходимости для того, чтобы эффективно прийти к полному решению.
+Такой подход к разбору известен как <a name="chart_parsing_index_term"></a> <span class="termdef">табличный (графический-?) синтаксический анализ</span>.  Мы познакомим вас с основной идеей в этом разделе; обратитесь к онлайн материалам для этой главы для получения более подробной информации о реализации.</p>
+<p>Динамическое программирование позволяет строить <tt class="doctest"><span class="pre">PP</span></tt> <span class="example">in my pajamas</span> только один раз.  Первый раз, когда мы создаем его, мы сохраняем его в таблице, затем мы находим его, когда мы должны использовать его в качестве подкомпонента либо объекта <tt class="doctest"><span class="pre">NP</span></tt> или более высокого уровня <tt class="doctest"><span class="pre">VP</span></tt>. Эта таблица известна как <a name="well_formed_substring_table_index_term"></a> <span class="termdef">таблица хорошо сформированных подстрок</span> или ТХСП (WFST) для краткости.
+(Термин "подстроки" относится к непрерывной последовательности слов в предложении.)
+Мы покажем, как построить WFST снизу вверх так, чтобы систематически записывать, какие синтаксические компоненты были найдены.</p>
+<p>Давайте используем в качестве нашего входа предложении из <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-marx-elephant">(2)</a>.  Численно указанные пролеты WFST напоминают срез как нотацию языка Python (<a class="reference external" href="http://www.nltk.org/book/ch03.html#sec-strings">3.2</a>).  Еще один способ думать о структуре данных, показанной на <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-chart-positions1">4.3</a>, - это структура данных, известная как <a name="chart_index_term"></a><span class="termdef">график</span>.</p>
+<span class="target" id="fig-chart-positions1"></span><div class="figure" id="fig-chart-positions1">
+<img alt="../images/chart_positions1.png" src="http://www.nltk.org/images/chart_positions1.png" style="width:129.75px;height:11.0px">
+<p class="caption"><span class="caption-label">Рисунок 4.3:</span> Диаграмма структуры данных: слова являются метками ребер линейной графической структуры.</p>
+</div>
+<p>В WFST мы фиксируем положение слов путем заполнения ячеек треугольной матрицы: вертикальная ось будет обозначать начальную позицию подстроки, а горизонтальная ось будет обозначать конечное положение (таким образом <span class="example">shot</span> будет отображаться в ячейке с координатами (1, 2)).
+Для упрощения этого изложения мы будем считать, что каждое слово имеет уникальную лексическую категорию, и мы будем хранить ее (а не слово) в матрице.
+Таким образом, клетка (1, 2) будет содержать запись <tt class="doctest"><span class="pre">V</span></tt>. В более общем плане, если наша входная строка является <cite>a</cite><sub>0</sub><cite>a</cite><sub>1</sub> ... <cite>a</cite><sub>n</sub> и наша грамматика содержит подстановку вида <em>A</em> → <cite>a</cite><sub>i</sub>,  тогда мы добавляем <em>A</em> в ячейку (<cite>i</cite>, <a href="http://www.nltk.org/book/ch08.html#id1"><span class="problematic" id="id2">`</span></a>i`+1).</p>
+<div class="system-message" id="id1">
+<p class="system-message-title">Системное сообщение: ПРЕДУПРЕЖДЕНИЕ/2 (<tt class="docutils">ch08.rst2</tt>, строка 900); <em><a href="http://www.nltk.org/book/ch08.html#id2">обратная ссылка</a></em></p>
+Inline interpreted text or phrase reference start-string without end-string.</div>
+<p>Таким образом, для каждого слова в <tt class="doctest"><span class="pre">text</span></tt>, мы можем найти в нашей грамматике, к какой категории оно принадлежит.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text = ['I', 'shot', 'an', 'elephant', 'in', 'my', 'pajamas']
+&gt;&gt;&gt; groucho_grammar.productions(rhs=text[1])
+[V -&gt; 'shot']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Для нашего WFST мы создаем матрицу <span class="math">(n-1)</span>×<span class="math">(n-1)</span> в виде списка списков Python и заполняем его лексическими категориями каждого токена в функции <tt class="doctest"><span class="pre">init_wfst()</span></tt> в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-wfst">4.4</a>.  Мы также определяем утилитарную функцию <tt class="doctest"><span class="pre">display()</span></tt> для отображения WFST в удобном для нас виде.
+Как и следовало ожидать, в ячейке (1, 2) находится <tt class="doctest"><span class="pre">V</span></tt>.</p>
+<span class="target" id="code-wfst"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def init_wfst(tokens, grammar):
+    numtokens = len(tokens)
+    wfst = [[None for i in range(numtokens+1)] for j in range(numtokens+1)]
+    for i in range(numtokens):
+        productions = grammar.productions(rhs=tokens[i])
+        wfst[i][i+1] = productions[0].lhs()
+    return wfst
+
+def complete_wfst(wfst, tokens, grammar, trace=False):
+    index = dict((p.rhs(), p.lhs()) for p in grammar.productions())
+    numtokens = len(tokens)
+    for span in range(2, numtokens+1):
+        for start in range(numtokens+1-span):
+            end = start + span
+            for mid in range(start+1, end):
+                nt1, nt2 = wfst[start][mid], wfst[mid][end]
+                if nt1 and nt2 and (nt1,nt2) in index:
+                    wfst[start][end] = index[(nt1,nt2)]
+                    if trace:
+                        print("[%s] %3s [%s] %3s [%s] ==&gt; [%s] %3s [%s]" % \
+                        (start, nt1, mid, nt2, end, start, index[(nt1,nt2)], end))
+    return wfst
+
+def display(wfst, tokens):
+    print('\nWFST ' + ' '.join(("%-4d" % i) for i in range(1, len(wfst))))
+    for i in range(len(wfst)-1):
+        print("%d   " % i, end=" ")
+        for j in range(1, len(wfst)):
+            print("%-4s" % (wfst[i][j] or '.'), end=" ")
+        print()
+&gt;&gt;&gt; tokens = "I shot an elephant in my pajamas".split()
+&gt;&gt;&gt; wfst0 = init_wfst(tokens, groucho_grammar)
+&gt;&gt;&gt; display(wfst0, tokens)
+WFST 1    2    3    4    5    6    7
+0    NP   .    .    .    .    .    .
+1    .    V    .    .    .    .    .
+2    .    .    Det  .    .    .    .
+3    .    .    .    N    .    .    .
+4    .    .    .    .    P    .    .
+5    .    .    .    .    .    Det  .
+6    .    .    .    .    .    .    N
+&gt;&gt;&gt; wfst1 = complete_wfst(wfst0, tokens, groucho_grammar)
+&gt;&gt;&gt; display(wfst1, tokens)
+WFST 1    2    3    4    5    6    7
+0    NP   .    .    S    .    .    S
+1    .    V    .    VP   .    .    VP
+2    .    .    Det  NP   .    .    .
+3    .    .    .    N    .    .    .
+4    .    .    .    .    P    .    PP
+5    .    .    .    .    .    Det  NP
+6    .    .    .    .    .    .    N</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_wfst.py" type="text/x-python"><span class="caption-label">Пример 4.4 (code_wfst.py)</span></a>: <span class="caption-label">Рисунок 4.4:</span> Акцептор, использующий таблицу хорошо сформированных подстрок</p></td></tr>
+</table></div>
+<p>Возвращаясь к нашему табличному представлению, учитывая, что мы имеем <tt class="doctest"><span class="pre">Det</span></tt> в ячейке (2, 3) для слова <span class="example">an</span> и <tt class="doctest"><span class="pre">N</span></tt> в ячейке (3, 4) для слова <span class="example">elephant</span>, что мы должны поместить в ячейку (2, 4) для <span class="example">elephant</span>?
+Нам нужно найти подстановку вида <em>A</em> → <tt class="doctest"><span class="pre">Det N</span></tt>. Уточнив по грамматике, мы узнаем, что мы можем ввести <tt class="doctest"><span class="pre">NP</span></tt> в ячейке (2, 4).</p>
+<!-- XXX overuse of &#39;more generally&#39;? Maybe say: &#39;To summarise&#39;? -->
+<p>В более общем плане, мы можем ввести <em>A</em> в ячейку <span class="math">(i, j)</span>, если есть подстановка <em>A</em> → <em>B</em> <em>C</em>, и мы находим неконечное <em>B</em> в <span class="math">(i, k)</span> и <em>C</em> в <span class="math">(k, j)</span>.
+Программа в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-wfst">4.4</a> использует это правило для заполнения WFST. Установив значение <tt class="doctest"><span class="pre">trace</span></tt> - <tt class="doctest"><span class="pre">True</span></tt> при вызове функции <tt class="doctest"><span class="pre">complete_wfst()</span></tt>, мы видим вывод трассировки, который показывает, как WFST строится:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wfst1 = complete_wfst(wfst0, tokens, groucho_grammar, trace=True)
+[2] Det [3]   N [4] ==&gt; [2]  NP [4]
+[5] Det [6]   N [7] ==&gt; [5]  NP [7]
+[1]   V [2]  NP [4] ==&gt; [1]  VP [4]
+[4]   P [5]  NP [7] ==&gt; [4]  PP [7]
+[0]  NP [1]  VP [4] ==&gt; [0]   S [4]
+[1]  VP [4]  PP [7] ==&gt; [1]  VP [7]
+[0]  NP [1]  VP [7] ==&gt; [0]   S [7]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Например, это говорит о том, что, поскольку мы нашли <tt class="doctest"><span class="pre">Det</span></tt> в <tt class="doctest"><span class="pre">wfst[2][3]</span></tt> и <tt class="doctest"><span class="pre">N</span></tt> в <tt class="doctest"><span class="pre">wfst[3][4]</span></tt>, мы можем добавить <tt class="doctest"><span class="pre">NP</span></tt> к <tt class="doctest"><span class="pre">wfst[2][4]</span></tt>.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Чтобы помочь нам легко получать постановки по их правым частям, мы создаем индекс для грамматики.
+Это пример пространственно-временного компромисса: мы делаем обратный поиск по грамматике, вместо того, чтобы проверять весь список подстановок каждый раз, когда мы хотим найти по правой стороне.</p>
+</div>
+<span class="target" id="fig-chart-positions2"></span><div class="figure" id="fig-chart-positions2">
+<img alt="../images/chart_positions2.png" src="http://www.nltk.org/images/chart_positions2.png" style="width:129.75px;height:44.0px">
+<p class="caption"><span class="caption-label">Рисунок 4.5:</span> Графическая структура данных: неконечные представлены как дополнительные ребра на графике.</p>
+</div>
+<p>Мы приходим к выводу, что для синтаксического анализа входной строки существует разбор, раз мы построили узел <tt class="doctest"><span class="pre">S</span></tt> в ячейке (0, 7), показывающий, что мы нашли предложение, которое охватывает весь вход.  Конечное состояние WFST изображено на <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-chart-positions2">4.5</a>.</p>
+<p>Обратите внимание на то, что мы не использовали каких-либо встроенных функций синтаксического анализа здесь.
+Мы реализовали полный примитивный графический анализатор с нуля!</p>
+<!-- XXX distinction between recognition and parsing should be explained
+more carefully or else dropped. -->
+<p>WFST имеют несколько недостатков.
+Во-первых, как вы можете видеть, WFST не является сама по себе деревом разбора, поэтому метод, строго говоря, <a name="recognizing_index_term"></a><span class="termdef">распознает</span>, что предложение признается грамматикой, а не разбирает его.
+Во- вторых, она требует, чтобы каждая нелексическая подстановка грамматики была <span class="emphasis">бинарной</span>.
+Несмотря на то, что можно преобразовать произвольную CFG в эту форму, мы предпочли бы использовать подход без такого требования.
+В-третьих, как подход снизу вверх она потенциально расточительна, будучи в состоянии предложить конституенты в тех местах, которые бы не были признаны грамматикой.</p>
+<!-- XXX is this correct? There isn&#39;t an NP -> NP PP edge in the table -->
+<p>И, наконец, WFST не представляет структурную неоднозначность в предложении (то есть два прочтения глагольной фразы).  <tt class="doctest"><span class="pre">VP</span></tt> в ячейке (1, 7) была фактически введена дважды, один раз для прочтения <tt class="doctest"><span class="pre">V NP</span></tt> и один раз для прочтения <tt class="doctest"><span class="pre">VP PP</span></tt>.  Это разные гипотезы, а вторая переписала первую (как оказалось, это не имело значения, так как левая часть была такой же.)
+Графические анализаторы используют немного более богатую структуру данных и некоторые интересные алгоритмы для решения этих проблем (обратитесь к разделу Дополнительные материалы в конце этой главы для получения подробностей).</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Попробуйте интерактивное приложение графический анализатор <tt class="doctest"><span class="pre">nltk.app.chartparser()</span></tt>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="dependencies-and-dependency-grammar">
+<h1>5 Зависимости и грамматика зависимостей</h1>
+<p>Грамматика фразовой структуры занимается тем, как слова и последовательности слов <span class="emphasis">объединяются</span>, чтобы сформировать конституенты. Отличный и взаимодополняющий подход, грамматика зависимости, фокусирует внимание на том, как слова <span class="emphasis">соотносятся</span> с другими словами. Зависимость - это бинарное асимметричное отношение, которое имеет место между <a name="head_index_term"></a> <span class="termdef">главой</span> и его <a name="dependents_index_term"></a><span class="termdef">зависимыми</span>.
+Главой предложения обычно выбирается глагол в определенном времени, и все остальные слова либо зависят от главы предложения, либо соединяются с ним через путь зависимостей.</p>
+<!-- XXX explain concept of "head"? -->
+<p>Представлением зависимости является размеченный направленный граф, в котором узлы являются лексическими единицами и помеченые дуги представляют отношения зависимости между главами и зависимыми.  Рисунок <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-depgraph0">5.1</a> иллюстрирует график зависимости, где стрелки указывают от глав к их зависимым.</p>
+<span class="target" id="fig-depgraph0"></span><div class="figure" id="fig-depgraph0">
+<img alt="../images/depgraph0.png" src="http://www.nltk.org/images/depgraph0.png" style="width:643.3px;height:109.55px">
+<p class="caption"><span class="caption-label">Рисунок 5.1:</span> Структура зависимости: стрелки указывают от глав к их зависимым; метки указывают на грамматическую функцию зависимого как субъекта, объекта или модификатора.</p>
+</div>
+<p>Дуги на Рисунке <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-depgraph0">5.1</a> помечены грамматической функцией, которая имеет место между зависимым и его главой. Например, <span class="example">I</span> - это <tt class="doctest"><span class="pre">SBJ</span></tt> (субъект) слова <span class="example">shot</span> (которое является главой всего предложения), а <span class="example">in</span> - это <tt class="doctest"><span class="pre">NMOD</span></tt> (модификатор существительного) для слова <span class="example">elephant</span>. В отличие от грамматики фразовой структуры, следовательно, грамматики зависимостей могут быть использованы для прямого выражения грамматических функций как типа зависимости.</p>
+<p>Вот один из способов кодирования грамматики зависимостей в NLTK - обратите внимание, что она фиксирует только голую информацию о зависимостях без указания типа зависимости:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; groucho_dep_grammar = nltk.DependencyGrammar.fromstring("""
+... 'shot' -&gt; 'I' | 'elephant' | 'in'
+... 'elephant' -&gt; 'an' | 'in'
+... 'in' -&gt; 'pajamas'
+... 'pajamas' -&gt; 'my'
+... """)
+&gt;&gt;&gt; print(groucho_dep_grammar)
+Dependency grammar with 7 productions
+  'shot' -&gt; 'I'
+  'shot' -&gt; 'elephant'
+  'shot' -&gt; 'in'
+  'elephant' -&gt; 'an'
+  'elephant' -&gt; 'in'
+  'in' -&gt; 'pajamas'
+  'pajamas' -&gt; 'my'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>График зависимости является <a name="projective_index_term"></a><span class="termdef">проективным</span> "если", когда все слова написаны в линейном порядке, ребра могут быть нарисованы выше слов без пересечения. Это равносильно тому, что слово и все его потомки (зависимые и зависимые их зависимых и т.д.) образуют непрерывную последовательность слов в пределах предложения. График на Рисунке <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-depgraph0">5.1</a> проективный, и мы можем разобрать много предложений на английском языке с использованием проективного анализатора зависимостей. В следующем примере показано, как <tt class="doctest"><span class="pre">groucho_dep_grammar</span></tt> обеспечивает альтернативный подход к схватыванию двусмысленности приложения, которую мы рассмотрели ранее с грамматикой фразовой структуры.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pdp = nltk.ProjectiveDependencyParser(groucho_dep_grammar)
+&gt;&gt;&gt; sent = 'I shot an elephant in my pajamas'.split()
+&gt;&gt;&gt; trees = pdp.parse(sent)
+&gt;&gt;&gt; for tree in trees:
+...     print(tree)
+(shot I (elephant an (in (pajamas my))))
+(shot I (elephant an) (in (pajamas my)))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Эти заключенные в квадратные скобки структуры зависимостей также могут отображаться в виде деревьев, где зависимые показаны как дети их глав.</p>
+<span class="target" id="ex-depgraph1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(14)</td><td width="15"></td><td><img alt="tree_images / ch08-дерево-10.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-10.png" style="width:126.0px;height:144.0px"><img alt="tree_images / ch08-дерево-11.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch08-tree-11.png" style="width:206.0px;height:104.0px"></td></tr></table></p>
+<p>В языках с более гибким порядком слов, чем в английском, не проективные зависимости более частотны.</p>
+<!-- give example of parsing non-projective example -->
+<!-- really needs better technique for visualizing a DependencyGraph -->
+<p>Различные критерии были предложены для принятия решения о том, что является главой <em>H</em> и что является зависимым <em>D</em> в конструкции <em>C</em>. Вот несколько наиболее важных из них:</p>
+<ol class="arabic simple">
+<li><em>H</em> определяет класс распределения <em>C</em>; или иначе внешние синтаксические свойства <em>C</em> обусловлены <em>Н</em>.</li>
+<li><em>H</em> определяет семантический тип <em>C</em>.</li>
+<li><em>H</em> является обязательным, в то время как <em>D</em> может быть необязательным.</li>
+<li><em>H</em> выбирает <em>D</em> и определяет, является ли он обязательным или необязательным.</li>
+<li>Морфологическая форма <em>D</em> определяется <em>H</em> (например, agreement or casr government).</li>
+</ol>
+<p>Когда мы говорим в грамматике фразовой структуры, что непосредственными составляющими <tt class="doctest"><span class="pre">PP</span></tt> являются <tt class="doctest"><span class="pre">P</span></tt> и <tt class="doctest"><span class="pre">NP</span></tt>, мы неявно используем различие между главой и зависимым. Предложной фраза это фраза, главой которой является предлог; более того, <tt class="doctest"><span class="pre">NP</span></tt> является зависимым от <tt class="doctest"><span class="pre">Р</span></tt>.  То же самое различие распространяется на другие типы фраз, которые мы обсуждали. Ключевым моментом, который необходимо здесь отметить, является то, что, хотя грамматики фразовой структуры кажутся отличными от грамматик зависимостей, они неявно заключают в себе распознание отношений зависимости. В то время как CFGs не предназначены для непосредственного схватывания зависимостей, более поздние языковые концепции все чаще применяют формализмы, которые сочетают в себе аспекты обоих подходов.</p>
+<div class="section" id="valency-and-the-lexicon">
+<h2>5.1 Валентность и лексикон</h2>
+<p>Давайте подробнее рассмотрим глаголы и их зависимые.
+Грамматика в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-cfg2">3.3</a> правильно генерирует примеры, как <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-subcat1">(15d)</a>.</p>
+<span class="target" id="ex-subcat1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(15)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>The squirrel was frightened.
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Chatterer saw the bear.
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>Chatterer thought Buster was angry.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td>Joe put the fish on the log.
+</td></tr></table></p>
+</td></tr></table></p>
+<!-- XXX CFG productions in the DG section? -->
+<p>Эти возможности соответствуют следующим подстановкам:</p>
+<span class="target" id="tab-subcat"></span><table border="1" class="docutils" id="tab-subcat">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">VP -&gt; V Adj</span></tt></td>
+<td><span class="example">was</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">VP -&gt; V NP</span></tt></td>
+<td><span class="example">saw</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">VP -&gt; VS</span></tt></td>
+<td><span class="example">thought</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">VP -&gt; V NP PP</span></tt></td>
+<td><span class="example">put</span></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 5.1</span>: <p>VP подстановки и их лексические главы</p>
+</p>
+</td></table>
+<!-- XXX above table is missing a caption, required for formal tables -->
+<p>То есть, <span class="example">was</span> может возникнуть с последующим <tt class="doctest"><span class="pre">Adj</span></tt>, <span class="example">saw</span> может возникнуть со последующим <tt class="doctest"><span class="pre">NP</span></tt>, <span class="example">thought</span> может возникнуть со следующим <tt class="doctest"><span class="pre">S</span></tt>, а <span class="example">put</span> может возникнуть с последующим <tt class="doctest"><span class="pre">NP</span></tt> и <tt class="doctest"><span class="pre">PP</span></tt>.Зависимые <tt class="doctest"><span class="pre">Adj</span></tt>, <tt class="doctest"><span class="pre">NP</span></tt>, <tt class="doctest"><span class="pre">PP</span></tt> и <tt class="doctest"><span class="pre">S</span></tt> часто называют <a name="complements_index_term"></a><span class="termdef">дополнениями</span> соответствующих глаголов, при этом существуют серьезные ограничения на то, какие глаголы могут возникнуть с какими дополнениями. В отличие от <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-subcat1">(15d)</a>, последовательности слов в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-subcat2">(16d)</a> плохо сформированы:</p>
+<span class="target" id="ex-subcat2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(16)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>*The squirrel was Buster was angry.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*Chatterer saw frightened.
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>*Chatterer thought the bear.
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td>*Joe put on the log.
+</td></tr></table></p>
+</td></tr></table></p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Использовав немного воображения, можно придумать условия, в которых необычные сочетания глаголов и дополнений являются интерпретируемыми. Однако мы предполагаем, что приведенные выше примеры должны интерпретироваться в нейтральных контекстах.</p>
+</div>
+<!-- XXX does the historical note matter here?  Can we just talk about
+valency without linking it to a tradition? -->
+<p>В традиции грамматики зависимостей, говорят, что глаголы в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#tab-subcat">5.1</a> имеют разные <a name="valencies_index_term"></a><span class="termdef">валентности</span>. Ограничения валентности не только применимы к глаголам, но также и к другим классам глав.</p>
+<!-- XXX "techniques within frameworks based on PSG" overly complicated.
+This paragraph probably works just fine without this sentence. -->
+<p>В рамках концепций на основе грамматики фразовой структуры, различные методы были предложены для исключения неграмматических примеров в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-subcat2">(16d)</a>. В CFG нам нужен какой-то способ ограничения подстановок грамматики, которые расширяют <tt class="doctest"><span class="pre">VP</span></tt> так, чтобы глаголы возникали <em>только</em> с правильными дополнениями. Мы можем сделать это путем деления класса глаголов на "подкатегории", каждая из которых связана с другим набором дополнений. Например, <a name="transitive_verbs_index_term"></a><span class="termdef">переходные глаголы</span>, такие как <span class="example">chases</span> и <span class="example">saw</span> требуют следующего за ними <tt class="doctest"><span class="pre">NP</span></tt> объекта в качестве дополнения; то есть, они <a name="subcategorized_index_term"></a><span class="termdef">подразделены</span> на глаголы, требующие прямых объектов <tt class="doctest"><span class="pre">NP</span></tt>. Если мы введем новую метку категории для переходных глаголов, а именно: <tt class="doctest"><span class="pre">TV</span></tt> (для переходного глагола (Transitive Verb)), то мы можем использовать ее в следующих подстановках:</p>
+<pre class="literal-block">
+VP -&gt; TV NP
+TV -&gt; 'chased' | 'saw'
+</pre>
+<p>Теперь предложение <span class="example">*Joe thought the bear</span> будет исключено , так как мы не включили <span class="example">thought</span> как <tt class="doctest"><span class="pre">TV</span></tt>, но <span class="example">Chatterer saw the bear</span> по-прежнему разрешено.
+<a class="reference internal" href="http://www.nltk.org/book/ch08.html#tab-verbcat">5.2</a> предоставляет дополнительные примеры меток для глагольных подкатегорий.</p>
+<span class="target" id="tab-verbcat"></span><table border="1" class="docutils" id="tab-verbcat">
+<colgroup>
+<col width="12%">
+<col width="40%">
+<col width="48%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Обозначения</th>
+<th class="head">Значение</th>
+<th class="head">Пример</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>IV</td>
+<td>непереходный глагол</td>
+<td><em>barked</em></td>
+</tr>
+<tr><td>TV</td>
+<td>переходный глагол</td>
+<td><em>saw a man</em></td>
+</tr>
+<tr><td>DatV</td>
+<td>датив глагол</td>
+<td><em>gave a dog to a man</em></td>
+</tr>
+<tr><td>SV</td>
+<td>сентенциальный глагол</td>
+<td><em>said that a dog barked</em></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 5.2</span>: <p>Подкатегории глагола</p>
+</p>
+</td></table>
+<p>Валентность является свойством лексических единиц, и мы будем обсуждать ее дальше в <a class="reference external" href="http://www.nltk.org/book/ch09.html#chap-featgram">9.</a> .</p>
+<p>Дополненния часто противопоставляется модификаторам (or adjuncts?), хотя оба являются видами зависимого. Предложные фразы, прилагательные и наречия, как правило, функционируют в качестве модификаторов. В отличие от дополнений, модификаторы не являются обязательными, часто могут повторяться, и не выбираются главами таким же образом, как дополнения. Например, наречие <span class="example">really</span> может быть добавлено в качестве модификатора ко всему предложению в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-mod">(17d)</a>:</p>
+<span class="target" id="ex-mod"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(17)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>The squirrel really was frightened.
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Chatterer really saw the bear.
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>Chatterer really thought Buster was angry.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td>Joe really put the fish on the log.
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Структурная неоднозначность приложения <tt class="doctest"><span class="pre">PP</span></tt>, которую мы проиллюстрировали как в грамматике фразовой структуры, так и в грамматике зависимостей, соответствует семантически неоднозначности охвата модификатора.</p>
+</div>
+<div class="section" id="scaling-up">
+<h2>5.2 Расширение масштаба</h2>
+<p>До сих пор мы рассматривали только "игрушечные грамматики", маленькие грамматики, которые иллюстрируют ключевые аспекты синтаксического анализа.  Но встает очевидный вопрос, может ли подход быть расширены, чтобы покрыть большие корпусы естественных языков. Как трудно было бы построить такой набор подстановок вручную? В целом ответ такой: <em>очень трудно</em>. Даже если мы позволим себе использовать различные формальные устройства, которые дают гораздо более емкие представления подстановок грамматики, все равно чрезвычайно трудно держать под контролем сложные взаимодействия между многими подстановками необходимыми для покрытия основных конструкций языка. Другими словами, трудно построить грамматику модульно, чтобы одну ее часть можно было разрабатывать независимо от других ее частей. Это, в свою очередь, означает, что трудно распределить задачу написания грамматики на команду лингвистов. Другая трудность состоит в том, что по мере того, как грамматика расширяется, чтобы охватить все более широкий диапазон конструкций, увеличивается число разборов, которые допускаются для одного предложения. Другими словами, неопределенность возрастает с увеличением охвата.</p>
+<p>Несмотря на эти проблемы, некоторые крупные совместные проекты достигли интересных и впечатляющих результатов в разработке грамматик на основе правил для нескольких языков. Примерами являются проекты Lexical Functional Grammar (LFG) Pargram,
+Head-Driven Phrase Structure Grammar (HPSG) LinGO Matrix
+и Lexicalized Tree Adjoining Grammar XTAG.</p>
+</div>
+</div>
+<div class="section" id="grammar-development">
+<span id="sec-grammar-development"></span><h1>6 Разработка грамматики</h1>
+<p>Синтаксический анализ строит деревья для предложений в соответствии с грамматикой фразовой структуры.  Сейчас все примеры, которые мы привели выше, использовали только игрушечные грамматики, содержащие несколько подстановок.
+Что произойдет, если мы попытаемся расширить масштабы этого подхода для работы с более реалистичными корпусами языка?  В этом разделе мы увидим, как получить доступ к банкам деревьев, и рассмотрим на задачу разработки грамматик широкого охвата.</p>
+<div class="section" id="treebanks-and-grammars">
+<h2>6.1 Банки деревьев и грамматики</h2>
+<p>Модуль <tt class="doctest"><span class="pre">corpus</span></tt> определяет ридер корпуса <tt class="doctest"><span class="pre">treebank</span></tt>, который содержит 10% образец корпуса Penn Treebank.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import treebank
+&gt;&gt;&gt; t = treebank.parsed_sents('wsj_0001.mrg')[0]
+&gt;&gt;&gt; print(t)
+(S
+  (NP-SBJ
+    (NP (NNP Pierre) (NNP Vinken))
+    (, ,)
+    (ADJP (NP (CD 61) (NNS years)) (JJ old))
+    (, ,))
+  (VP
+    (MD will)
+    (VP
+      (VB join)
+      (NP (DT the) (NN board))
+      (PP-CLR
+        (IN as)
+        (NP (DT a) (JJ nonexecutive) (NN director)))
+      (NP-TMP (NNP Nov.) (CD 29))))
+  (. .))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем использовать эти данные, чтобы помочь нам в разработке грамматики.
+Например, программа в листинге <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-sentential-complement">6.1</a> использует простой фильтр, чтобы найти глаголы, которые принимают сентенциальные дополнения.
+Предполагая, что у нас уже есть подстановка вида <tt class="doctest"><span class="pre">VP -&gt; Vs S</span></tt>, эта информация позволяет идентифицировать конкретные глаголы, которые будут включены в расширение <tt class="doctest"><span class="pre">Vs</span></tt>.</p>
+<span class="target" id="code-sentential-complement"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def filter(tree):
+    child_nodes = [child.label() for child in tree
+                   if isinstance(child, nltk.Tree)]
+    return  (tree.label() == 'VP') and ('S' in child_nodes)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import treebank
+&gt;&gt;&gt; [subtree for tree in treebank.parsed_sents()
+...          for subtree in tree.subtrees(filter)]
+ [Tree('VP', [Tree('VBN', ['named']), Tree('S', [Tree('NP-SBJ', ...]), ...]), ...]</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_sentential_complement.py" type="text/x-python"><span class="caption-label">Пример 6.1 (code_sentential_complement.py)</span></a>: <span class="caption-label">Рисунок 6.1:</span> Поиск в корпусе Treebank сентенциальных дополнений</p></td></tr>
+</table></div>
+<p>Корпус Prepositional Phrase Attachment, <tt class="doctest"><span class="pre">nltk.corpus.ppattach</span></tt>, является еще одним источником информации о валентности конкретных глаголов.
+Здесь мы иллюстрируем технику для копания этого корпуса.
+Она находит пары предложных фраз, где предлог и существительное являются фиксированными, но где выбор глагола определяет, прилагается ли предложная фраза к <tt class="doctest"><span class="pre">VP</span></tt> или к <tt class="doctest"><span class="pre">NP</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from collections import defaultdict
+&gt;&gt;&gt; entries = nltk.corpus.ppattach.attachments('training')
+&gt;&gt;&gt; table = defaultdict(lambda: defaultdict(set))
+&gt;&gt;&gt; for entry in entries:
+...     key = entry.noun1 + '-' + entry.prep + '-' + entry.noun2
+...     table[key][entry.attachment].add(entry.verb)
+...
+&gt;&gt;&gt; for key in sorted(table):
+...     if len(table[key]) &gt; 1:
+...         print(key, 'N:', sorted(table[key]['N']), 'V:', sorted(table[key]['V']))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Среди выходных строк этой программы мы находим <tt class="doctest"><span class="pre">offer-<span class="pysrc-keyword">from</span>-group N: [ <span class="pysrc-string">'rejected'</span>] V: [<span class="pysrc-string">'received'</span>]</span></tt>, что свидетельствует о том, что <span class="example">received</span> ожидает отдельное <tt class="doctest"><span class="pre">PP</span></tt> дополнение, прикрепленное к <tt class="doctest"><span class="pre">VP</span></tt>, в то время как <span class="example">rejected</span> нет.
+Как и раньше, мы можем использовать эту информацию, чтобы помочь нам построить грамматику.</p>
+<p>Коллекция NLTK включает в себя данные из распределенных задач: PE08
+Cross-Framework и Cross Domain Parser Evaluation.
+Коллекция больших грамматик была подготовлена с целью сравнения различных анализаторов, которые могут быть получены путем загрузки пакета <tt class="doctest"><span class="pre">large_grammars</span></tt> (например, <tt class="doctest"><span class="pre">python -m nltk.downloader large_grammars</span></tt>).</p>
+<p>Коллекция корпусов NLTK также включает в себя образец из <em>Sinica Treebank Corpus</em>, состоящий из 10.000 разобранных предложений, взятых из <em>Academia Sinica Balanced Corpus of Modern Chinese</em>.
+Давайте загрузим и отобразим одно из деревьев в этом корпусе.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.corpus.sinica_treebank.parsed_sents()[3450].draw()               </pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<img alt="../images/sinica-tree.png" src="http://www.nltk.org/images/sinica-tree.png" style="width:703.1999999999999px;height:208.2px">
+</div>
+<div class="section" id="pernicious-ambiguity">
+<h2>6.2 Гибельная неоднозначность</h2>
+<p>К сожалению, по мере того, как охват грамматики увеличивается и длина входных фраз растет, количество деревьев разбора быстро растет.  На самом деле, оно растет с астрономической скоростью.</p>
+<p>Давайте исследуем этот вопрос с помощью простого примера.
+Слово <span class="example">fish</span> является как существительным, так и глаголом.  Мы можем составить предложение <span class="example">fish fish fish</span>, означающее <em>fish like to fish other fish</em>.
+(Попробуйте это со словом <span class="example">police</span>, если вы предпочитаете что-то более осмысленное.)
+Вот игрушечная грамматика для "fish" предложений.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; grammar = nltk.CFG.fromstring("""
+... S -&gt; NP V NP
+... NP -&gt; NP Sbar
+... Sbar -&gt; NP V
+... NP -&gt; 'fish'
+... V -&gt; 'fish'
+... """)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь мы можем попробовать разобрать более длинную фразу, <span class="example">fish fish fish fish fish</span>, которая помимо всего прочего, означает "fish that other fish
+fish are in the habit of fishing fish themselves". Мы используем графический парсер NLTK, о котором упоминалось ранее в этой главе.  Это предложение имеет два чтения.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tokens = ["fish"] * 5
+&gt;&gt;&gt; cp = nltk.ChartParser(grammar)
+&gt;&gt;&gt; for tree in cp.parse(tokens):
+...     print(tree)
+(S (NP fish) (V fish) (NP (NP fish) (Sbar (NP fish) (V fish))))
+(S (NP (NP fish) (Sbar (NP fish) (V fish))) (V fish) (NP fish))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>По мере того, как длина этого предложения идет вверх (3, 5, 7, ...) мы получаем следующие количества деревьев разбора: 1; 2; 5; 14; 42; 132; 429; 1.430; 4.862; 16.796; 58.786; 208.012; ...
+(Это <a name="catalan_numbers_index_term"></a><span class="term">Числа Катала́на</span>, которые мы видели в одном из упражнений в <a class="reference external" href="http://www.nltk.org/book/ch04.html#chap-structured-programming">4</a>).
+Последнее из них для предложения длиной в 23 слова, что соответствует средней длине предложений в разделе WSJ корпуса Penn Treebank.  Для предложения длиной в 50 слов было бы более 10<sup>12</sup> разборов, а это только половина длины предложения Пяточка (<a class="reference internal" href="http://www.nltk.org/book/ch08.html#sec-dilemmas">1</a>), которое маленькие дети понимают без усилий.
+Ни одна практическая НЛП система не может построить миллионы деревьев для предложения и выбрать подходяще в заданном контексте.
+Понятно, что люди также не делают этого!</p>
+<p>Обратите внимание, что проблема не связана с нашим выбором примера.
+<a class="reference external" href="http://www.nltk.org/book/bibliography.html#church1982csa" id="id3">(Church &amp; Патил, 1982)</a> указывают, что синтаксическая двусмысленность прикрепления <tt class="doctest"><span class="pre">PP</span></tt> в предложениях, как <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-pp">(18)</a>, также растет в пропорции чисел Каталана.</p>
+<span class="target" id="ex-pp"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(18)</td><td width="15"></td><td>Поместите блок в коробку на столе.</td></tr></table></p>
+<p>Так много проблем для структурной неопределенности; а что насчет лексической неоднозначности?
+Как только мы пытаемся построить грамматику с широким охватом, мы вынуждены сделать лексические записи в высокой степени неоднозначными с точки зрения их части речи.  В игрушечной грамматике, <span class="example">a</span> является только определителем, <span class="example">dog</span> только существительным, а <span class="example">runs</span> только глаголом.  Тем не менее, в грамматике с широким охватом, <cite>a</cite> является также существительным (например, <span class="example">part а</span>), <span class="example">dog</span> является также глаголом (означающим следовать близко) и <span class="example">runs</span> также является существительным (например, <span class="example">ski runs</span>).  На самом деле, со всеми словами можно установить связь как с именем: например, <span class="example">the verb 'ate' is spelled with three letters</span>; в речи мы не должны ставить кавычки.
+Кроме того, можно <em>превратить в глагол (to verb)</em> большинство существительных.  Поэтому синтаксический анализатор для грамматики с широким охватом будет завален двусмысленностями.  Даже полная тарабарщина часто имеет прочтение, например, <span class="example">the a are of I</span>.  Как <a class="reference external" href="http://www.nltk.org/book/bibliography.html#abney1996sml" id="id4">(Klavans &amp; Resnik, 1996)</a> указали, это не салат из слов, но грамматическая именная фраза, в которой <span class="example">are</span> - это существительное, означающее сотую долю гектара (или 100 кв. м), а <span class="example">a</span> и <span class="example">I</span> существительные, обозначающие координаты, как показано на Рисунке <a class="reference internal" href="http://www.nltk.org/book/ch08.html#fig-are">6.2</a>.</p>
+<span class="target" id="fig-are"></span><div class="figure" id="fig-are">
+<img alt="../images/are.png" src="http://www.nltk.org/images/are.png" style="width:452.6px;height:182.60000000000002px">
+<p class="caption"><span class="caption-label">Рисунок 6.2:</span> "The a are of II": схематический чертеж 27 загонов, каждый из которых размером в один "ар" и каждый из которых определяется с помощью координат; верхняя левая ячейка - это <span class="emphasis">а</span> "ар" колонки <span class="emphasis">I</span> (вслед за Abney).</p>
+</div>
+<p>
+Даже если эта фраза мало вероятна, она все равно грамматична и синтаксический анализатор широкого охвата должен быть в состоянии построить дерево разбора для нее.  Аналогичным образом, предложения, которые кажутся однозначными, такие как <span class="example">John saw Mary</span>, оказывается, имеют другие прочтения, которые мы не предвидели (как объясняет Abney).  Эта неоднозначность неизбежна и приводит к ужасающей неэффективности при разборе, казалось бы, безобидных предложений.
+Решение этих задач обеспечивается с помощью <span class="emphasis">вероятностного синтаксического анализа</span>, который позволяет <span class="emphasis">ранжировать</span> разборы неоднозначного предложения на основе данных из корпусов.</p>
+</div>
+<div class="section" id="weighted-grammar">
+<h2>6.3 Взвешенная Грамматика</h2>
+<!-- TODO: mention interest in having weights is because they can be learned.
+Without this it is mysterious why we would want to bother.
+Technical aspects follow, but this is important motivation (Steven) -->
+<p>Как мы только что видели, работа с неоднозначностью является ключевой задачей при разработке анализаторов широкого охвата.
+Графические анализаторы повышают эффективность вычислений нескольких разборов одних и тех же предложений, но они по-прежнему перегружены огромным числом возможных разборов.  Взвешенные грамматики и вероятностные алгоритмы синтаксического анализа обеспечили эффективное решение этих проблем.</p>
+<p>Перед их рассмотрением, мы должны понять, почему понятие грамматичности может быть <span class="emphasis">градиентным</span>.  Рассмотрим глагол <span class="example">give</span>.
+Этот глагол требует как прямой объект (вещь, которая отдается) и косвенный объект (получатель).
+Эти дополнения могут быть заданы в любом порядке, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-dative">(19)</a>.  В "предложной дательной" в форме <a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-dative-prepositional">(19а)</a>, прямой объект появляется первым, за которым следует предложная фраза, содержащая косвенный объект.</p>
+<span class="target" id="ex-dative"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(19)</td><td width="15"></td><td><span class="target" id="ex-dative-prepositional"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Kim gave a bone to the dog</td></tr></table></p>
+<span class="target" id="ex-dative-double-object"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Kim gave the dog a bone
+</td></tr></table></p>
+</td></tr></table></p>
+<p>В форме "двойного объекта" в<a class="reference internal" href="http://www.nltk.org/book/ch08.html#ex-dative-double-object">(19b)</a> косвенный объект появляется первым, за которым следует прямой объект.
+В приведенном выше случае любой порядок приемлем.  Тем не менее, если косвенный объект является местоимением, есть сильное предпочтение для конструкции с двойным объектом:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(20)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><em>Kim gives the heebie-jeebies to me (*prepositional dative)</em></td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Kim gives me the heebie-jeebies <em>(double object)</em></td></tr></table></p>
+</td></tr></table></p>
+<p>Используя образец корпуса Penn Treebank, мы можем рассмотреть все экземпляры конструкций с предложным дательным и двойным объектом, включающих <span class="example">give</span>, как показано на Рисунке <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-give">6.3</a>.</p>
+<span class="target" id="code-give"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def give(t):
+    return t.label() == 'VP' and len(t) &gt; 2 and t[1].label() == 'NP'\
+           and (t[2].label() == 'PP-DTV' or t[2].label() == 'NP')\
+           and ('give' in t[0].leaves() or 'gave' in t[0].leaves())
+def sent(t):
+    return ' '.join(token for token in t.leaves() if token[0] not in '*-0')
+def print_node(t, width):
+        output = "%s %s: %s / %s: %s" %\
+            (sent(t[0]), t[1].label(), sent(t[1]), t[2].label(), sent(t[2]))
+        if len(output) &gt; width:
+            output = output[:width] + "..."
+        print(output)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+ 	
+&gt;&gt;&gt; for tree in nltk.corpus.treebank.parsed_sents():
+...     for t in tree.subtrees(give):
+...         print_node(t, 72)
+gave NP: the chefs / NP: a standing ovation
+give NP: advertisers / NP: discounts for maintaining or increasing ad sp...
+give NP: it / PP-DTV: to the politicians
+gave NP: them / NP: similar help
+give NP: them / NP:
+give NP: only French history questions / PP-DTV: to students in a Europe...
+give NP: federal judges / NP: a raise
+give NP: consumers / NP: the straight scoop on the U.S. waste crisis
+gave NP: Mitsui / NP: access to a high-tech medical product
+give NP: Mitsubishi / NP: a window on the U.S. glass industry
+give NP: much thought / PP-DTV: to the rates she was receiving , nor to ...
+give NP: your Foster Savings Institution / NP: the gift of hope and free...
+give NP: market operators / NP: the authority to suspend trading in futu...
+gave NP: quick approval / PP-DTV: to $ 3.18 billion in supplemental appr...
+give NP: the Transportation Department / NP: up to 50 days to review any...
+give NP: the president / NP: such power
+give NP: me / NP: the heebie-jeebies
+give NP: holders / NP: the right , but not the obligation , to buy a cal...
+gave NP: Mr. Thomas / NP: only a `` qualified '' rating , rather than ``...
+give NP: the president / NP: line-item veto power</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_give.py" type="text/x-python"><span class="caption-label">Пример 6.3 (code_give.py)</span></a>: <span class="caption-label">Рисунок 6.3</span>: Использование Give и Gave в образце корпуса Penn Treebank</p></td></tr>
+</table></div>
+<p>Мы можем видеть сильную тенденцию более короткого дополнения стоять первым.  Тем не менее, это не учитывает форму, как <tt class="doctest"><span class="pre">give NP: federal judges / NP: a raise</span></tt>, где одушевленность может играть определенную роль.  На самом деле, там может оказаться большое количество факторов, как показано в работе <a class="reference external" href="http://www.nltk.org/book/bibliography.html#bresnan2006gg" id="id5">(Bresnan &amp; Hay, 2006)</a>.
+Такие предпочтения могут быть представлены во взвешенной грамматике.</p>
+<p><a name="probabilistic_context_free_grammar_index_term"></a><span class="termdef">Вероятностная безконтекстная грамматика</span> (или <em>PCFG</em>) является безконтекстной грамматикой, которая связывает вероятность с каждой из своих подстановок.
+Она генерирует тот же набор разборов для текста, что и соответствующая безконтекстная грамматика, но присваивает вероятность каждому синтаксическому разбору.
+Вероятность синтаксического разбора, порожденного PCFG, является просто произведением вероятностей подстановок, использованных для его генерации.</p>
+<p>Самый простой способ определить PCFG - загрузить ее из специально отформатированной строки, состоящей из последовательности взвешенных подстановок, где веса указаны в скобках, как показано в листинге <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-pcfg1">6.4</a>.</p>
+<span class="target" id="code-pcfg1"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+grammar = nltk.PCFG.fromstring("""
+    S    -&gt; NP VP              [1.0]
+    VP   -&gt; TV NP              [0.4]
+    VP   -&gt; IV                 [0.3]
+    VP   -&gt; DatV NP NP         [0.3]
+    TV   -&gt; 'saw'              [1.0]
+    IV   -&gt; 'ate'              [1.0]
+    DatV -&gt; 'gave'             [1.0]
+    NP   -&gt; 'telescopes'       [0.8]
+    NP   -&gt; 'Jack'             [0.2]
+    """)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(grammar)
+Grammar with 9 productions (start state = S)
+    S -&gt; NP VP [1.0]
+    VP -&gt; TV NP [0.4]
+    VP -&gt; IV [0.3]
+    VP -&gt; DatV NP NP [0.3]
+    TV -&gt; 'saw' [1.0]
+    IV -&gt; 'ate' [1.0]
+    DatV -&gt; 'gave' [1.0]
+    NP -&gt; 'telescopes' [0.8]
+    NP -&gt; 'Jack' [0.2]</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_pcfg1.py" type="text/x-python"><span class="caption-label">Пример 6.4 (code_pcfg1.py)</span></a>: <span class="caption-label">Листинг 6.4</span>: Определение вероятностной безконтекстной грамматики (PCFG)</p></td></tr>
+</table></div>
+<p>Иногда удобно объединить несколько подстановок в одну строку, например, <tt class="doctest"><span class="pre">VP -&gt; TV NP [0.4] | IV [0.3] | DatV NP NP [0.3]</span></tt>.
+Для того, чтобы гарантировать, что деревья, порождаемые грамматикой образуют распределение вероятностей, PCFG грамматики накладывают ограничение, что все подстановки с заданной левой стороной должны иметь сумму вероятностей равную 1.
+Грамматика в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-pcfg1">6.4</a> соответствует этому ограничению: для <tt class="doctest"><span class="pre">S</span></tt> есть только одна подстановка с вероятностью 1,0; для <tt class="doctest"><span class="pre">VP</span></tt> 0,3 + 0,4 + 0,3 = 1,0; и для <tt class="doctest"><span class="pre">NP</span></tt> 0,8 + 0,2 = 1,0.
+Дерево синтаксического разбора, возвращаемое методом <tt class="doctest"><span class="pre">parse()</span></tt> включает в себя вероятности:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; viterbi_parser = nltk.ViterbiParser(grammar)
+&gt;&gt;&gt; for tree in viterbi_parser.parse(['Jack', 'saw', 'telescopes']):
+...     print(tree)
+(S (NP Jack) (VP (TV saw) (NP telescopes))) (p=0.064)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь, когда деревьям разбора присвоены вероятности, уже не важно, что может быть огромное количество возможных разборов для данного предложения.
+Анализатор будет нести ответственность за нахождение наиболее вероятных разборов.</p>
+</div>
+</div>
+<div class="section" id="summary">
+<h1>8 Резюме</h1>
+<ul class="simple">
+<li>Предложения имеют внутреннюю организацию, которая может быть представлена ​​с помощью дерева. Основными свойствами конституентной структуры являются: рекурсия, главы, дополнения и модификаторы.</li>
+<li>Грамматика представляет собой компактную характеристику потенциально бесконечного множества предложений; мы говорим, что дерево хорошо сформировано в соответствии с грамматикой, или что грамматика лицензирует (допускает) данное дерево.</li>
+<li>Грамматика - это формальная модель для описания того, может ли данной фразе  быть присвоен отдельный конституент или структура зависимости.</li>
+<li>Учитывая набор синтаксических категорий, безконтекстная грамматика использует набор подстановок, чтобы сказать, как фраза некоторой категории <em>А</em> может быть разобрана на последовательность меньших частей α<sub>1</sub> ... α<sub>n</sub>.</li>
+<li>Грамматика зависимости использует подстановки для спецификации зависимых данной лексической главы.</li>
+<li>Синтаксическая неоднозначность возникает, когда одно предложение имеет более одного синтаксического разбора (например, неоднозначность приложения предложной фразы).</li>
+<li>Анализатор представляет собой процедуру для нахождения одного или нескольких деревьев, соответствующих грамматически хорошо сформированным предложениям.</li>
+<li>Простой анализатор сверху вниз - рекурсивно спускающийся анализатор, который рекурсивно расширяет начальный символ (обычно <tt class="doctest"><span class="pre">S</span></tt>) с помощью подстановок грамматики и пытается найти соответствие входному предложению.  Этот анализатор не может справиться с леворекурсивными подстановками (например, такими подстановками, как <tt class="doctest"><span class="pre">NP -&gt; NP PP</span></tt>).
+Он неэффективен в том, что слепо расширяет категории без проверки, являются ли они совместимыми с входной строкой, и в том, что многократно расширяет одни и те же нетерминалы и в том, что отбрасывает результаты.</li>
+<li>Простой анализатор снизу вверх - анализатор помещения-смещения, который перемещает ввод в стек и пытается сопоставить элементы в верхней части стека с правой стороной грамматических подстановок.  Этот анализатор не гарантирует нахождение правильного разбора для ввода, даже если таковой существует и строит подструктуру без проверки того, является ли она глобально совместимой с грамматикой.</li>
+</ul>
+<!-- * It is difficult to develop a broad-coverage grammar ... -->
+</div>
+<div class="section" id="further-reading">
+<h1>7 Дополнительные материалы</h1>
+<p>Дополнительные материалы для этой главы размещены на странице <tt class="doctest"><span class="pre">http://nltk.org/</span></tt>, в том числе ссылки на свободно доступные ресурсы в сети.
+Для получения большего количества примеров разбора с помощью NLTK, обратитесь к HOWTO по разбору на <tt class="doctest"><span class="pre">http://nltk.org/howto.</span></tt></p>
+<p>Есть много вводных книг по синтаксису. <a class="reference external" href="http://www.nltk.org/book/bibliography.html#ogrady2004" id="id6">(O'Grady et al, 2004)</a> представляет собой общее введение в языкознание, в то время как <a class="reference external" href="http://www.nltk.org/book/bibliography.html#radford1988tg" id="id7">(Radford, 1988)</a> обеспечивает введение в трансформационную грамматику и может быть рекомендована за ее охват трансформационных подходов к неограниченным конструкциям зависимостей.  Наиболее широко используемый термин в лингвистике для формальной грамматики <a name="generative_grammar_index_term"></a> - это <span class="termdef">порождающая (генеративная) грамматика</span>, хотя она не имеет ничего общего с поколением <a class="reference external" href="http://www.nltk.org/book/bibliography.html#chomsky1965" id="id8">(Chomsky, 1965)</a>.
+Концепция X-bar синтаксиса введена в работе <a class="reference external" href="http://www.nltk.org/book/bibliography.html#chomsky1970rn" id="id9">(Jacobs &amp; Rosenbaum, 1970)</a>,  исследована более подробно в <a class="reference external" href="http://www.nltk.org/book/bibliography.html#jackendoff1977xs" id="id10">(Jackendoff, 1977)</a> (простые числа, которые мы используем, заменяют типографски более сложные горизонтальные полосы Хомского.)</p>
+<p><a class="reference external" href="http://www.nltk.org/book/bibliography.html#burtonroberts1997as" id="id11">(Burton-Roberts, 1997)</a> является практически ориентированным учебником о том, как анализировать конституенцию в английском языке, с обширным примерами и упражнениями. <a class="reference external" href="http://www.nltk.org/book/bibliography.html#huddleston2002cge" id="id12">(Hiddleston &amp; Pullum, 2002)</a> предоставляет современный и всесторонний анализ синтаксических явлений в английском языке.</p>
+<p>Глава 12 <a class="reference external" href="http://www.nltk.org/book/bibliography.html#jurafskymartin2008" id="id13">(Jurafsky &amp; Martin, 2008)</a> охватывает формальные грамматики английского языка; Разделы 13.1-3 охватывают простые алгоритмы синтаксического анализа и методов борьбы с неоднозначностью; Глава 14 охватывает статистический разбор; Глава 16 охватывает иерархию Chomsky и формальную сложность естественного языка.
+<a class="reference external" href="http://www.nltk.org/book/bibliography.html#levin1993" id="id14">(Levin, 1993)</a> классифицировал английские глаголы на мелкие классы в соответствии с их синтаксическими свойствами.</p>
+<p>Есть несколько действующий проектов по созданию крупномасштабных основанных на правилах грамматик, например, проекты LFG Pargram <tt class="doctest"><span class="pre">http://www2.parc.com/istl/groups/nltt/pargram//0}, HPSG LinGO Matrix <tt class="doctest"><span class="pre">http:// www.delph-<span class="pysrc-keyword">in</span>.net/matrix/</span></tt> и XTAG <tt class="doctest"><span class="pre">http://www.cis.upenn.edu/~xtag/</span></tt></span></tt>.</p>
+</div>
+<div class="section" id="exercises">
+<h1>9 Упражнения</h1>
+<ol class="arabic">
+<li><p class="first">☼ Можете ли вы придумать с грамматическими предложениями, которые, вероятно, никогда не были произнесены раньше?  (Сменяйтесь с партнером.)  Что это говорит вам о человеческом языке?</p>
+</li>
+<li><p class="first">☼ Напомним Strunk и запрет белых против предложения-первоначального <span class="example">однако</span> используется для обозначения "хотя".
+У веб - поиска для <span class="example">однако</span> используется в начале предложения.
+Как широко используется эта конструкция?</p>
+</li>
+<li><p class="first">☼ Рассмотрим предложение <cite>Ким прибывшего или Дана налево и все повеселел.</cite>
+Запишите введенными формы , чтобы показать относительный объем <span class="example">и</span> и <span class="example">или.</span>  Создавать структуры дерева, соответствующие обоим из этих интерпретаций.</p>
+</li>
+<li><p class="first">☼ Класс <tt class="doctest"><span class="pre">Дерево</span></tt> реализует множество других полезных методов.
+Обратитесь к документации <tt class="doctest"><span class="pre">Дерево</span></tt> справки для получения более подробной информации, то есть импортировать класс дерева , а затем ввести <tt class="doctest"><span class="pre">помощь (дерево).</span></tt></p>
+</li>
+<li><p class="first">☼ В этом упражнении вы будете вручную построить несколько деревьев разбора.</p>
+<ol class="loweralpha simple">
+<li>Написать код , чтобы произвести два дерева, один для каждого чтения фразы <span class="example">стариков и женщин</span></li>
+<li>Кодировать любой из деревьев , представленных в этой главе в качестве меченого брекет и использовать <tt class="doctest"><span class="pre">NLTK.Дерево ()</span></tt> , чтобы проверить , что он хорошо сформирован.
+Теперь с помощью <tt class="doctest"><span class="pre">дро ()</span></tt> для отображения дерева.</li>
+<li>Как и в (а) выше, нарисовать дерево для <span class="example">женщины увидели человека</span> в <span class="example">прошлый четверг.</span></li>
+</ol>
+</li>
+<li><p class="first">☼ Написать рекурсивную функцию для обхода дерева и вернуть глубину дерева, таким образом, что дерево с одним узлом будет иметь глубину ноль.  (Подсказка: глубина поддерева максимальная глубина его детей, плюс один.)</p>
+</li>
+<li><p class="first">☼ Анализ А. А. Милна предложение о Пятачка, подчеркиванием всех предложений оно содержит то , заменяя их с <tt class="doctest"><span class="pre">S</span></tt> (например , первое предложение становится <tt class="doctest"><span class="pre">S</span></tt> , <cite>когда:</cite> lx` <tt class="doctest"><span class="pre">S).</span></tt>
+Нарисуйте структуру дерева для этого "сжатого" предложения.  Каковы основные синтаксические конструкции, используемые для построения такой долгий срок?</p>
+</li>
+<li><p class="first">☼ В метод рекурсивного спуска демо, эксперимент с изменением предложения , которое будет разобрано, выбрав <em>Edit Text</em> в меню <em>Правка.</em></p>
+</li>
+<li><p class="first">☼ Может грамматика в <tt class="doctest"><span class="pre">grammar1</span></tt> быть использованы для описания предложений, которые более чем 20 слов в длину?</p>
+</li>
+<li><p class="first">☼ Используйте графический интерфейс график-парсер, чтобы экспериментировать с различными стратегиями правила вызова. Придумайте с вашей собственной стратегии, которые можно выполнить вручную с помощью графического интерфейса. Опишите шаги, и сообщать о любых повышения эффективности она имеет (например, с точки зрения размера полученной диаграммы). эти улучшения зависят ли от структуры грамматики? Что вы думаете о перспективах значительных повышений производительности от стратегий Призывании лучшими, правила?</p>
+</li>
+<li><p class="first">☼ С ручкой и бумагой, вручную отслеживать выполнение рекурсивного спуска парсер и сдвиг-свертка анализатор, для CFG вы уже видели, или один из ваших собственного изобретения.</p>
+</li>
+<li><p class="first">☼ Мы видели, что блок-анализатор добавляет, но никогда не удаляет ребра из диаграммы.  (Почему?)</p>
+</li>
+<li><p class="first">☼ Рассмотрим последовательность слов: <span class="example">Буффало буйвола Buffalo буйвола буйвола буйвола буйвола буйвола.</span>
+Это грамматически правильное предложение, как объяснено на <tt class="doctest"><span class="pre">http://en.wikipedia.org/wiki/Buffalo_buffalo_Buffalo_buffalo_buffalo_buffalo_Buffalo_buffalo.</span></tt> Рассмотрим дерево диаграмма, представленная на этой странице Википедии, и записать соответствующую грамматику.  Нормализация дело в нижнем регистре, чтобы имитировать эту проблему, что слушатель, услышав это предложение.  Можете ли вы найти другие разборов для этого предложения?
+Как количество деревьев разбора расти, поскольку предложение становится больше?
+(Другие примеры этих предложений можно найти на сайте <tt class="doctest"><span class="pre">http://en.wikipedia.org/wiki/List_of_homophonous_phrases).</span></tt></p>
+</li>
+<li><p class="first">◑ Вы можете модифицировать грамматику в метод рекурсивного спуска демо, выбрав <em>Edit Грамматика</em> в меню <em>Правка.</em> Заменить второе производство расширения, а именно <tt class="doctest"><span class="pre">NP -&gt; Det N PP,</span></tt> <tt class="doctest"><span class="pre">НП -&gt; NP PP.</span></tt> С помощью кнопки <em>Step,</em> попробуйте построить дерево разбора. Что происходит?</p>
+</li>
+<li><p class="first">◑ Продлить грамматику в <tt class="doctest"><span class="pre">grammar2</span></tt> с производств , которые расширяют предлоги как интранзитивной, переходные и требующие <tt class="doctest"><span class="pre">PP</span></tt> дополнения. На основе этих производств, использовать метод предыдущего упражнения , чтобы нарисовать дерево для предложения <span class="example">Ли сбежал домой.</span></p>
+</li>
+<li><p class="first">◑ Выберите некоторые общие глаголы и выполнить следующие задачи:</p>
+<ol class="loweralpha simple">
+<li>Напишите программу , чтобы найти эти глаголы в предложной Attachment Корпус <tt class="doctest"><span class="pre">nltk.corpus.ppattach.</span></tt>  Найдите случаи , когда тот же глагол имеет два различных вложения, но где первое существительное, или второе существительное, или предлога, остаются неизменными (как мы видели в нашем обсуждении синтаксической неоднозначностью <a class="reference internal" href="http://www.nltk.org/book/ch08.html#sec-whats-the-use-of-syntax">2</a> ).</li>
+<li>Разрабатывают CFG грамматики производств для покрытия некоторых из этих случаев.</li>
+</ol>
+</li>
+<li><p class="first">◑ Напишите программу для сравнения эффективности сверху вниз диаграммы синтаксического анализа по сравнению с метод рекурсивного спуска ( <a class="reference internal" href="http://www.nltk.org/book/ch08.html#sec-parsing">4</a> ).
+Используйте те же грамматические и входные предложения для обоих.  Сравните их производительность с помощью модуля <tt class="doctest"><span class="pre">timeit</span></tt> (см <a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-algorithm-design">4.7</a> для примера того , как сделать это).</p>
+</li>
+<li><p class="first">◑ Сравните производительность сверху вниз, снизу вверх, а левой углу анализаторами, используя ту же грамматику и три грамматические тестовые предложения. Используйте <tt class="doctest"><span class="pre">timeit</span></tt> регистрировать количество времени каждый парсер принимает на том же самом предложении.  Напишите функцию, которая выполняет все три парсеры на всех трех предложениях, и печатает 3 на 3 сетки раз, а также строк и столбцов итогов. Обсудите свои выводы.</p>
+</li>
+<li><p class="first">◑ Читайте на "пути" сад предложений.  Как может вычислительная работа синтаксического анализатора относятся к сложности у людей есть с обработкой этих предложений?
+<tt class="doctest"><span class="pre">http://en.wikipedia.org/wiki/Garden_path_sentence</span></tt></p>
+</li>
+<li><p class="first">◑ Для сравнения нескольких деревьев в одном окне, мы можем использовать <tt class="doctest"><span class="pre">()</span></tt> метод <tt class="doctest"><span class="pre">draw_trees.</span></tt>  Определить некоторые деревья и попробовать его:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">От</span> <span class="pysrc-keyword">импорта</span> nltk.draw.tree draw_trees <span class="pysrc-prompt">&gt;&gt;&gt;</span> draw_trees (Дерево1, tree2, tree3)                    </pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</li>
+<li><p class="first">◑ Используя позиции дерева, список субъектов первых 100 предложений в Treebank Penn; чтобы результаты легче просматривать, ограничить извлеченные объекты для поддеревьев, высота которых 2.</p>
+</li>
+<li><p class="first">◑ Осмотрите предложной Attachment Корпус и попытаться предложить некоторые факторы, влияющие на присоединение <tt class="doctest"><span class="pre">PP.</span></tt></p>
+</li>
+<li><p class="first">◑ В этом разделе мы утверждали, что существуют языковые закономерности, которые не могут быть описаны просто в терминах п-грамм.
+Рассмотрим следующее предложение, в частности , положение фразы , <span class="example">в свою очередь.</span>  иллюстрировать ли это проблемы для подхода, основанного на п-г?</p>
+<blockquote>
+<p><cite>То, что было больше, то в свою очередь, несколько моложавый Николай Парфенович также оказался единственным человеком во всем мире, чтобы получить искреннюю симпатию к нашему "дискриминируемых" общественного прокурора.</cite>
+(Достоевский: Братья Карамазовы)</p>
+</blockquote>
+</li>
+<li><p class="first">◑ Написать рекурсивную функцию, которая производит вложенную брэкетинг для дерева, в результате чего из узлов листа, и отображая нетерминальные этикетки после того, как их поддеревьев.  Таким образом, приведенный выше пример о Pierre Vinken будет производить: <tt class="doctest"><span class="pre">[[[ННП ННП] NP, [ADJP [CD NNS] NP JJ] ADJP,] NP-SBJ MD [VB [DT NN] NP [IN [DT JJ NN] NP] PP-CLR [ННП CD] NP-TMP] VP.]S</span></tt> Последовательные категории должны быть разделены пробелом.</p>
+</li>
+<li><p class="first">◑ Скачать несколько электронных книг из Проекта Гутенберг.
+Написать программу для сканирования этих текстов для любых экстремально длинных предложений.
+Что самое длинное предложение вы можете найти?  Какие синтаксические конструкции (s) отвечают за такие длительные сроки?</p>
+</li>
+<li><p class="first">◑ Измените функции <tt class="doctest"><span class="pre">init_wfst ()</span></tt> и <tt class="doctest"><span class="pre">complete_wfst ()</span></tt> , так что содержимое каждой ячейки в WFST представляет собой набор нетерминальных символов , а не один нетерминал.</p>
+</li>
+<li><p class="first">◑ Рассмотрим алгоритм в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-wfst">4.4</a> .  Можете ли вы объяснить , почему разбора контекстно-свободной грамматики пропорциональна <cite>N</cite> <sup>3,</sup> где <em>п</em> длина входного предложения.</p>
+</li>
+<li><p class="first">◑ Преобразовать каждое дерево из Treebank корпуса образца <tt class="doctest"><span class="pre">nltk.corpus.treebank</span></tt> и извлечь производств с помощью <tt class="doctest"><span class="pre">Tree.productions ().</span></tt>  Откажитесь от производств, которые происходят только один раз.  Productions с той же левой стороны, и аналогичные правые могут быть свернуты, в результате чего в эквивалентной, но более компактный набор правил.  Написать код для вывода компактную грамматику.</p>
+</li>
+<li><p class="first">★ Один общий способ определения субъектом приговора <tt class="doctest"><span class="pre">S</span></tt> в английском языке в качестве <em>словосочетанием</em> , <em>который является потомком</em> <tt class="doctest"><span class="pre">S</span></tt> <em>и родственный</em> <tt class="doctest"><span class="pre">VP.</span></tt>   Написать функцию, которая принимает дерево для предложения и возвращает поддерево, соответствующее предмету предложения.  Что он должен делать , если корневой узел дерева , переданного этой функции не <tt class="doctest"><span class="pre">S,</span></tt> или ему не хватает предмета?</p>
+</li>
+<li><p class="first">★ Написать функцию , которая принимает грамматику (например, ту , которая определена в <a class="reference internal" href="http://www.nltk.org/book/ch08.html#code-cfg1">3.1</a> ) и возвращает случайное предложение , порожденную грамматики.
+(Используйте <tt class="doctest"><span class="pre">grammar.start ()</span></tt> , чтобы найти начальный символ грамматики; <tt class="doctest"><span class="pre">grammar.productions (LHS)</span></tt> , чтобы получить список спектаклей из грамматики , которые имеют указанную с левой стороны, и <tt class="doctest"><span class="pre">production.rhs ()</span></tt> , чтобы получить право -hand сторона производства.)</p>
+</li>
+<li><p class="first">★ реализовать версию рычага селектора уменьшить синтаксический анализатор с использованием откаты, так что она находит все возможные разборы для предложения, что можно было бы назвать "рекурсивный подъем СА». Обратитесь статью в Википедии для возвратов в <tt class="doctest"><span class="pre">http://en.wikipedia.org/wiki/Backtracking</span></tt></p>
+</li>
+<li><p class="first">★ Как мы видели в <a class="reference external" href="http://www.nltk.org/book/ch07.html#chap-chunk">7.</a> , можно свернуть куски вплоть до их куска этикетке.  Когда мы делаем это для предложений с участием слово <span class="example">дал,</span> мы находим образцы , такие как:</p>
+<pre class="literal-block">
+дал НП отказался НП в НП дал НП давала НП НП НП дал НП
+</pre>
+<ol class="loweralpha simple">
+<li>Используйте этот метод для изучения комплементации закономерности глагола интерес, и писать подходящие грамматические постановки.  (Эта задача иногда называется <a name="lexical_acquisition_index_term"></a> <span class="termdef">лексическая приобретение.)</span></li>
+<li>Определить некоторые английские глаголы, которые почти-синонимы, такие как <span class="example">сбрасывали / заполненного / загруженном</span> пример из ранее в этой главе.
+Используйте метод отрывов для изучения комплементационной образцы этих глаголов.  Создание грамматики, чтобы покрыть эти случаи.  Могут ли глаголы свободно замещать друг друга, или являются их ограничения?
+Обсудите свои выводы.</li>
+</ol>
+</li>
+<li><p class="first">★ Разработка левого угла анализатор , основанный на метод рекурсивного спуска, и наследовать имущество <tt class="doctest"><span class="pre">ParseI.</span></tt></p>
+</li>
+<li><p class="first">★ Расширение NLTK смещать-свертка анализатор включать откаты, так что он гарантированно найти все разборы, которые существуют (т.е. <a name="complete_index_term"></a> <span class="termdef">полная).</span></p>
+</li>
+<li><p class="first">★ Изменение функции <tt class="doctest"><span class="pre">init_wfst ()</span></tt> и <tt class="doctest"><span class="pre">complete_wfst ()</span></tt> , так что , когда нетерминального символ добавляется в ячейку в WFST, она включает в себя запись клеток , из которых она была получена. Реализовать функцию, которая будет конвертировать WFST в этой форме дерева разбора.</p>
+</li>
+</ol>
+<!-- recurse over tree to look for coordinate constructions (cf 4th
+example in chapter 1.1); (possible extension: callback function for Tree.subtrees()) -->
+<!-- Footer to be used in all chapters -->
+<div class="admonition-about-this-document admonition">
+<p class="first admonition-title">Об этом документе ...</p>
+<p>Обновлялся для NLTK 3.0.
+Это глава из книги <em>Обработка естественного языка с помощью Python</em> написанной <a class="reference external" href="http://estive.net/">Стивеном Бердом</a> , <a class="reference external" href="http://homepages.inf.ed.ac.uk/ewan/">Эваном Клайном</a> и <a class="reference external" href="http://ed.loper.org/">Эдвардом Лопером</a> , Copyright © 2014 авторов.
+Он распространяется с <em>Набором инструментов для естественного языка</em> <tt class="doctest"><span class="pre">[http://nltk.org/],</span></tt> версия 3.0 в соответствии с условиями <em>Creative Commons Attribution-Noncommercial-No Derivative Works 3.0 Лицензии Соединенных Штатов</em> [ <a class="reference external" href="http://creativecommons.org/licenses/by-nc-nd/3.0/us/">http://creativecommons.org/licenses/by-nc-nd/3.0/us/</a>].</p>
+<p class="last">Этот документ был построен на ср 1 июля 2015 12:30:05 AEST</p>
+</div>
+</div>
+</div>
+</body>
+</html>

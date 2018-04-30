@@ -1,0 +1,1584 @@
+﻿<html lang="ru" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ascii"></meta>
+<meta name="generator" content="Docutils 0.12: http://docutils.sourceforge.net/"></meta>
+<title>4,46%9 Построение грамматики основанной на свойствах</title>
+<style type="text/css">/* :Author: Edward Loper, James Curran:Copyright: This stylesheet has been placed in the public domain.Stylesheet for use with Docutils.This stylesheet defines new css classes used by NLTK.It uses a Python syntax highlighting scheme that matchesthe colour scheme used by IDLE, which makes it easier forbeginners to check they are typing things in correctly. */
+/* Include the standard docutils stylesheet. */
+</style>
+</head>
+<body dir="ltr">
+<div class="document" id="building-feature-based-grammars">
+<span id="chap-featgram"></span>
+<h1 class="title">9. Построение грамматики основанной на свойствах</h1>
+
+<!-- -*- mode: rst -*- -->
+<!-- -*- mode: rst -*- -->
+<!-- CAP abbreviations (map to small caps in LaTeX) -->
+<!-- Other candidates for global consistency -->
+<!-- PTB removed since it must be indexed -->
+<!-- WN removed since it must be indexed -->
+<!-- misc & punctuation -->
+<!-- cdots was unicode U+22EF but not working -->
+<!-- exercise meta-tags -->
+<!-- Unicode tests -->
+<!-- phonetic -->
+<!-- misc -->
+<!-- used in Unicode section -->
+<!-- arrows -->
+<!-- unification stuff -->
+<!-- Math & Logic -->
+<!-- sets -->
+<!-- Greek -->
+<!-- Chinese -->
+<!-- URLs -->
+<!-- Python example - a snippet of code in running text -->
+<!-- PlaceHolder example -  something that should be replaced by actual code -->
+<!-- Linguistic eXample - cited form in running text -->
+<!-- Emphasized (more declarative than just using *) -->
+<!-- Grammatical Category - e.g. NP and verb as technical terms
+.. role:: gc
+   :class: category -->
+<!-- Math expression - e.g. especially for variables -->
+<!-- Textual Math expression - for words &#39;inside&#39; a math environment -->
+<!-- Feature (or attribute) -->
+<!-- Raw LaTeX -->
+<!-- Raw HTML -->
+<!-- Feature-value -->
+<!-- Lexemes -->
+<!-- Replacements that rely on previous definitions :-) -->
+<!-- standard global imports
+
+>>> from __future__ import division
+>>> import nltk, re, pprint -->
+<!-- TODO:
+discuss applications of unify() to dicts, lists, and mixtures of dicts and lists
+FeatureValueTuple: &#39;[x=(1,2,3)]&#39;
+FeatureValueSet: &#39;[x={1,2,3}]&#39;
+NB: Unification does *not* descend into tuples or sets; but variable
+substitution from bindings does.  Generally speaking, tuples and set
+feature values should never contain feature structures.
+FeatureValueUnion: &#39;{?a+?b}&#39;, which will automatically collapse to a
+FeatureValueSet as soon as all top-level variables are replaced with set values.
+As with FeatureValueSet, unification does not descend into FeatureValueUnion,
+but variable binding does.
+More examples are in Edward&#39;s email of 24 August 2007
+
+* AP: Give example of grammar with HPSG style subcat? Probably not
+  doable :-(
+
+* AP: The "Heads Revisited" subsection: there is some interaction
+  of the material of this subsection with the material of the
+  previous subsection, on "Subcategorization".  In fact, something
+  like X-bar theory is implicitly introduced in that previous
+  section, with V&#39;&#39; = V[SUBCAT <>], and V' = V[SUBCAT <NP>].
+  Shouldn&#39;t these two subsections be merged (or otherwise
+  reorganised)?
+
+* AP (70) and Figure 9.3: maybe I am thinking in terms of HPSG again,
+  but would it be possible to generalise these grammar fragments to
+  gaps of any type, not just NP?  For example, instead of (70), I&#39;d
+  like something like:
+
+  (70&#39;) ?x/?x - ->
+
+  and in the grammar in Figure 9.3, the first rule could (?) be
+  generalised to something like:
+
+  S[-INV] - -> ?x S/?x
+
+  etc. If this is possible in this formalism, maybe it would make sense
+  to mention it?
+
+* AP (72) and the sentence above - - there are also German verbs taking
+  *genitive* complements.
+
+  Figure 9.4: it&#39;s a pity the grammar uses IV/TV instead of illustrating
+  the list-valued SUBCAT...
+
+  "Further Reading": reference to GPSG garbled; some interesting
+  given ereferences not in the bibliography chapter (e.g., Grosz and
+  Stickel 1983, Dahl and Saint-Dizier 1985, etc.). -->
+<p>Естественные языки имеют широкий спектр грамматических конструкций, с которыми трудно справиться простыми методами, описанными в <a class="reference external" href="http://www.nltk.org/book/ch08.html#chap-parse">8.</a>. Для того, чтобы получить больше гибкости, мы изменим наше отношение к грамматическим категориям, таким как <tt class="doctest"><span class="pre">S</span></tt>, <tt class="doctest"><span class="pre">NP</span></tt> и <tt class="doctest"><span class="pre">V</span></tt>. Вместо атомарных меток мы разложим их в структуры наподобие словарей, в которых свойства могут принимать диапазон значений.</p>
+<p>Цель этой главы - ответить на следующие вопросы:</p>
+<ol class="arabic simple">
+<li>Как мы можем расширить рамки контекстно-свободных грамматик с помощью свойств, чтобы получить более точный контроль над грамматическими категориями и продуцированиями?</li>
+<li>Каковы основные формальные признаки структур свойств и как мы используем их в вычислительном отношении?</li>
+<li>Какие виды языковых паттернов и грамматических конструкций мы можем теперь схватить с помощью грамматик на основе свойств?</li>
+</ol>
+<p>Параллельно мы рассмотрим новые темы английского синтаксиса, в том числе такие явления, как соглашение, субкатегоризация и неограниченные конструкции зависимостей.</p>
+<div class="section" id="grammatical-features">
+<h1>1 Грамматические свойства</h1>
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch06.html#chap-data-intensive">chap-data-intensive</a> мы описали, как построить классификаторы, которые основываются на выявлении свойств текста.  Такие функции могут быть довольно простыми, такими как извлечение последней буквы слова, или более сложными, такими как метка части речи, которая в свою очередь была предсказана классификатором.  В этой главе мы будем исследовать роль свойств в построении грамматик на основе правил.  В отличие от экстракторов свойств, которые записывают свойства, которые были обнаружены автоматически, мы теперь собираемся <em>декларировать</em> свойства слов и фраз. Мы начинаем с очень простого примера, используя словари для хранения свойств и их значений.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; kim = {'CAT': 'NP', 'ORTH': 'Kim', 'REF': 'k'}
+&gt;&gt;&gt; chase = {'CAT': 'V', 'ORTH': 'chased', 'REL': 'chase'}</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Объекты <tt class="doctest"><span class="pre">kim</span></tt> и <tt class="doctest"><span class="pre">chase</span></tt> имеют несколько общих черт, <tt class="doctest"><span class="pre">CAT</span></tt> (грамматическую категорию) и <tt class="doctest"><span class="pre">ORTH</span></tt> (орфографию, то есть написание). Кроме того, каждый из них имеет более семантически ориентированное свойство: <tt class="doctest"><span class="pre">kim[<span class="pysrc-string">'REF'</span>]</span></tt> предназначен для того, чтобы указать референт для <tt class="doctest"><span class="pre">kim</span></tt>, в то время как <tt class="doctest"><span class="pre">chase[<span class="pysrc-string">'REL'</span>]</span></tt> указывает на отношение, выраженное <tt class="doctest"><span class="pre">chase</span></tt>.  В контексте грамматик, основанных на правилах, такие пары свойств и значений известны как <a name="feature_structures_index_term"></a><span class="termdef">структуры свойств</span>, и мы скоро увидим альтернативные обозначения для них.</p>
+<p>Структуры свойств содержат различные виды информации о грамматических объектах. Информация не должна быть исчерпывающей, и мы могли бы добавить дополнительные свойства. Например, в случае глагола часто бывает полезно знать, какую "семантическую роль" играют аргументы глагола. В случае <span class="example">chase</span> субъект играет роль «агента», в то время как объект играет роль "патиента". Давайте добавим эту информацию, используя <tt class="doctest"><span class="pre"><span class="pysrc-string">'sbj'</span></span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-string">'obj'</span></span></tt> в качестве заполнителей, которые будут заполняться, когда глагол сочетается со своими грамматическими аргументами:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; chase['AGT'] = 'sbj'
+&gt;&gt;&gt; chase['PAT'] = 'obj'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Если мы теперь будем обрабатывать предложение <cite>Kim chased Lee</cite>, мы захотим "привязать" роль глагольного агента к субъекту, а роль патиента к объекту. Мы делаем это, связывая с <tt class="doctest"><span class="pre">REF</span></tt> свойством соответствующего <tt class="doctest"><span class="pre">NP</span></tt>. В следующем примере, мы делаем незамысловатое предположение, что <tt class="doctest"><span class="pre">NP</span></tt> непосредственно слева и справа от глагола - это субъект и объект соответственно. Мы также добавляем структуру свойств для <span class="example">Lee</span>, чтобы придать примеру завершенность.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent = "Kim chased Lee"
+&gt;&gt;&gt; tokens = sent.split()
+&gt;&gt;&gt; lee = {'CAT': 'NP', 'ORTH': 'Lee', 'REF': 'l'}
+&gt;&gt;&gt; def lex2fs(word):
+...     for fs in [kim, lee, chase]:
+...         if fs['ORTH'] == word:
+...             return fs
+&gt;&gt;&gt; subj, verb, obj = lex2fs(tokens[0]), lex2fs(tokens[1]), lex2fs(tokens[2])
+&gt;&gt;&gt; verb['AGT'] = subj['REF']
+&gt;&gt;&gt; verb['PAT'] = obj['REF']
+&gt;&gt;&gt; for k in ['ORTH', 'REL', 'AGT', 'PAT']:
+...     print("%-5s =&gt; %s" % (k, verb[k]))
+ORTH  =&gt; chased
+REL   =&gt; chase
+AGT   =&gt; k
+PAT   =&gt; l</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Такой же подход может быть принят для другого глагола, скажем, <span class="example">surprise</span>, хотя в этом случае субъект будет играть роль "источника" <tt class="doctest"><span class="pre">(SRC)</span></tt>, а объект роль "переживающего" <tt class="doctest"><span class="pre">(EXP)</span></tt>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; surprise = {'CAT': 'V', 'ORTH': 'surprised', 'REL': 'surprise',
+...             'SRC': 'sbj', 'EXP': 'obj'}</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Структуры свойств являются довольно мощными, но способ, которым мы управляли ими чрезвычайно привязан к конкретному случаю (<em>ad hoc</em>). Наша следующая задача в этой главе показать, как рамки контекстно-свободной грамматики и синтаксического анализа могут быть расширены для использования структур свойств, чтобы мы могли строить анализ, как этот, в более обобщенном виде.
+Мы начнем с рассмотрения явления синтаксического соглашения; мы покажем, как ограничения соглашения могут быть выражены элегантно с помощью свойств, и проиллюстрируем их использование в простой грамматике.</p>
+<p>Так как структуры свойств представляют собой общую структуру данных для представления информации любого рода, мы кратко рассмотрим их с более формальной точки зрения, и проиллюстрируем поддержку структур свойств в NLTK. В заключительной части главы мы покажем, что дополнительная выразительность свойств открывает широкий спектр возможностей для описания сложных аспектов языковой структуры.</p>
+<div class="section" id="syntactic-agreement">
+<h2>1.1 Синтаксическое соглашение</h2>
+<p>Следующие примеры показывают пары последовательностей слов, первая из которых является грамматической, а вторая нет. (Мы используем звездочку в начале последовательности слов, чтобы отметить, что это неграматично.)</p>
+<span class="target" id="ex-thisdog"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(1)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>this dog</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*these dog</td></tr></table></p>
+</td></tr></table></p>
+<span class="target" id="ex-thesedogs"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(2)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>these dogs</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*this dogs</td></tr></table></p>
+</td></tr></table></p>
+<p>В английском языке существительные, как правило, отмечены как имеющие единственное или множественное число. Форма демонстратива также изменяется: <span class="example">this</span> ( в единственном числе) и <span class="example">these</span> (множественное число).
+Примеры <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-thisdog">(1b)</a> и <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-thesedogs">(2b)</a> показывают, что существуют ограничения на использование местоимений и существительных в пределах именной фразы: либо оба имеют единственное число, либо оба имеют множественное число. Аналогичное ограничение имеет место между субъектами и предикатами:</p>
+<span class="target" id="ex-subjpredsg"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(3)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>the dog runs</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*the dog run</td></tr></table></p>
+</td></tr></table></p>
+<span class="target" id="ex-subjpredpl"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(4)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>the dogs run</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*the dogs runs</td></tr></table></p>
+</td></tr></table></p>
+<!-- Proposed for deletion: The element which determines the
+agreement, here the subject noun phrase, is called the agreement
+`controller`:dt:, while the element whose form is determined by
+agreement, here the verb, is called the `target`:dt:. -->
+<p>Здесь мы видим, что морфологические свойства глагола ковариантны с синтаксическими свойствами субъекта именной фразы.  Это ковариация называется <a name="agreement_index_term"></a><span class="termdef">соглашением</span>.
+Если мы посмотрим дальше на глагольные соглашения в английском языке, то мы увидим, что глаголы настоящего времени, как правило, имеют две флективные формы: одна для третьего лица единственного числа, а другая для любой другой комбинации лица и числа, как показано в таблице <a class="reference internal" href="http://www.nltk.org/book/ch09.html#tab-agreement-paradigm">1.1</a>.</p>
+<span class="target" id="tab-agreement-paradigm"></span><table border="1" class="docutils" id="tab-agreement-paradigm">
+<colgroup>
+<col width="34%">
+<col width="37%">
+<col width="29%">
+</colgroup>
+<tbody valign="top">
+<tr><td> </td>
+<td><strong>единственное число</strong></td>
+<td><strong>множественное число</strong></td>
+</tr>
+<tr><td><strong>1-е л.</strong></td>
+<td><em>I run</em></td>
+<td><em>we run</em></td>
+</tr>
+<tr><td><strong>2-е л.</strong></td>
+<td><em>you run</em></td>
+<td><em>you run</em></td>
+</tr>
+<tr><td><strong>3-е л.</strong></td>
+<td><em>he/she/it runs</em></td>
+<td><em>they run</em></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 1.1</span>: <p>Парадигма согласования для английских правильных глаголов</p>
+</p>
+</td></table>
+<p>Мы можем сделать роль морфологических свойств немного более явной, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-runs">ex-runs</a> и <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-run">ex-run</a>. Эти представления показывают, что глагол согласуется со своим субъектом в лице и числе. (Мы используем "3" как аббревиатуру для 3-го лица, "SG" для единственного числа и "PL" для множественного числа.)</p>
+<div class="system-message" id="ex-runs">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+Ошибка в "глосс" директиве: может содержать только одну таблицу.</div>
+<div class="system-message" id="ex-run">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+Ошибка в "глосс" директиве: может содержать только одну таблицу.</div>
+<p>Давайте посмотрим, что произайдет, когда мы закодируем эти ограничения согласования в контекстно-свободную грамматику.  Начнем с простой CFG в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg0">(5)</a>.</p>
+<span class="target" id="ex-agcfg0"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(5)</td><td width="15"></td><td><pre class="literal-block">
+S   -&gt;   NP VP
+NP  -&gt;   Det N
+VP  -&gt;   V
+
+Det  -&gt;  'this'
+N    -&gt;  'dog'
+V    -&gt;  'runs'
+
+</pre>
+</td></tr></table></p>
+<p>Грамматика <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg0">(5)</a> позволяет сформировать предложение <span class="example">this dog runs</span>; однако то, что мы действительно хотим сделать, это также сгенерировать <span class="example">these dogs run</span>, блокируя нежелательные последовательности, как <span class="example">*this dogs run</span> и <span class="example">*these dog runs</span>. Самый простой подход заключается в добавлении новых неконечных и продуцирований в грамматику:</p>
+<span class="target" id="ex-agcfg1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(6)</td><td width="15"></td><td><pre class="literal-block">
+S -&gt; NP_SG VP_SG
+S -&gt; NP_PL VP_PL
+NP_SG -&gt; Det_SG N_SG
+NP_PL -&gt; Det_PL N_PL
+VP_SG -&gt; V_SG
+VP_PL -&gt; V_PL
+
+Det_SG -&gt; 'this'
+Det_PL -&gt; 'these'
+N_SG -&gt; 'dog'
+N_PL -&gt; 'dogs'
+V_SG -&gt; 'runs'
+V_PL -&gt; 'run'
+</pre>
+</td></tr></table></p>
+<p>Вместо одного продуцирования, раскрывающего <tt class="doctest"><span class="pre">S</span></tt>, мы теперь имеем два продуцирования, одно, охватывающее предложения, включающие <tt class="doctest"><span class="pre">NP</span></tt>s и <tt class="doctest"><span class="pre">VP</span></tt>s с субъектом в единственном числе, и другое, покрывающее предложения, включающие <tt class="doctest"><span class="pre">NP</span></tt>s и <tt class="doctest"><span class="pre">VP</span></tt>s с субъектом во множественном числе. На самом деле, любое продуцирование в
+<a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg0">(5)</a> имеет два соответствия в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg1">(6)</a>. Для небольшой грамматики это, на самом деле, не такая уж и проблема, хотя это эстетически и непривлекательно. Тем не менее, для большей грамматики, которая покрывает солидное подмножество английских конструкций, перспектива удвоения размера грамматики очень непривлекательна. Предположим теперь, что мы использовали тот же подход для обработки согласования с первым, вторым и третьим лицом для единственного и множественного числа. Это привело бы к увеличению исходной грамматики в 6 раз, чего мы определенно хотим избежать. Можем ли мы придумать что-то лучше, чем это? В следующем разделе мы покажем, что схватывание согласования по числу и лицу не должно происходить ценой "взрыва" количества продуцирований.</p>
+<!-- Rule multiplication is of course more severe if we add in
+person agreement constraints.
+"rule multiplication" will be meaningless to some readers.
+We need to be consistent in referring to these as productions. -->
+</div>
+<div class="section" id="using-attributes-and-constraints">
+<h2>1.2 Использование атрибутов и ограничений</h2>
+<p>Мы говорили неформально о лингвистических категориях, обладающих <em>свойствами</em>; например, что существительное обладает свойством множественного числа. Давайте сделаем это явно:</p>
+<span class="target" id="ex-num0"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">7.</td><td width="15"></td><td><pre class="literal-block">
+N[NUM = pl]
+</pre>
+</td></tr></table></p>
+<p>В <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-num0">(7)</a> мы ввели некоторое новое обозначение, которое говорит, что категория <tt class="doctest"><span class="pre">N</span></tt> имеет (грамматическое) <a name="feature_index_term"></a> <span class="termdef">свойство</span> под названием <tt class="doctest"><span class="pre">NUM</span></tt> (сокращение от 'number') и что значение этого свойства <tt class="doctest"><span class="pre">pl</span></tt> (сокращение от 'plural'). Мы можем добавить подобные аннотации к другим категориям и использовать их в лексических записях:</p>
+<span class="target" id="ex-agcfg2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(8)</td><td width="15"></td><td><pre class="literal-block">
+Det[NUM=sg] -&gt; 'this'
+Det[NUM=pl] -&gt; 'these'
+
+N[NUM=sg] -&gt; 'dog'
+N[NUM=pl] -&gt; 'dogs'
+V[NUM=sg] -&gt; 'runs'
+V[NUM=pl] -&gt; 'run'
+</pre>
+</td></tr></table></p>
+<p>Помогает ли это вообще? Пока что это выглядит как чуть более многословная альтернатива тому, что было указано в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg1">(6)</a>. Дело становятся более интересным, когда мы начинаем вводим <em>переменные</em> для значений свойств и используем их для записи ограничений:</p>
+<span class="target" id="ex-agcfg3"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(9)</td><td width="15"></td><td><pre class="literal-block">
+S -&gt; NP[NUM=?n] VP[NUM=?n]
+NP[NUM=?n] -&gt; Det[NUM=?n] N[NUM=?n]
+VP[NUM=?n] -&gt; V[NUM=?n]
+</pre>
+</td></tr></table></p>
+<p>Мы используем <tt class="doctest"><span class="pre">?n</span></tt> в качестве переменной для значений <tt class="doctest"><span class="pre">NUM</span></tt>; ей может быть присвоено либо <tt class="doctest"><span class="pre">sg</span></tt>, либо <tt class="doctest"><span class="pre">pl</span></tt> в пределах данного продуцирования.
+Мы можем прочитать первое продуцирование, как поговорку, что какое бы значение <tt class="doctest"><span class="pre">NP</span></tt> ни принимала для свойства <tt class="doctest"><span class="pre">NUM</span></tt>, <tt class="doctest"><span class="pre">VP</span></tt> должна принимать такое же значение.</p>
+<p>Для того чтобы понять, как работают эти ограничения свойств, полезно подумать о том, как можно было бы построить дерево. Лексические продуцирования допускают следующие локальные деревья (деревья глубиной один):</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(10)</td><td width="15"></td><td><span class="target" id="ex-this"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-1.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-1.png" style="width:107.0px;height:64.0px"></td></tr></table></p>
+<span class="target" id="ex-these"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-2.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-2.png" style="width:103.0px;height:64.0px"></td></tr></table></p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(11)</td><td width="15"></td><td><span class="target" id="ex-dog"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-3.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-3.png" style="width:93.0px;height:64.0px"></td></tr></table></p>
+<span class="target" id="ex-dogs"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-4.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-4.png" style="width:89.0px;height:64.0px"></td></tr></table></p>
+</td></tr></table></p>
+<p>Теперь <tt class="doctest"><span class="pre">S -&gt; NP[NUM =?n] VP[NUM =?n]</span></tt> говорит, что независимо от значения <tt class="doctest"><span class="pre">NUM</span></tt> для <tt class="doctest"><span class="pre">N</span></tt> и <tt class="doctest"><span class="pre">Det</span></tt> они должны быть одинаковыми. Следовательно, <tt class="doctest"><span class="pre">NP [NUM =?n] -&gt; Det[NUM =?n] N[NUM =?n]</span></tt> позволит объединить <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-this">(10a)</a> и <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dog">(11а)</a> в <tt class="doctest"><span class="pre">NP</span></tt>, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-good1">(12а)</a>, а также позволит объединить <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-these">(10b)</a> и <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dogs">(11b)</a>, как в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-good2">(12b)</a>. В противоположность этому <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-bad1">(13а)</a> и <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-bad2">(13b)</a> запрещены, потому что корни их поддеревьев различаются по своим значениям для свойства <tt class="doctest"><span class="pre">NUM</span></tt>; эта несовместимость значений указывается неформально значением <em>FAIL</em> в верхнем узле.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(12)</td><td width="15"></td><td><span class="target" id="ex-good1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-5.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-5.png" style="width:210.0px;height:104.0px"></td></tr></table></p>
+<span class="target" id="ex-good2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-6.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-6.png" style="width:201.0px;height:104.0px"></td></tr></table></p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(13)</td><td width="15"></td><td><span class="target" id="ex-bad1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-7.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-7.png" style="width:206.0px;height:104.0px"></td></tr></table></p>
+<span class="target" id="ex-bad2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-8.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-8.png" style="width:206.0px;height:104.0px"></td></tr></table></p>
+</td></tr></table></p>
+<p>Продуцирование <tt class="doctest"><span class="pre">VP [NUM =?n] -&gt; V [NUM =?n]</span></tt> говорит о том, что значение <tt class="doctest"><span class="pre">NUM</span></tt> головного глагола должно быть таким же, как значение <tt class="doctest"><span class="pre">NUM</span></tt> родителя <tt class="doctest"><span class="pre">VP</span></tt>. В сочетании с продуцированием для расширения <tt class="doctest"><span class="pre">S</span></tt>, получаем следствие, что если значение <tt class="doctest"><span class="pre">NUM</span></tt> головного имени субъекта <tt class="doctest"><span class="pre">pl</span></tt>, то таким же является значение <tt class="doctest"><span class="pre">NUM</span></tt> головного глагола <tt class="doctest"><span class="pre">VP</span></tt>.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(14)</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-9.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-9.png" style="width:310.0px;height:144.0px"></td></tr></table></p>
+<p>Грамматика <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg2">(8)</a> иллюстрирует лексические продуцирования для определителей, как <span class="example">this</span> и <span class="example">these</span>, которые требуют единственное или множественное  число головного существительного соответственно. Тем не менее, другие определители на английском языке не выбирают грамматическое число существительного, с которым они сочетаются.
+Одним из способов описания этого было бы добавить две лексические записи в грамматику, по одному для единственного и множественного числа определителей, таких как <span class="example">the</span></p>
+<pre class="literal-block">
+Det[NUM=sg] -&gt; 'the' | 'some' | 'any'
+Det[NUM=pl] -&gt; 'the' | 'some' | 'any'
+</pre>
+<p>Однако более элегантное решение заключается в том, чтобы оставить значение <tt class="doctest"><span class="pre">NUM</span></tt> <a name="underspecified_index_term"></a><span class="termdef">недоопределенным</span>, позволяя ему согласовываться в числе с тем, с чем он комбинируется. Присвоение переменного значения <tt class="doctest"><span class="pre">NUM</span></tt> является одним из способов достижения этого результата:</p>
+<pre class="literal-block">
+Det[NUM=?n] -&gt; 'the' | 'some' | 'any'
+</pre>
+<p>Но на самом деле мы можем быть еще более экономичными и просто опустить любую спецификацию для <tt class="doctest"><span class="pre">NUM</span></tt> в таких продукциях. Нам нужно только явным образом ввести значение переменной, когда это ограничивает другое значение в любом другом месте в том же продуцировании.</p>
+<p>Грамматика в листинге <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-feat0cfg">1.1</a> иллюстрирует большинство идей, с которыми мы до сих пор вас познакомили в этой главе, плюс несколько новых.</p>
+<!-- XXX name show_cfg() is idiosyncratic for something which print a file -->
+<!-- XXX The contents of feat0.fcfg seems to have changed in the file.
+I won&#39;t pull in the updated version in case the discussion also needs to be updated. -->
+<span class="target" id="code-feat0cfg"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.data.show_cfg('grammars/book_grammars/feat0.fcfg')
+% start S
+# ###################
+# Grammar Productions
+# ###################
+# S expansion productions
+S -&gt; NP[NUM=?n] VP[NUM=?n]
+# NP expansion productions
+NP[NUM=?n] -&gt; N[NUM=?n]
+NP[NUM=?n] -&gt; PropN[NUM=?n]
+NP[NUM=?n] -&gt; Det[NUM=?n] N[NUM=?n]
+NP[NUM=pl] -&gt; N[NUM=pl]
+# VP expansion productions
+VP[TENSE=?t, NUM=?n] -&gt; IV[TENSE=?t, NUM=?n]
+VP[TENSE=?t, NUM=?n] -&gt; TV[TENSE=?t, NUM=?n] NP
+# ###################
+# Lexical Productions
+# ###################
+Det[NUM=sg] -&gt; 'this' | 'every'
+Det[NUM=pl] -&gt; 'these' | 'all'
+Det -&gt; 'the' | 'some' | 'several'
+PropN[NUM=sg]-&gt; 'Kim' | 'Jody'
+N[NUM=sg] -&gt; 'dog' | 'girl' | 'car' | 'child'
+N[NUM=pl] -&gt; 'dogs' | 'girls' | 'cars' | 'children'
+IV[TENSE=pres,  NUM=sg] -&gt; 'disappears' | 'walks'
+TV[TENSE=pres, NUM=sg] -&gt; 'sees' | 'likes'
+IV[TENSE=pres,  NUM=pl] -&gt; 'disappear' | 'walk'
+TV[TENSE=pres, NUM=pl] -&gt; 'see' | 'like'
+IV[TENSE=past] -&gt; 'disappeared' | 'walked'
+TV[TENSE=past] -&gt; 'saw' | 'liked'</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_feat0cfg.py" type="text/x-python"><span class="caption-label">Пример 1.1 (code_feat0cfg.py)</span></a>: <span class="caption-label">Листинг 1.1:</span> Пример грамматики основанной на свойствах</p></td></tr>
+</table></div>
+<p>Обратите внимание на то, что синтаксическая категория может иметь более чем одно свойство; например, <tt class="doctest"><span class="pre">V[TENSE = pres, NUM = pl]</span></tt>.
+Вообще мы можем добавить столько свойств, сколько захотим.</p>
+<p>Последняя деталь, касающаяся листинга <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-feat0cfg">1.1</a>, - предложение <tt class="doctest"><span class="pre">%start S</span></tt>. Эта "директива" говорит анализатору принять <tt class="doctest"><span class="pre">S</span></tt> как стартовый символ грамматики.</p>
+<p>Вообще когда мы пытаемся разработать даже очень маленькую грамматику, удобно записывать продуцирования в файл, где они могут быть отредактированы, испытаны и пересмотрены.  Мы сохранили <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-feat0cfg">1.1</a> в виде файла с именем <tt class="doctest"><span class="pre"><span class="pysrc-string">'feat0.fcfg'</span></span></tt> в дистрибутиве данных NLTK. Вы можете сделать свою собственную копию этого файла с помощью <tt class="doctest"><span class="pre">nltk.data.load()</span></tt> для дальнейших экспериментов.</p>
+<p>Листинг <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-featurecharttrace">1.2</a> иллюстрирует работу графического анализатора с грамматикой  на основе свойств.
+После токенизации входа, мы импортируем функцию <tt class="doctest"><span class="pre">load_parser</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch09.html#load_parser1"><span id="ref-load_parser1"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, которая принимает имя файла грамматики в качестве входных данных и возвращает графический синтаксический анализатор <tt class="doctest"><span class="pre">cp</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch09.html#load_parser2"><span id="ref-load_parser2"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.  Вызов метода <tt class="doctest"><span class="pre">parse()</span></tt> анализатора вернет итератор полученных деревьев разбора; <tt class="doctest"><span class="pre">trees</span></tt> будет пустой, если грамматика не может разобрать ввод, и будет содержать один или более деревьев разбора, в зависимости от того, является ли ввод синтаксически однозначным или нет.</p>
+<span class="target" id="code-featurecharttrace"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tokens = 'Kim likes children'.split()
+&gt;&gt;&gt; from nltk import load_parser 
+&gt;&gt;&gt; cp = load_parser('grammars/book_grammars/feat0.fcfg', trace=2)  
+&gt;&gt;&gt; for tree in cp.parse(tokens):
+...     print(tree)
+...
+|.Kim .like.chil.|
+Leaf Init Rule:
+|[----]    .    .| [0:1] 'Kim'
+|.    [----]    .| [1:2] 'likes'
+|.    .    [----]| [2:3] 'children'
+Feature Bottom Up Predict Combine Rule:
+|[----]    .    .| [0:1] PropN[NUM='sg'] -&gt; 'Kim' *
+Feature Bottom Up Predict Combine Rule:
+|[----]    .    .| [0:1] NP[NUM='sg'] -&gt; PropN[NUM='sg'] *
+Feature Bottom Up Predict Combine Rule:
+|[----&gt;    .    .| [0:1] S[] -&gt; NP[NUM=?n] * VP[NUM=?n] {?n: 'sg'}
+Feature Bottom Up Predict Combine Rule:
+|.    [----]    .| [1:2] TV[NUM='sg', TENSE='pres'] -&gt; 'likes' *
+Feature Bottom Up Predict Combine Rule:
+|.    [----&gt;    .| [1:2] VP[NUM=?n, TENSE=?t] -&gt; TV[NUM=?n, TENSE=?t] * NP[] {?n: 'sg', ?t: 'pres'}
+Feature Bottom Up Predict Combine Rule:
+|.    .    [----]| [2:3] N[NUM='pl'] -&gt; 'children' *
+Feature Bottom Up Predict Combine Rule:
+|.    .    [----]| [2:3] NP[NUM='pl'] -&gt; N[NUM='pl'] *
+Feature Bottom Up Predict Combine Rule:
+|.    .    [----&gt;| [2:3] S[] -&gt; NP[NUM=?n] * VP[NUM=?n] {?n: 'pl'}
+Feature Single Edge Fundamental Rule:
+|.    [---------]| [1:3] VP[NUM='sg', TENSE='pres'] -&gt; TV[NUM='sg', TENSE='pres'] NP[] *
+Feature Single Edge Fundamental Rule:
+|[==============]| [0:3] S[] -&gt; NP[NUM='sg'] VP[NUM='sg'] *
+(S[]
+  (NP[NUM='sg'] (PropN[NUM='sg'] Kim))
+  (VP[NUM='sg', TENSE='pres']
+    (TV[NUM='sg', TENSE='pres'] likes)
+    (NP[NUM='pl'] (N[NUM='pl'] children))))</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_featurecharttrace.py" type="text/x-python"><span class="caption-label">Пример 1.2 (code_featurecharttrace.py)</span></a>: <span class="caption-label">Листинг 1.2</span>: Вывод графического анализатора на основе свойств в режиме отладки</p></td></tr>
+</table></div>
+<p>Подробности процедуры синтаксического анализа не так важны для настоящих целей. Тем не менее, существует проблема реализации, которая касается нашего более раннего обсуждения размера грамматики. Один из возможных подходов к синтаксическому анализу продуцирований, содержащих ограничения свойств, заключается в компиляции всех допустимых значений соответствующих свойств, чтобы у нас получилась большая, полностью определенная контекстно-свободная грамматика в соответствии с <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg1">(6)</a>. В противоположность этому процесс синтаксического анализа, показанный выше, работает непосредственно с недоопределенными продуцированиями данной грамматикой. Значения свойств "перетекают наверх" от лексических записей, и значения переменных затем ассоциируются с ними с помощью привязок (т.е. словарей), таких как <tt class="doctest"><span class="pre">{?n: <span class="pysrc-string">'sg'</span>, ?t: <span class="pysrc-string">'pres'</span>}</span></tt>.  По мере того, как анализатор собирает информацию об узлах дерева, которое он строит, эти привязки переменных используются для определения значений в этих узлах; таким образом недоопределенное <tt class="doctest"><span class="pre">VP[NUM =?n, TENSE =?t] -&gt; TV[NUM =?n, TENSE =?t] NP[]</span></tt> получает конкретные значения как <tt class="doctest"><span class="pre">VP[NUM = <span class="pysrc-string">'sg'</span>, TENSE=<span class="pysrc-string">'pres'</span>] -&gt; TV[NUM = <span class="pysrc-string">'sg'</span>, TENSE=<span class="pysrc-string">'pres'</span>] NP[]</span></tt> путем поиска значений <tt class="doctest"><span class="pre">?n</span></tt> и <tt class="doctest"><span class="pre">?t</span></tt> в привязках.</p>
+<p>И, наконец, мы можем проверить в получившиеся деревья разбора (в данном случае одно дерево).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for tree in trees: print(tree)
+(S[]
+  (NP[NUM='sg'] (PropN[NUM='sg'] Kim))
+  (VP[NUM='sg', TENSE='pres']
+    (TV[NUM='sg', TENSE='pres'] likes)
+    (NP[NUM='pl'] (N[NUM='pl'] children))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="terminology">
+<h2>1.3 Терминология</h2>
+<p>До сих пор мы видели как значения свойств только <tt class="doctest"><span class="pre">sg</span></tt> и <tt class="doctest"><span class="pre">pl</span></tt>. Эти простые значения, как правило, называют <a name="atomic_index_term"></a><span class="termdef">атомарными</span> - то есть, они не могут быть разложены на подчасти. Особый случай атомарных значений - это <a name="boolean_index_term"></a><span class="termdef">логические</span> значения, то есть значения, которые просто указывают, какое значение имеет свойство: истина или ложь. Например, мы могли бы захотеть выделить <a name="auxiliary_index_term"></a><span class="termdef">вспомогательные</span> глаголы, такие как <span class="example">can</span>, <span class="example">may</span>, <span class="example">will</span> и <span class="example">do</span> с помощью логического свойства <tt class="doctest"><span class="pre">AUX</span></tt>. Например, продуцирование <tt class="doctest"><span class="pre">V[TENSE = pres, AUX = +] -&gt; <span class="pysrc-string">'can'</span></span></tt> означает, что <span class="example">can</span> принимает значение <tt class="doctest"><span class="pre">pres</span></tt> для свойства <tt class="doctest"><span class="pre">TENSE</span></tt> и <tt class="doctest"><span class="pre">+</span></tt> или <tt class="doctest"><span class="pre">true</span></tt> для <tt class="doctest"><span class="pre">AUX</span></tt>. Существует широко принятое соглашение сокращать представление логических свойств <tt class="doctest"><span class="pre">f</span></tt> следующим образом: вместо <tt class="doctest"><span class="pre">AUX=+</span></tt> или <tt class="doctest"><span class="pre">AUX=-</span></tt> мы используем <tt class="doctest"><span class="pre">+AUX</span></tt> и <tt class="doctest"><span class="pre">-AUX</span></tt> соответственно. Это только сокращения, однако, и анализатор интерпретирует их, как если бы <tt class="doctest"><span class="pre">+</span></tt> и <tt class="doctest"><span class="pre">-</span></tt> были, как любые другие атомарные значения. <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-lex">(15)</a> показывает некоторые репрезентативные продуцирования:</p>
+<span class="target" id="ex-lex"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(15)</td><td width="15"></td><td><pre class="literal-block">
+V[TENSE=pres, +AUX] -&gt; 'can'
+V[TENSE=pres, +AUX] -&gt; 'may'
+
+V[TENSE=pres, -AUX] -&gt; 'walks'
+V[TENSE=pres, -AUX] -&gt; 'likes'
+
+</pre>
+</td></tr></table></p>
+<p>Мы уже говорили о прикреплении "свойств как аннотаций" к синтаксическим категориям. Более радикальный подход представляет целую категорию - то есть, неконечный символ плюс аннотацию - как пучок свойств.  Например, <tt class="doctest"><span class="pre">N[NUM=sg]</span></tt> содержит информации о части речи, которая может быть представлена в виде <tt class="doctest"><span class="pre">POS=N</span></tt>.  Поэтому альтернатива для обозначения этой категории <tt class="doctest"><span class="pre">[POS = N, NUM = sg]</span></tt>.</p>
+<p>В дополнение к свойствам с атомарными значениями, свойства могут принимать значения, которые сами являются структурой свойств. Например, мы можем сгруппировать вместе свойства согласования (например, лицо, число и пол) в качестве отдельной части категории как значение свойства <tt class="doctest"><span class="pre">AGR</span></tt>. В этом случае мы говорим, что <tt class="doctest"><span class="pre">AGR</span></tt> имеет <a name="complex_index_term"></a><span class="termdef">комплексное</span> значение. Листинг <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agr0">(16)</a> изображает структуру в формате известном как <a name="attribute_value_matrix_index_term"></a> <span class="termdef">матрица значений атрибутов</span> (AVM).</p>
+<span class="target" id="ex-agr0"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(16)</td><td width="15"></td><td><pre class="literal-block">
+[POS = N           ]
+[                  ]
+[AGR = [PER = 3   ]]
+[      [NUM = pl  ]]
+[      [GND = fem ]]
+
+</pre>
+</td></tr></table></p>
+<span class="target" id="fig-avm1"></span><div class="figure" id="fig-avm1">
+<img alt="../images/avm1.png" src="http://www.nltk.org/images/avm1.png" style="width:221.4px;height:107.39999999999999px">
+<p class="caption"><span class="caption-label">Рисунок 1.3:</span> Визуализация структуры свойств как матрицы значений атрибутов</p>
+</div>
+<p>Попутно следует отметить, что существуют альтернативные подходы для отображения AVM; <a class="reference internal" href="http://www.nltk.org/book/ch09.html#fig-avm1">1.3</a> показывает пример.
+Хотя структуры свойств, визуализированные в стиле <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agr0">(16)</a>, менее визуально приятны, мы будем придерживаться этого формата, так как он соответствует выходу, который мы будем получать от NLTK.</p>
+<!-- XXX if people think of these as dictionaries there&#39;s nothing surprising about order -->
+<p>По поводу представления мы также отметим, что структуры свойств, как словари, не придают особого значения <em>порядку</em> свойств. Таким образом, <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agr0">(16)</a> эквивалентно:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(17)</td><td width="15"></td><td><pre class="literal-block">
+[AGR = [NUM = pl  ]]
+[      [PER = 3   ]]
+[      [GND = fem ]]
+[                  ]
+[POS = N           ]
+</pre>
+</td></tr></table></p>
+<p>Имея возможность использовать такие свойства, как <tt class="doctest"><span class="pre">AGR</span></tt>, мы можем реорганизовать грамматику наподобие <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-feat0cfg">1.1</a>, что свойства согласования  были объединены вместе. Крошечный грамматика, иллюстрирующая эту идею, показана в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agr2">(18)</a>.</p>
+<span class="target" id="ex-agr2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(18)</td><td width="15"></td><td><pre class="literal-block">
+S                    -&gt; NP[AGR=?n] VP[AGR=?n]
+NP[AGR=?n]           -&gt; PropN[AGR=?n]
+VP[TENSE=?t, AGR=?n] -&gt; Cop[TENSE=?t, AGR=?n] Adj
+
+Cop[TENSE=pres,  AGR=[NUM=sg, PER=3]] -&gt; 'is'
+PropN[AGR=[NUM=sg, PER=3]]            -&gt; 'Kim'
+Adj                                   -&gt; 'happy'
+</pre>
+</td></tr></table></p>
+</div>
+</div>
+<div class="section" id="processing-feature-structures">
+<span id="sec-feat-comp"></span><h1>2 Обработка структур свойств</h1>
+<p>В этом разделе мы покажем, как можно построить и управлять структурами свойств NLTK. Мы также обсудим фундаментальную операцию унификации, которая позволяет объединить информацию, содержащуюся в двух различных структурах свойств.</p>
+<p>Структуры свойств в NLTK объявляются с помощью конструктора <tt class="doctest"><span class="pre">FeatStruct(</span></tt>. Атомарные значения свойств могут быть строками или целыми числами.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs1 = nltk.FeatStruct(TENSE='past', NUM='sg')
+&gt;&gt;&gt; print(fs1)
+[ NUM   = 'sg'   ]
+[ TENSE = 'past' ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Структура свойств, на самом деле, просто своего рода словарь, поэтому мы обращаемся к его значениям путем индексации обычным способом.
+Мы можем использовать наш знакомый синтаксис для <em>присвоения</em> значений свойствам:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs1 = nltk.FeatStruct(PER=3, NUM='pl', GND='fem')
+&gt;&gt;&gt; print(fs1['GND'])
+fem
+&gt;&gt;&gt; fs1['CASE'] = 'acc'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы также можем определить структуры свойств, которые имеют комплексные значения, как обсуждалось ранее.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs2 = nltk.FeatStruct(POS='N', AGR=fs1)
+&gt;&gt;&gt; print(fs2)
+[       [ CASE = 'acc' ] ]
+[ AGR = [ GND  = 'fem' ] ]
+[       [ NUM  = 'pl'  ] ]
+[       [ PER  = 3     ] ]
+[                        ]
+[ POS = 'N'              ]
+&gt;&gt;&gt; print(fs2['AGR'])
+[ CASE = 'acc' ]
+[ GND  = 'fem' ]
+[ NUM  = 'pl'  ]
+[ PER  = 3     ]
+&gt;&gt;&gt; print(fs2['AGR']['PER'])
+3</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Альтернативный способ определения структур свойств заключается в использовании строки в квадратных скобках, состоящей из пар свойство-значение в формате <tt class="doctest"><span class="pre">feature=value</span></tt>, где значения сами могут быть структурами свойств:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(nltk.FeatStruct("[POS='N', AGR=[PER=3, NUM='pl', GND='fem']]"))
+[       [ GND = 'fem' ] ]
+[ AGR = [ NUM = 'pl'  ] ]
+[       [ PER = 3     ] ]
+[                       ]
+[ POS = 'N'             ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Структуры свойств не по природе связаны с языковыми объектами; они представляют собой структуры общего назначения для представления знаний. Например, мы могли бы кодировать информацию о человеке в структуре свойств:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(nltk.FeatStruct(NAME='Lee', TELNO='01 27 86 42 96', AGE=33))
+[ AGE   = 33               ]
+[ NAME  = 'Lee'            ]
+[ TELNO = '01 27 86 42 96' ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>На следующих нескольких страницах мы будем использовать примеры наподобие этого, чтобы изучить стандартные операции над структурами свойств.
+Это на короткое время отвлечет нас от обработки естественного языка, но мы должны заложить фундамент, прежде чем мы сможем вернуться к разговору о грамматиках. Держитесь крепче!</p>
+<p>Часто бывает полезно просматривать структуры свойств в виде графиков; говоря более конкретно, в виде <a name="directed_acyclic_graphs_index_term"></a><span class="termdef">направленных ациклических графов</span> (DAG).
+Граф <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag01">(19)</a> эквивалентен выше приведенному AVM.</p>
+<span class="target" id="ex-dag01"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(19)</td><td width="15"></td><td><img alt="../images/dag01.png" src="http://www.nltk.org/images/dag01.png" style="width:209.20000000000002px;height:176.8px"></td></tr></table></p>
+<p>Названия свойств отображаются в виде меток на направленных дугах, а значения свойств показываются в качестве меток на узлах, на которые указывают дуги.</p>
+<p>Так же, как и раньше, значения свойств могут быть сложными:</p>
+<span class="target" id="ex-dag02"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(20)</td><td width="15"></td><td><img alt="../images/dag02.png" src="http://www.nltk.org/images/dag02.png" style="width:260.0px;height:281.2px"></td></tr></table></p>
+<p>Когда мы смотрим на такие графы, естественно думать в категориях путей через граф. <a name="feature_path_index_term"></a><span class="termdef">Путь свойства</span> является последовательностью дуг, по которым можно проследовать к свойству из корневого узла. Мы будем представлять пути с помощью кортежей. Таким образом, <tt class="doctest"><span class="pre">(<span class="pysrc-string">'ADDRESS'</span>, <span class="pysrc-string">'STREET'</span>)</span></tt> представляет собой путь свойства, значение которого в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag02">(20)</a> - это узел с меткой <tt class="doctest"><span class="pre"><span class="pysrc-string">'rue Pascal'</span></span></tt>.</p>
+<p>Теперь давайте рассмотрим ситуацию, когда Ли (Lee) имеет супруга (spouse) по имени <em>Kim</em>, который имеет такой же адрес, как Ли.
+Мы могли бы представить это, как <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag04">(21)</a>.</p>
+<span class="target" id="ex-dag04"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(21)</td><td width="15"></td><td><img alt="../images/dag04.png" src="http://www.nltk.org/images/dag04.png" style="width:468.0px;height:298.0px"></td></tr></table></p>
+<p>Однако вместо того, чтобы повторять информацию об адресах в структуре свойств, мы можем "делить" один и тот же подграф между различными дугами:</p>
+<span class="target" id="ex-dag03"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(22)</td><td width="15"></td><td><img alt="../images/dag03.png" src="http://www.nltk.org/images/dag03.png" style="width:376.8px;height:281.2px"></td></tr></table></p>
+<p>Другими словами, значение пути <tt class="doctest"><span class="pre">(<span class="pysrc-string">'ADDRESS'</span>)</span></tt> в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag03">(22)</a> совпадает со значением пути <tt class="doctest"><span class="pre">(<span class="pysrc-string">'SPOUSE'</span>, <span class="pysrc-string">'ADDRESS'</span>)</span></tt>.  Говорят, что DAGи, такие как <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag03">(22)</a>, влекут <a name="structure_sharing_index_term"></a><span class="termdef">совместное использование структуры</span> или <a name="reentrancy_index_term"></a><span class="termdef">повторное вхождение (реентерабельность)</span>. Когда два пути имеют одно и то же значение, говорят, что они <a name="equivalent_index_term"></a><span class="termdef">эквивалентны</span>.</p>
+<p>Для того, чтобы показать повторное вхождение в наших матричных представлениях, мы предваряем первое вхождение общей структуры свойств целым числом в скобках, например <tt class="doctest"><span class="pre">(1)</span></tt>.
+Любые последующие ссылки на эту структуру будут использовать обозначение <tt class="doctest"><span class="pre">-&gt;(1)</span></tt>, как показано ниже.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(nltk.FeatStruct("""[NAME='Lee', ADDRESS=(1)[NUMBER=74, STREET='rue Pascal'],
+...                          SPOUSE=[NAME='Kim', ADDRESS-&gt;(1)]]"""))
+[ ADDRESS = (1) [ NUMBER = 74           ] ]
+[               [ STREET = 'rue Pascal' ] ]
+[                                         ]
+[ NAME    = 'Lee'                         ]
+[                                         ]
+[ SPOUSE  = [ ADDRESS -&gt; (1)  ]           ]
+[           [ NAME    = 'Kim' ]           ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Целое число в квадратных скобках иногда называют <a name="tag_index_term"></a><span class="termdef">меткой</span> или <a name="coindex_index_term"></a><span class="termdef">коиндексом</span>. Выбор целого числа не имеет существенного значения.
+В пределах одной структуры свойств может быть любое количество меток.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(nltk.FeatStruct("[A='a', B=(1)[C='c'], D-&gt;(1), E-&gt;(1)]"))
+[ A = 'a'             ]
+[                     ]
+[ B = (1) [ C = 'c' ] ]
+[                     ]
+[ D -&gt; (1)            ]
+[ E -&gt; (1)            ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- TODO following AVM doesn&#39;t currently parse -->
+<!-- We can also share empty structures:
+
+    >>> fs2 = nltk.FeatStruct("[A=(1)[], B=(2)[], C->(1), D->(2)]")
+
+.. _ex-reentrant03:
+.. ex::
+      ::
+
+         [ A = (1) [ ] ]
+         [ B = (2) [ ] ]
+         [ C -> (1)    ]
+         [ D -> (2)    ] -->
+<div class="section" id="subsumption-and-unification">
+<h2>2.1 Вбирание и объединение</h2>
+<p>Общепринято думать о структурах свойств как обеспечивающих <a name="partial_information_index_term"></a><span class="termdef">частичную информацию</span> о каком-то объекте в том смысле, что мы можем расположить структуры свойств согласно тому, сколько информации они содержат. Например, <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs01">(23а)</a> имеет меньше информации, чем <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs02">(23b)</a>, которая в свою очередь имеет меньше информации, чем <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs03">(23c)</a>.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(23)</td><td width="15"></td><td><span class="target" id="ex-fs01"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><pre class="literal-block">
+[НОМЕР = 74]
+</pre>
+</td></tr></table></p>
+<span class="target" id="ex-fs02"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><pre class="literal-block">
+[НОМЕР = 74] [УЛИЦА = 'Рю Паскаль']
+</pre>
+</td></tr></table></p>
+<span class="target" id="ex-fs03"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td><pre class="literal-block">
+[НОМЕР = 74] [УЛИЦА = 'Рю Паскаль'] [ГОРОД = 'Париж']
+</pre>
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Это упорядочение называется <a name="subsumption_index_term"></a><span class="termdef">вбиранием</span>; <span class="math">FS</span><sub>0</sub> вбирает <span class="math">FS</span><sub>1</sub>, если вся информация, содержащаяся в <span class="math">FS</span><sub>0</sub> содержится также в <span class="math">FS</span><sub>1</sub>.
+Мы используем символ ⊑ для обозначения вбирания.</p>
+<p>Когда мы добавляем возможность повторного вхождения, мы должны быть более осторожными в описании вбирания: если <span class="math">FS</span><sub>0</sub> ⊑ <span class="math">FS</span><sub>1</sub>, то <span class="math">FS</span><sub>1</sub> должна иметь все пути и повторные <span class="math">FS</span><sub>0</sub>. Поэтому <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag02">(20)</a> вбирает <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag03">(22)</a>, так как последняя имеет дополнительные повторные вхождения. Должно быть очевидно, что вбирание обеспечивает только частичное упорядочение структур свойств, так как некоторые структуры свойств несоизмеримы. Например, <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs04">(24)</a> ни вбирает, ни поглощается <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs01">(23а)</a>.</p>
+<span class="target" id="ex-fs04"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(24)</td><td width="15"></td><td><pre class="literal-block">
+[TELNO = 01 27 86 42 96]
+
+</pre>
+</td></tr></table></p>
+<p>Итак, мы увидели, что некоторые структуры свойств несут больше информации, чем другие. Как мы добавляем дополнительную информации к данной структуре свойств?
+Например, мы могли бы решить, что адреса должны содержать не только номер дома и название улицы, но и город. То есть, мы могли бы <em>объединить</em> граф <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag042">(25b)</a> с <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag041">(25а)</a>, чтобы получить <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag043">(25с)</a>.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(25)</td><td width="15"></td><td><span class="target" id="ex-dag041"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="../images/dag04-1.png" src="http://www.nltk.org/images/dag04-1.png" style="width:219.20000000000002px;height:132.4px"></td></tr></table></p>
+<span class="target" id="ex-dag042"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="../images/dag04-2.png" src="http://www.nltk.org/images/dag04-2.png" style="width:61.2px;height:141.20000000000002px"></td></tr></table></p>
+<span class="target" id="ex-dag043"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td><img alt="../images/dag04-3.png" src="http://www.nltk.org/images/dag04-3.png" style="width:219.20000000000002px;height:149.20000000000002px"></td></tr></table></p>
+</td></tr></table></p>
+<p>Объединение информации из двух структур свойств называется <a name="unification_index_term"></a><span class="termdef">объединением (унификацией)</span> и поддерживается методом <tt class="doctest"><span class="pre">unify()</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs1 = nltk.FeatStruct(NUMBER=74, STREET='rue Pascal')
+&gt;&gt;&gt; fs2 = nltk.FeatStruct(CITY='Paris')
+&gt;&gt;&gt; print(fs1.unify(fs2))
+[ CITY   = 'Paris'      ]
+[ NUMBER = 74           ]
+[ STREET = 'rue Pascal' ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Объединение формально определяется как (частичная) бинарная операция: <span class="math">FS</span><sub>0</sub> ⊔ <span class="math">FS</span><sub>1</sub>.
+Объединение является симметричным, поэтому <span class="math">FS</span><sub>0</sub> ⊔ <span class="math">FS</span><sub>1</sub> = <span class="math">FS</span><sub>1</sub> ⊔ <span class="math">FS</span><sub>0</sub>.
+То же самое верно в Python:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(fs2.unify(fs1))
+[ CITY   = 'Paris'      ]
+[ NUMBER = 74           ]
+[ STREET = 'rue Pascal' ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- TODO: also mention commutativity -->
+<!-- but >>> fs1.unify(fs2) is fs2.unify(fs1)
+    False
+only works with repr() -->
+<p>Если мы объединяем две структуры свойств, которые состоят в отношении вбирания, то результатом объединения является наиболее информативная из двух:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(26)</td><td width="15"></td><td>Если <span class="math">FS</span><sub>0</sub> ⊑ <span class="math">FS</span><sub>1</sub>, то <span class="math">FS</span><sub>0</sub> ⊔ <span class="math">FS</span><sub>1</sub> = <span class="math">FS</span><sub>1</sub></td></tr></table></p>
+<p>Например, результатом объединения <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs02">(23b)</a> с <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs03">(23с)</a> является <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-fs03">(23с)</a>.</p>
+<p>Объединение <span class="math">FS</span><sub>0</sub> и <span class="math">FS</span><sub>1</sub> не будет выполнено, если две структуры свойств разделяют путь π, но атомарное значение π в <span class="math">FS</span><sub>0</sub> отлично от значения π в <span class="math">FS</span><sub>1</sub>.
+Это реализуется путем установки результата объединения <tt class="doctest"><span class="pre">None</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs0 = nltk.FeatStruct(A='a')
+&gt;&gt;&gt; fs1 = nltk.FeatStruct(A='b')
+&gt;&gt;&gt; fs2 = fs0.unify(fs1)
+&gt;&gt;&gt; print(fs2)
+None</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь, если мы посмотрим на то, как объединение взаимодействует с разделением структуры, это становится действительно интересным. Во-первых, давайте определим <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag04">(21)</a> в Python:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs0 = nltk.FeatStruct("""[NAME=Lee,
+...                           ADDRESS=[NUMBER=74,
+...                                    STREET='rue Pascal'],
+...                           SPOUSE= [NAME=Kim,
+...                                    ADDRESS=[NUMBER=74,
+...                                             STREET='rue Pascal']]]""")
+&gt;&gt;&gt; print(fs0)
+[ ADDRESS = [ NUMBER = 74           ]               ]
+[           [ STREET = 'rue Pascal' ]               ]
+[                                                   ]
+[ NAME    = 'Lee'                                   ]
+[                                                   ]
+[           [ ADDRESS = [ NUMBER = 74           ] ] ]
+[ SPOUSE  = [           [ STREET = 'rue Pascal' ] ] ]
+[           [                                     ] ]
+[           [ NAME    = 'Kim'                     ] ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Что произойдет, если мы прибавим к адресу Кима спецификацию <tt class="doctest"><span class="pre">CITY</span></tt>?  Обратите внимание на то, что <tt class="doctest"><span class="pre">FS1</span></tt> должен включать весь путь от корня структуры свойств до <tt class="doctest"><span class="pre">CITY</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs1 = nltk.FeatStruct("[SPOUSE = [ADDRESS = [CITY = Paris]]]")
+&gt;&gt;&gt; print(fs1.unify(fs0))
+[ ADDRESS = [ NUMBER = 74           ]               ]
+[           [ STREET = 'rue Pascal' ]               ]
+[                                                   ]
+[ NAME    = 'Lee'                                   ]
+[                                                   ]
+[           [           [ CITY   = 'Paris'      ] ] ]
+[           [ ADDRESS = [ NUMBER = 74           ] ] ]
+[ SPOUSE  = [           [ STREET = 'rue Pascal' ] ] ]
+[           [                                     ] ]
+[           [ NAME    = 'Kim'                     ] ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В отличие от предыдущего результат сильно отличается, если <tt class="doctest"><span class="pre">fs1</span></tt> объединена с разделяющей структуру версией <tt class="doctest"><span class="pre">fs2</span></tt> (которая была показана ранее в виде графика <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-dag03">(22)</a>):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs2 = nltk.FeatStruct("""[NAME=Lee, ADDRESS=(1)[NUMBER=74, STREET='rue Pascal'],
+...                           SPOUSE=[NAME=Kim, ADDRESS-&gt;(1)]]""")
+&gt;&gt;&gt; print(fs1.unify(fs2))
+[               [ CITY   = 'Paris'      ] ]
+[ ADDRESS = (1) [ NUMBER = 74           ] ]
+[               [ STREET = 'rue Pascal' ] ]
+[                                         ]
+[ NAME    = 'Lee'                         ]
+[                                         ]
+[ SPOUSE  = [ ADDRESS -&gt; (1)  ]           ]
+[           [ NAME    = 'Kim' ]           ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Вместо того, чтобы просто обновить то, что в действительности было кимовской "копией" адреса Ли, мы сейчас обновили <span class="emphasis">оба</span> их адреса одновременно. В более общем плане, если объединение добавляет информацию к значению некоторого пути π, тогда это объединение одновременно обновляет значение <span class="emphasis">любого пути эквивалентного</span> π.</p>
+<!-- XXX The ?x gets broken across lines -->
+<p>Как мы уже видели, совместное использование структуры также может быть указано с помощью переменных, таких как <tt class="doctest"><span class="pre">?x</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fs1 = nltk.FeatStruct("[ADDRESS1=[NUMBER=74, STREET='rue Pascal']]")
+&gt;&gt;&gt; fs2 = nltk.FeatStruct("[ADDRESS1=?x, ADDRESS2=?x]")
+&gt;&gt;&gt; print(fs2)
+[ ADDRESS1 = ?x ]
+[ ADDRESS2 = ?x ]
+&gt;&gt;&gt; print(fs2.unify(fs1))
+[ ADDRESS1 = (1) [ NUMBER = 74           ] ]
+[                [ STREET = 'rue Pascal' ] ]
+[                                          ]
+[ ADDRESS2 -&gt; (1)                          ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+</div>
+<div class="section" id="extending-a-feature-based-grammar">
+<span id="sec-extending-a-feature-based-grammar"></span><h1>3 Расширение грамматики на основе свойств</h1>
+<p>В этом разделе мы возвращаемся к грамматике на основе свойств и исследуем различные лингвистических вопросы, а также демонстрируем преимущества включения свойств в грамматику.</p>
+<div class="section" id="subcategorization">
+<h2>3.1 Субкатегоризация</h2>
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch08.html#chap-parse">8.</a> мы расширили наши метки категорий для представления различных видов глагола и использовали метки <tt class="doctest"><span class="pre">IV</span></tt> и <tt class="doctest"><span class="pre">TV</span></tt> для непереходных и переходных глаголов соответственно.  Это позволило нам писать продуцирования подобные следующим:</p>
+<span class="target" id="ex-subcatcfg0"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(27)</td><td width="15"></td><td><pre class="literal-block">
+VP -&gt; IV
+VP -&gt; TV NP
+
+</pre>
+</td></tr></table></p>
+<p>Хотя мы знаем, что <tt class="doctest"><span class="pre">IV</span></tt> и <tt class="doctest"><span class="pre">TV</span></tt> два вида <tt class="doctest"><span class="pre">V</span></tt>, они просто атомарные нетерминальные символы из CFG, отличные друг от друга так же, как и любая другая пара символов.  Эта запись не позволяет нам ничего сказать о глаголах в целом, например, мы не можем сказать: "Все лексические единицы из категории <tt class="doctest"><span class="pre">V</span></tt> могут быть помечены временем", так как <span class="example">walk</span>, скажем, является элементом категории <tt class="doctest"><span class="pre">IV</span></tt>, а не <tt class="doctest"><span class="pre">V</span></tt>. Таким образом, мы можем заменить метки категорий, таких как <tt class="doctest"><span class="pre">TV</span></tt> и <tt class="doctest"><span class="pre">IV</span></tt> на <tt class="doctest"><span class="pre">V</span></tt> со свойством, которое говорит нам, объединяется ли глагол со следующим объектом <tt class="doctest"><span class="pre">NP</span></tt> или может ли это произойти без какого-либо предлога?</p>
+<p>Простой подход, изначально разработанный для конструкции грамматики, которая называется Обобщенная грамматика фразовой структуры (GPSG), пытается решить эту проблему, позволяя лексическим категориям обладать <tt class="doctest"><span class="pre">SUBCAT</span></tt>, который говорит нам, к какому субкатегоризационному классу элемент принадлежит. В то время как GPSG использовал целые значения для <tt class="doctest"><span class="pre">SUBCAT</span></tt>, пример ниже принимает более мнемонические значения, а именно <tt class="doctest"><span class="pre">intrans</span></tt>, <tt class="doctest"><span class="pre">trans</span></tt> и <tt class="doctest"><span class="pre">clause</span></tt>:</p>
+<span class="target" id="ex-subcatgpsg"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(28)</td><td width="15"></td><td><pre class="literal-block">
+VP[TENSE=?t, NUM=?n] -&gt; V[SUBCAT=intrans, TENSE=?t, NUM=?n]
+VP[TENSE=?t, NUM=?n] -&gt; V[SUBCAT=trans, TENSE=?t, NUM=?n] NP
+VP[TENSE=?t, NUM=?n] -&gt; V[SUBCAT=clause, TENSE=?t, NUM=?n] SBar
+
+V[SUBCAT=intrans, TENSE=pres, NUM=sg] -&gt; 'disappears' | 'walks'
+V[SUBCAT=trans, TENSE=pres, NUM=sg] -&gt; 'sees' | 'likes'
+V[SUBCAT=clause, TENSE=pres, NUM=sg] -&gt; 'says' | 'claims'
+
+V[SUBCAT=intrans, TENSE=pres, NUM=pl] -&gt; 'disappear' | 'walk'
+V[SUBCAT=trans, TENSE=pres, NUM=pl] -&gt; 'see' | 'like'
+V[SUBCAT=clause, TENSE=pres, NUM=pl] -&gt; 'say' | 'claim'
+
+V[SUBCAT=intrans, TENSE=past, NUM=?n] -&gt; 'disappeared' | 'walked'
+V[SUBCAT=trans, TENSE=past, NUM=?n] -&gt; 'saw' | 'liked'
+V[SUBCAT=clause, TENSE=past, NUM=?n] -&gt; 'said' | 'claimed'
+</pre>
+</td></tr></table></p>
+<p>Когда мы видим лексическую категорию как <tt class="doctest"><span class="pre">V[SUBCAT=trans]</span></tt>, мы можем интерпретировать спецификацию <tt class="doctest"><span class="pre">SUBCAT</span></tt> как указатель на продуцирование, в котором <tt class="doctest"><span class="pre">V[SUBCAT=trans]</span></tt> представлен в качестве главного ребенка в продуцировании <tt class="doctest"><span class="pre">VP</span></tt>.  По соглашению существует соответствие между значениями <tt class="doctest"><span class="pre">SUBCAT</span></tt> и продуцированиями, которые представляют лексические главы.  В таком подходе <tt class="doctest"><span class="pre">SUBCAT</span></tt> может появляться <em>только</em> для лексических категорий; например, нет никакого смысла указывать значение <tt class="doctest"><span class="pre">SUBCAT</span></tt> для <tt class="doctest"><span class="pre">VP</span></tt>. По необходимости и <span class="example">walk</span> и <span class="example">like</span> принадлежат к категории <tt class="doctest"><span class="pre">V</span></tt>.Тем не менее, <span class="example">walk</span> будет возникать только в <tt class="doctest"><span class="pre">VP</span></tt>, расширенных за счет продуцирования со свойством <tt class="doctest"><span class="pre">SUBCAT=intrans</span></tt> на правой стороне, в отличие от <span class="example">like</span>, который требует <tt class="doctest"><span class="pre">SUBCAT=trans</span></tt>.</p>
+<p>В нашем третьем классе глаголов выше, мы определили категорию <tt class="doctest"><span class="pre">SBar</span></tt>. Это метка для придаточных предложений, таких как комплемент <span class="example">утверждения</span> в примере <span class="example">Вы утверждаете, что вы любите детей</span>. Нам необходимо еще два продуцирования для анализа таких предложений:</p>
+<span class="target" id="ex-sbar"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(29)</td><td width="15"></td><td><pre class="literal-block">
+SBar -&gt; Comp S
+Comp -&gt; 'that'
+
+</pre>
+</td></tr></table></p>
+<p>Полученная структура - следующая.</p>
+<span class="target" id="ex-sbartree"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(30)</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-10.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-10.png" style="width:619.0px;height:265.0px"></td></tr></table></p>
+<p>Альтернативный подход к субкатегоризации, исходно заслуга конструкции известной как категориальная грамматика, представлен ​​в конструкциях на основе свойств, таких как PATR и ориентированная на главы грамматика фразовой структуры. Вместо того чтобы использовать значения <tt class="doctest"><span class="pre">SUBCAT</span></tt> как способ индексации продуцирований, значение <tt class="doctest"><span class="pre">SUBCAT</span></tt> непосредственно кодирует валентность главы (список аргументов, с которыми она может сочетаться). Например, глагол <span class="example">put</span>, который принимает <tt class="doctest"><span class="pre">NP</span></tt> и <tt class="doctest"><span class="pre">PP</span></tt> комплементы <span class="example">(put the book on the table)</span>, может быть представлен в виде <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-subcathpsg0">(31)</a>:</p>
+<!-- TODO: angle brackets don&#39;t appear -->
+<span class="target" id="ex-subcathpsg0"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(31)</td><td width="15"></td><td><pre class="literal-block">
+V[SUBCAT=&lt;NP, NP, PP&gt;]
+</pre>
+</td></tr></table></p>
+<p>Это говорит о том, что глагол может сочетаться с тремя аргументами. Крайний левый элемент в этом списке - это субъект <tt class="doctest"><span class="pre">NP</span></tt>, а все остальное - <tt class="doctest"><span class="pre">NP</span></tt>, за которым следует <tt class="doctest"><span class="pre">PP</span></tt> в данном случае - содержит субкатегоризацию для комплементов. Когда глагол, как <span class="example">put</span> сочетается с соответствующими комплементами, требования, которые указаны в <tt class="doctest"><span class="pre">SUBCAT</span></tt> сбрасываются и только субъект <tt class="doctest"><span class="pre">NP</span></tt> необходим. Эта категория, которая соответствует тому, что традиционно мыслилось как <tt class="doctest"><span class="pre">VP</span></tt>, может быть представлена следующим образом.</p>
+<span class="target" id="ex-subcathpsg1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(32)</td><td width="15"></td><td><pre class="literal-block">
+V[SUBCAT=&lt;NP&gt;]
+</pre>
+</td></tr></table></p>
+<p>Наконец, предложение является своего рода глагольной категорией, которая не имеет <span class="emphasis">каких-либо</span> требований для дальнейших аргументов и, следовательно, имеет <tt class="doctest"><span class="pre">SUBCAT</span></tt>, значение которого пустой список. Дерево <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-subcathpsg2">(33)</a> показывает, как эти присвоения категорий объединяются в разборе предложения <span class="example">Kim put the book on the table</span>.</p>
+<span class="target" id="ex-subcathpsg2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(33)</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-11.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-11.png" style="width:429.0px;height:144.0px"></td></tr></table></p>
+</div>
+<div class="section" id="heads-revisited">
+<h2>3.2 И снова главы </h2>
+<!-- XXX changed mother / head-daughter to parent / head-child in following -->
+<p>Мы отметили в предыдущем разделе, что за счет вывода субкатегоризационной информации из основной метки категории, мы могли бы выразить больше обобщений о свойствах глаголов. Еще одно свойство такого рода следующее: выражения категории <tt class="doctest"><span class="pre">V</span></tt> являются главами фраз категории <tt class="doctest"><span class="pre">VP</span></tt>. Точно так же, <tt class="doctest"><span class="pre">N</span></tt> являются главами <tt class="doctest"><span class="pre">NP</span></tt>, <tt class="doctest"><span class="pre">A</span></tt> (т.е. прилагательные) являются главами <tt class="doctest"><span class="pre">AP</span></tt> и <tt class="doctest"><span class="pre">P</span></tt> (т.е. предлоги) являются главами <tt class="doctest"><span class="pre">PP</span></tt>.
+Не все фразы имеют главы - например, принято говорить, что сочинительные фразы (например, <span class="example">книга и колокол</span>) не имеют глав - тем не менее, мы бы хотели, чтобы формализм нашей грамматики выражал отношение родитель/глава-ребенок везде, где оно имеет место.
+Пока что <tt class="doctest"><span class="pre">V</span></tt> и <tt class="doctest"><span class="pre">VP</span></tt> просто атомарные символы и нам нужно найти способ связать их с помощью свойств (как мы делали раньше, чтобы связать <tt class="doctest"><span class="pre">IV</span></tt> и <tt class="doctest"><span class="pre">TV</span></tt>).</p>
+<p>X-bar синтаксис решает эту проблему путем абстрагирования понятия <a name="phrasal_level_index_term"></a><span class="termdef">фразовый уровень</span>. Принято выделить три таких уровня. Если <tt class="doctest"><span class="pre">N</span></tt> представляет лексический уровень, тогда <tt class="doctest"><span class="pre">N'</span></tt> представляет собой следующий уровень вверх, что соответствует более традиционной категории <cite>Nom</cite>, в то время как <tt class="doctest"><span class="pre">N''</span></tt> представляет фразового уровень, соответствующий категории <tt class="doctest"><span class="pre">NP</span></tt>. Рисунок <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-xbar0">(34а)</a> иллюстрирует представительную структуру, в то время как <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-xbar01">(34b)</a> является более традиционным аналогом.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(34)</td><td width="15"></td><td><span class="target" id="ex-xbar0"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-12.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-12.png" style="width:186.0px;height:144.0px"></td></tr></table></p>
+<span class="target" id="ex-xbar01"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-13.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-13.png" style="width:187.0px;height:144.0px"></td></tr></table></p>
+</td></tr></table></p>
+<!-- XXX The second half of the next paragraph is heavy going, for
+a relatively simple idea; it would be easier to follow if
+there was a diagram to demonstrate the contrast, giving
+a pair of structures that are minimally different, e.g.
+"put the chair on the stage" vs "saw the chair on the stage".
+After this, prose could formalize the concepts. -->
+<p>Главой структуры <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-xbar0">(34а)</a> является <tt class="doctest"><span class="pre">N</span></tt>, тогда как <tt class="doctest"><span class="pre">N'</span></tt> и <tt class="doctest"><span class="pre">N''</span></tt> называются <a name="_phrasal__projections_index_term"></a><span class="termdef">(фразовыми) проекциями</span> <tt class="doctest"><span class="pre">N</span></tt>.<tt class="doctest"><span class="pre">N''</span></tt> является <a name="maximal_projection_index_term"></a><span class="termdef">максимальной проекцией</span>, а <tt class="doctest"><span class="pre">N</span></tt> иногда называют <a name="zero_projection_index_term"></a><span class="termdef">нулевой проекцией</span>. Одним из центральных притязаний синтаксиса X-bar является то, что все конституенты разделяют структурное сходство. Используя <tt class="doctest"><span class="pre">x</span></tt> в качестве переменной над <tt class="doctest"><span class="pre">N</span></tt>, <tt class="doctest"><span class="pre">V</span></tt>, <tt class="doctest"><span class="pre">А</span></tt> и <tt class="doctest"><span class="pre">Р</span></tt>, мы говорим, что непосредственно субкатегоризированные <span class="emphasis">комплементы</span> лексической главы <tt class="doctest"><span class="pre">x</span></tt> всегда помещаются в качестве братьев и сестер главы, в то время как <span class="emphasis">придаточные</span> помещаются как братья и сестры промежуточной категории, <tt class="doctest"><span class="pre">X'</span></tt>. Таким образом, конфигурация двух <tt class="doctest"><span class="pre">Р''</span></tt> придаточных в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-xbar1">(35)</a> отличается от комплемента <tt class="doctest"><span class="pre">Р''</span></tt> в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-xbar0">(34а)</a>.</p>
+<span class="target" id="ex-xbar1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(35)</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-14.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-14.png" style="width:343.0px;height:225.0px"></td></tr></table></p>
+<p>Продуцирования в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-xbar2">(36)</a> показывают, как бар-уровни могут быть закодированы с помощью структур свойств. Вложенная структура в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-xbar1">(35)</a> достигается за счет применения двух рекурсивных правил, расширяющих <tt class="doctest"><span class="pre">N[BAR=1]</span></tt>.</p>
+<span class="target" id="ex-xbar2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(36)</td><td width="15"></td><td><pre class="literal-block">
+S -&gt; N[BAR=2] V[BAR=2]
+N[BAR=2] -&gt; Det N[BAR=1]
+N[BAR=1] -&gt; N[BAR=1] P[BAR=2]
+N[BAR=1] -&gt; N[BAR=0] P[BAR=2]
+N[BAR=1] -&gt; N[BAR=0]XS
+</pre>
+</td></tr></table></p>
+</div>
+<div class="section" id="auxiliary-verbs-and-inversion">
+<h2>3.3 Вспомогательные Глаголы и Инверсия</h2>
+<p>Перевернутые предложения - где порядок субъекта и глагола меняется - возникает в английских вопросительных предложениях, а также после «негативных» наречий:</p>
+<span class="target" id="ex-inv1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(37)</td><td width="15"></td><td><span class="target" id="ex-inv1a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Do you like children?</td></tr></table></p>
+<span class="target" id="ex-inv1b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Can Jody walk?</td></tr></table></p>
+</td></tr></table></p>
+<span class="target" id="ex-inv2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(38)</td><td width="15"></td><td><span class="target" id="ex-inv2a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Rarely do you see Kim.
+</td></tr></table></p>
+<span class="target" id="ex-inv2b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Never have I seen this dog.
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Однако мы не можем поставить любой глагол в позицию перед субъектом:</p>
+<span class="target" id="ex-inv3"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(39)</td><td width="15"></td><td><span class="target" id="ex-inv3a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>*Like you children?</td></tr></table></p>
+<span class="target" id="ex-inv3b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*Walks Jody?</td></tr></table></p>
+</td></tr></table></p>
+<span class="target" id="ex-inv4"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(40)</td><td width="15"></td><td><span class="target" id="ex-inv4a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>*Rarely see you Kim.</td></tr></table></p>
+<span class="target" id="ex-inv4b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*Never saw I this dog.</td></tr></table></p>
+</td></tr></table></p>
+<p>Глаголы, которые исходно могут быть расположены в предложениях с обратным порядком слов, относятся к классу известному как <a name="auxiliaries_index_term"></a><span class="termdef">вспомогательные глаголы</span>, а так же такие, как <span class="example">do</span>, <span class="example">can</span> и <span class="example">have</span>, включают в себя <span class="example">be</span> <span class="example">will</span> и <span class="example">shall</span>. Один из способов схватывания таких структур - с помощью следующего продуцирования:</p>
+<span class="target" id="ex-sinv"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(41)</td><td width="15"></td><td><pre class="literal-block">
+S[+INV] -&gt; V[+AUX] NP VP
+
+</pre>
+</td></tr></table></p>
+<p>То есть предложение, отмеченное как <cite>[+INV]</cite> содержит вспомогательный глагол, за которым следует <tt class="doctest"><span class="pre">VP</span></tt>.(В более детальной грамматике мы должны были бы поставить некоторые ограничения на формы <tt class="doctest"><span class="pre">VP</span></tt> в зависимости от выбора вспомогательного глагола.)<a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-invtree">(42)</a> иллюстрирует структуру предложения с обратным порядком слов.</p>
+<span class="target" id="ex-invtree"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(42)</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-15.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-15.png" style="width:447.0px;height:144.0px"></td></tr></table></p>
+</div>
+<div class="section" id="unbounded-dependency-constructions">
+<h2>3.4 Конструкции неограниченных зависимостей</h2>
+<p>Рассмотрим следующие контрастные примеры:</p>
+<span class="target" id="ex-gap1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(43)</td><td width="15"></td><td><span class="target" id="ex-gap1a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>You like Jody.</td></tr></table></p>
+<span class="target" id="ex-gap1b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*You like.
+</td></tr></table></p>
+</td></tr></table></p>
+<span class="target" id="ex-gap2"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(44)</td><td width="15"></td><td><span class="target" id="ex-gap2a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>You put the card into the slot.</td></tr></table></p>
+<span class="target" id="ex-gap2b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*You put into the slot.</td></tr></table></p>
+<span class="target" id="ex-gap2c"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>*You put the card.
+</td></tr></table></p>
+<span class="target" id="ex-gap2d"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td>*You put.
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Глагол <span class="example">like</span> требует <tt class="doctest"><span class="pre">NP</span></tt> дополнения, в то время как <span class="example">put</span> требует как <tt class="doctest"><span class="pre">NP</span></tt>, так и <tt class="doctest"><span class="pre">PP</span></tt>.Примеры <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap1">(43)</a> и <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap2">(44)</a> показывают, что эти дополнения являются <em>обязательными</em>: их отсутствие приводит к неграматичности. Тем не менее, существуют контексты, в которых обязательные дополнения могут быть опущены, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap3">(45)</a> и <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap4">(46)</a>.</p>
+<span class="target" id="ex-gap3"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(45)</td><td width="15"></td><td><span class="target" id="ex-gap3a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Kim knows who you like.</td></tr></table></p>
+<span class="target" id="ex-gap3b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>This music, you really like.</td></tr></table></p>
+</td></tr></table></p>
+<span class="target" id="ex-gap4"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(46)</td><td width="15"></td><td><span class="target" id="ex-gap4a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Which card do you put into the slot?</td></tr></table></p>
+<span class="target" id="ex-gap4b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Which slot do you put the card into?
+</td></tr></table></p>
+</td></tr></table></p>
+<p>То есть, обязательное дополнение может быть опущено, если есть соответствующий <a name="filler_index_term"></a> <span class="termdef">филлер</span> в предложении, такой как вопросительное слово <span class="example">who</span> в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap3a">(45а)</a>, препозиция темы <span class="example">this music</span> в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap3b">(45b)</a> или <span class="example">wh</span> фразы, <span class="example">which card/slot</span> в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap4">(46)</a>. Принято говорить, что предложения типа <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap3">(45)</a> - <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap4">(46)</a> содержат <a name="gaps_index_term"></a><span class="termdef">пропуски</span> там, где были опущены обязательные дополнения, и эти пропуски иногда делаются явными с помощью подчеркивания:</p>
+<span class="target" id="ex-gap5"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(47)</td><td width="15"></td><td><span class="target" id="ex-gap5a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Which card do you put __ into the slot?</td></tr></table></p>
+<span class="target" id="ex-gap5b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Which slot do you put the card into __?
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Таким образом, пропуск может возникнуть, если он <a name="licensed_index_term"></a><span class="termdef">оправдан</span> филлером. С другой стороны, филлеры могут иметь место только в случае, если имеется соответствующий пропуск в другом месте в предложении, как показано в следующих примерах.</p>
+<span class="target" id="ex-gap6"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(48)</td><td width="15"></td><td><span class="target" id="ex-gap6a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>*Kim knows who you like Jody.
+</td></tr></table></p>
+<span class="target" id="ex-gap6b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*This music, you really like hip-hop.
+</td></tr></table></p>
+</td></tr></table></p>
+<span class="target" id="ex-gap7"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(49)</td><td width="15"></td><td><span class="target" id="ex-gap7a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>*Which card do you put this into the slot?
+</td></tr></table></p>
+<span class="target" id="ex-gap7b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*Which slot do you put the card into this one?
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Совместное появление филлера и пропуска иногда называют "зависимостью". Одной из проблем, имеющих значительную важность в теоретической лингвистике, был вопрос о характере материала, который может располагаться между филлером и пропуском, который он оправдывает; в частности, можем ли мы просто перечислить конечное множество разделяющих их последовательностей? Ответ - Нет: нет верхней границы расстояния между филлером и пропуском. Этот факт можно легко проиллюстрировать с помощью конструкций с участием дополнений-предложений, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gap8">(50)</a>.</p>
+<span class="target" id="ex-gap8"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(50)</td><td width="15"></td><td><span class="target" id="ex-gap8a"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Who do you like __?</td></tr></table></p>
+<span class="target" id="ex-gap8b"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Who do you claim that you like __?
+</td></tr></table></p>
+<span class="target" id="ex-gap8c"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>Who do you claim that Jody says that you like __?
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Так как мы можем иметь бесконечно глубокую рекурсию дополнений-предложений, пропуск может быть находится бесконечно глубоко внутри целого предложения. Это созвездие свойств приводит к понятию <a name="unbounded_dependency_construction_index_term"></a><span class="termdef">конструкции неограниченной зависимости</span>; то есть зависимости между филлером и пропуском, где нет верхней границы расстояния между ними.</p>
+<p>Различные механизмы были предложены для обработки неограниченных зависимостей в формальных грамматиках; здесь мы проиллюстрируем подход, который является заслугой грамматики обобщенной фразовой структуры, которая включает <a name="slash_categories_index_term"></a><span class="termdef">слэш-категории</span>. Категория с косой чертой имеет вид <tt class="doctest"><span class="pre">Y/XP</span></tt>; мы интерпретируем это как фраза из категории <tt class="doctest"><span class="pre">Y</span></tt>, которой не хватает субконституента категории <tt class="doctest"><span class="pre">XP</span></tt>. Например, <tt class="doctest"><span class="pre">S/NP</span></tt> является <tt class="doctest"><span class="pre">S</span></tt>, которому не хватает <tt class="doctest"><span class="pre">NP</span></tt>. Использование категорий с косой чертой показано в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gaptree1">(51)</a>.</p>
+<span class="target" id="ex-gaptree1"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(51)</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-16.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-16.png" style="width:504.0px;height:185.0px"></td></tr></table></p>
+<p>Верхняя часть дерева представляет наполнитель <span class="example">who</span> (рассматривается как выражение категории <tt class="doctest"><span class="pre">NP[+wh])</span></tt> вместе с соответствующим конституентом, содержащим пропуск <tt class="doctest"><span class="pre">S/NP</span></tt>.Информация о пропуске затем "просачивается" вниз по дереву через категорию <tt class="doctest"><span class="pre">VP/NP</span></tt>, пока она не достигнет категории <tt class="doctest"><span class="pre">NP/NP</span></tt>.В этой точке зависимость снимается посредством реализации информации о пропуске как пустой строки, над которой непосредственно доминирует <tt class="doctest"><span class="pre">NP/NP</span></tt>.</p>
+<p>Нужно ли нам думать о категориях с косой чертой как совершенно новом виде объекта?  К счастью, мы можем разместить их в нашей существующей основанной на свойствах схеме, рассматривая косую черту как свойство, а категорию справа от нее как значение; то есть, <tt class="doctest"><span class="pre">S/NP</span></tt> сводится к <tt class="doctest"><span class="pre">S[SLASH=NP]</span></tt>. На практике это то, как синтаксический анализатор интерпретирует категории с косой чертой.</p>
+<p>Грамматика в листинге <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-slashcfg">3.1</a> иллюстрирует основные принципы категорий с косой чертой, а также включает в себя продуцирования для предложений с обратным порядком слов. Для упрощения изложения мы опустили любую спецификацию времени глаголов.</p>
+<!-- XXX The contents of feat1.fcfg seems to have changed in the file.
+I won&#39;t pull in the updated version in case the discussion also needs to be updated. -->
+<span class="target" id="code-slashcfg"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.data.show_cfg('grammars/book_grammars/feat1.fcfg')
+% start S
+# ###################
+# Grammar Productions
+# ###################
+S[-INV] -&gt; NP VP
+S[-INV]/?x -&gt; NP VP/?x
+S[-INV] -&gt; NP S/NP
+S[-INV] -&gt; Adv[+NEG] S[+INV]
+S[+INV] -&gt; V[+AUX] NP VP
+S[+INV]/?x -&gt; V[+AUX] NP VP/?x
+SBar -&gt; Comp S[-INV]
+SBar/?x -&gt; Comp S[-INV]/?x
+VP -&gt; V[SUBCAT=intrans, -AUX]
+VP -&gt; V[SUBCAT=trans, -AUX] NP
+VP/?x -&gt; V[SUBCAT=trans, -AUX] NP/?x
+VP -&gt; V[SUBCAT=clause, -AUX] SBar
+VP/?x -&gt; V[SUBCAT=clause, -AUX] SBar/?x
+VP -&gt; V[+AUX] VP
+VP/?x -&gt; V[+AUX] VP/?x
+# ###################
+# Lexical Productions
+# ###################
+V[SUBCAT=intrans, -AUX] -&gt; 'walk' | 'sing'
+V[SUBCAT=trans, -AUX] -&gt; 'see' | 'like'
+V[SUBCAT=clause, -AUX] -&gt; 'say' | 'claim'
+V[+AUX] -&gt; 'do' | 'can'
+NP[-WH] -&gt; 'you' | 'cats'
+NP[+WH] -&gt; 'who'
+Adv[+NEG] -&gt; 'rarely' | 'never'
+NP/NP -&gt;
+Comp -&gt; 'that'</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_slashcfg.py" type="text/x-python"><span class="caption-label">Пример 3.1 (code_slashcfg.py)</span></a>: <span class="caption-label">Рисунок 3.1</span>: Грамматика с продуцированиями для предложений с обратным порядком слов и зависимостями на больших расстояниях, использующая категории с косой чертой</p></td></tr>
+</table></div>
+<p>Грамматика в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-slashcfg">3.1</a> содержит одно продуцирование "вводящее пропуск", а именно <tt class="doctest"><span class="pre">S[-INV]-&gt;NP S/NP</span></tt>.Для того, чтобы корректно спустить вниз по дереву свойство косой черты, мы должны добавлять косые черты с переменными значениями к обеим сторонам стрелки в продуцированиях, расширяющих <tt class="doctest"><span class="pre">S</span></tt>, <tt class="doctest"><span class="pre">VP</span></tt> и <tt class="doctest"><span class="pre">NP</span></tt>.Например, <tt class="doctest"><span class="pre">VP/?х -&gt; V SBar/?{/1}х</span></tt> является версией <tt class="doctest"><span class="pre">VP -&gt; V SBar</span></tt> с косой чертой и говорит, что значение косой черты может быть указано на <tt class="doctest"><span class="pre">VP</span></tt> родителе конституента, если то же значение также указано на ребенка <tt class="doctest"><span class="pre">SBar</span></tt>. И, наконец, <tt class="doctest"><span class="pre">NP/NP -&gt;</span></tt> позволяет снять информацию косой черты на <tt class="doctest"><span class="pre">NP</span></tt> как пустую строку.
+Используя <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-slashcfg">3.1</a>, мы можем разобрать последовательность <span class="example">who do you claim that you like</span></p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tokens = 'who do you claim that you like'.split()
+&gt;&gt;&gt; from nltk import load_parser
+&gt;&gt;&gt; cp = load_parser('grammars/book_grammars/feat1.fcfg')
+&gt;&gt;&gt; for tree in cp.parse(tokens):
+...     print(tree)
+(S[-INV]
+  (NP[+WH] who)
+  (S[+INV]/NP[]
+    (V[+AUX] do)
+    (NP[-WH] you)
+    (VP[]/NP[]
+      (V[-AUX, SUBCAT='clause'] claim)
+      (SBar[]/NP[]
+        (Comp[] that)
+        (S[-INV]/NP[]
+          (NP[-WH] you)
+          (VP[]/NP[] (V[-AUX, SUBCAT='trans'] like) (NP[]/NP[] )))))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- XXX actual output has SUBCAT=2 instead of SUBCAT=&#39;clause&#39; -->
+<p>Более удобный для чтения вариант этого дерева показан на рисунке <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-gapparse">(52)</a>.</p>
+<span class="target" id="ex-gapparse"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(52)</td><td width="15"></td><td><img alt="tree_images / CH09-дерево-17.png" class="align-top" src="http://www.nltk.org/book/tree_images/ch09-tree-17.png" style="width:514.0px;height:183.0px"></td></tr></table></p>
+<p>Грамматика в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-slashcfg">3.1</a> также позволит нам разобрать предложения без пропусков:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tokens = 'you claim that you like cats'.split()
+&gt;&gt;&gt; for tree in cp.parse(tokens):
+...     print(tree)
+(S[-INV]
+  (NP[-WH] you)
+  (VP[]
+    (V[-AUX, SUBCAT='clause'] claim)
+    (SBar[]
+      (Comp[] that)
+      (S[-INV]
+        (NP[-WH] you)
+        (VP[] (V[-AUX, SUBCAT='trans'] like) (NP[-WH] cats))))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Кроме того, она допускает предложения с обратным порядком слов, которые не включают <span class="example">wh</span> конструкции:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tokens = 'rarely do you sing'.split()
+&gt;&gt;&gt; for tree in cp.parse(tokens):
+...     print(tree)
+(S[-INV]
+  (Adv[+NEG] rarely)
+  (S[+INV]
+    (V[+AUX] do)
+    (NP[-WH] you)
+    (VP[] (V[-AUX, SUBCAT='intrans'] sing))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="case-and-gender-in-german">
+<h2>3.5 Падеж и пол в немецком языке</h2>
+<p>По сравнению с английским немецкий язык имеет относительно богатую морфологию для согласования. Например, определенный артикль в немецком языке изменяется в зависимости от падежа, пола и числа, как показано в таблице <a class="reference internal" href="http://www.nltk.org/book/ch09.html#tab-german-def-art">3.1</a>.</p>
+<span class="target" id="tab-german-def-art"></span><table border="1" class="docutils" id="tab-german-def-art">
+<colgroup>
+<col width="20%">
+<col width="20%">
+<col width="20%">
+<col width="20%">
+<col width="21%">
+</colgroup>
+<tbody valign="top">
+<tr><td><strong>Падеж</strong></td>
+<td><strong>Мужской род</strong></td>
+<td><strong>Женский род</strong></td>
+<td><strong>Средний род</strong></td>
+<td><strong>Множественное число</strong></td>
+</tr>
+<tr><td><em>Nom</em></td>
+<td>der</td>
+<td>die</td>
+<td>das</td>
+<td>die</td>
+</tr>
+<tr><td><em>Gen</em></td>
+<td>des</td>
+<td>der</td>
+<td>des</td>
+<td>der</td>
+</tr>
+<tr><td><em>Dat</em></td>
+<td>dem</td>
+<td>der</td>
+<td>dem</td>
+<td>den</td>
+</tr>
+<tr><td><em>Acc</em></td>
+<td>den</td>
+<td>die</td>
+<td>das</td>
+<td>die</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 3.1</span>: <p>Морфологические парадигмы для немецкого определенного артикля</p>
+</p>
+</td></table>
+<p>Субъекты в немецком языке принимают именительный падеж, а большинство глаголов управляют своими объектами в винительном падеже. Тем не менее, есть исключения, как <span class="example">helfen</span>, которые управляет в дательном падеже:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">4,46%</td><td width="15"></td><td><div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+Ошибка в "глосс" директивы: может содержать только одну таблицу.</div>
+<div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+Ошибка в "глосс" директивы: может содержать только одну таблицу.</div>
+<div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+Ошибка в "глосс" директивы: может содержать только одну таблицу.</div>
+<div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+Ошибка в "глосс" директивы: может содержать только одну таблицу.</div>
+</td></tr></table></p>
+<p>Грамматика в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-germancfg">3.2</a> иллюстрирует взаимодействие согласования (включая лицо, число и пол) с падежом.</p>
+<!-- XXX The contents of german.fcfg seems to have changed in the file.
+I won&#39;t pull in the updated version in case the discussion also needs to be updated. -->
+<span class="target" id="code-germancfg"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.data.show_cfg('grammars/book_grammars/german.fcfg')
+% start S
+ # Grammar Productions
+ S -&gt; NP[CASE=nom, AGR=?a] VP[AGR=?a]
+ NP[CASE=?c, AGR=?a] -&gt; PRO[CASE=?c, AGR=?a]
+ NP[CASE=?c, AGR=?a] -&gt; Det[CASE=?c, AGR=?a] N[CASE=?c, AGR=?a]
+ VP[AGR=?a] -&gt; IV[AGR=?a]
+ VP[AGR=?a] -&gt; TV[OBJCASE=?c, AGR=?a] NP[CASE=?c]
+ # Lexical Productions
+ # Singular determiners
+ # masc
+ Det[CASE=nom, AGR=[GND=masc,PER=3,NUM=sg]] -&gt; 'der'
+ Det[CASE=dat, AGR=[GND=masc,PER=3,NUM=sg]] -&gt; 'dem'
+ Det[CASE=acc, AGR=[GND=masc,PER=3,NUM=sg]] -&gt; 'den'
+ # fem
+ Det[CASE=nom, AGR=[GND=fem,PER=3,NUM=sg]] -&gt; 'die'
+ Det[CASE=dat, AGR=[GND=fem,PER=3,NUM=sg]] -&gt; 'der'
+ Det[CASE=acc, AGR=[GND=fem,PER=3,NUM=sg]] -&gt; 'die'
+ # Plural determiners
+ Det[CASE=nom, AGR=[PER=3,NUM=pl]] -&gt; 'die'
+ Det[CASE=dat, AGR=[PER=3,NUM=pl]] -&gt; 'den'
+ Det[CASE=acc, AGR=[PER=3,NUM=pl]] -&gt; 'die'
+ # Nouns
+ N[AGR=[GND=masc,PER=3,NUM=sg]] -&gt; 'Hund'
+ N[CASE=nom, AGR=[GND=masc,PER=3,NUM=pl]] -&gt; 'Hunde'
+ N[CASE=dat, AGR=[GND=masc,PER=3,NUM=pl]] -&gt; 'Hunden'
+ N[CASE=acc, AGR=[GND=masc,PER=3,NUM=pl]] -&gt; 'Hunde'
+ N[AGR=[GND=fem,PER=3,NUM=sg]] -&gt; 'Katze'
+ N[AGR=[GND=fem,PER=3,NUM=pl]] -&gt; 'Katzen'
+ # Pronouns
+ PRO[CASE=nom, AGR=[PER=1,NUM=sg]] -&gt; 'ich'
+ PRO[CASE=acc, AGR=[PER=1,NUM=sg]] -&gt; 'mich'
+ PRO[CASE=dat, AGR=[PER=1,NUM=sg]] -&gt; 'mir'
+ PRO[CASE=nom, AGR=[PER=2,NUM=sg]] -&gt; 'du'
+ PRO[CASE=nom, AGR=[PER=3,NUM=sg]] -&gt; 'er' | 'sie' | 'es'
+ PRO[CASE=nom, AGR=[PER=1,NUM=pl]] -&gt; 'wir'
+ PRO[CASE=acc, AGR=[PER=1,NUM=pl]] -&gt; 'uns'
+ PRO[CASE=dat, AGR=[PER=1,NUM=pl]] -&gt; 'uns'
+ PRO[CASE=nom, AGR=[PER=2,NUM=pl]] -&gt; 'ihr'
+ PRO[CASE=nom, AGR=[PER=3,NUM=pl]] -&gt; 'sie'
+ # Verbs
+ IV[AGR=[NUM=sg,PER=1]] -&gt; 'komme'
+ IV[AGR=[NUM=sg,PER=2]] -&gt; 'kommst'
+ IV[AGR=[NUM=sg,PER=3]] -&gt; 'kommt'
+ IV[AGR=[NUM=pl, PER=1]] -&gt; 'kommen'
+ IV[AGR=[NUM=pl, PER=2]] -&gt; 'kommt'
+ IV[AGR=[NUM=pl, PER=3]] -&gt; 'kommen'
+ TV[OBJCASE=acc, AGR=[NUM=sg,PER=1]] -&gt; 'sehe' | 'mag'
+ TV[OBJCASE=acc, AGR=[NUM=sg,PER=2]] -&gt; 'siehst' | 'magst'
+ TV[OBJCASE=acc, AGR=[NUM=sg,PER=3]] -&gt; 'sieht' | 'mag'
+ TV[OBJCASE=dat, AGR=[NUM=sg,PER=1]] -&gt; 'folge' | 'helfe'
+ TV[OBJCASE=dat, AGR=[NUM=sg,PER=2]] -&gt; 'folgst' | 'hilfst'
+ TV[OBJCASE=dat, AGR=[NUM=sg,PER=3]] -&gt; 'folgt' | 'hilft'
+ TV[OBJCASE=acc, AGR=[NUM=pl,PER=1]] -&gt; 'sehen' | 'moegen'
+ TV[OBJCASE=acc, AGR=[NUM=pl,PER=2]] -&gt; 'sieht' | 'moegt'
+ TV[OBJCASE=acc, AGR=[NUM=pl,PER=3]] -&gt; 'sehen' | 'moegen'
+ TV[OBJCASE=dat, AGR=[NUM=pl,PER=1]] -&gt; 'folgen' | 'helfen'
+ TV[OBJCASE=dat, AGR=[NUM=pl,PER=2]] -&gt; 'folgt' | 'helft'
+ TV[OBJCASE=dat, AGR=[NUM=pl,PER=3]] -&gt; 'folgen' | 'helfen'</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_germancfg.py" type="text/x-python"><span class="caption-label">Пример 3.2 (code_germancfg.py)</span></a>: <span class="caption-label">Листинг 3.2</span>: Пример грамматики на основе свойств</p></td></tr>
+</table></div>
+<p>Как вы можете видеть, свойство <cite>objcase</cite> используется, чтобы указать падеж, в котором глагол управляет своим объектом. Следующий пример иллюстрирует дерево синтаксического разбора для предложения, содержащего глагол, который управляет в дательном падеже.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tokens = 'ich folge den Katzen'.split()
+&gt;&gt;&gt; cp = load_parser('grammars/book_grammars/german.fcfg')
+&gt;&gt;&gt; for tree in cp.parse(tokens):
+...     print(tree)
+(S[]
+  (NP[AGR=[NUM='sg', PER=1], CASE='nom']
+    (PRO[AGR=[NUM='sg', PER=1], CASE='nom'] ich))
+  (VP[AGR=[NUM='sg', PER=1]]
+    (TV[AGR=[NUM='sg', PER=1], OBJCASE='dat'] folge)
+    (NP[AGR=[GND='fem', NUM='pl', PER=3], CASE='dat']
+      (Det[AGR=[NUM='pl', PER=3], CASE='dat'] den)
+      (N[AGR=[GND='fem', NUM='pl', PER=3]] Katzen))))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>При разработке грамматик исключение неграмматических последовательностей слов часто столь же сложно, как и разбор грамматических. Для того, чтобы получить представление о том, где и почему последовательность не может быть разобрана, установка параметра <tt class="doctest"><span class="pre">trace</span></tt> метода <tt class="doctest"><span class="pre">load_parser()</span></tt> может иметь решающее значение. Рассмотрим следующий сбой синтаксического анализа:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+ 	
+&gt;&gt;&gt; tokens = 'ich folge den Katze'.split()
+&gt;&gt;&gt; cp = load_parser('grammars/book_grammars/german.fcfg', trace=2)
+&gt;&gt;&gt; for tree in cp.parse(tokens):
+...     print(tree)
+|.ich.fol.den.Kat.|
+Leaf Init Rule:
+|[---]   .   .   .| [0:1] 'ich'
+|.   [---]   .   .| [1:2] 'folge'
+|.   .   [---]   .| [2:3] 'den'
+|.   .   .   [---]| [3:4] 'Katze'
+Feature Bottom Up Predict Combine Rule:
+|[---]   .   .   .| [0:1] PRO[AGR=[NUM='sg', PER=1], CASE='nom']
+                          -&gt; 'ich' *
+Feature Bottom Up Predict Combine Rule:
+|[---]   .   .   .| [0:1] NP[AGR=[NUM='sg', PER=1], CASE='nom'] -&gt; PRO[AGR=[NUM='sg', PER=1], CASE='nom'] *
+Feature Bottom Up Predict Combine Rule:
+|[---&gt;   .   .   .| [0:1] S[] -&gt; NP[AGR=?a, CASE='nom'] * VP[AGR=?a] {?a: [NUM='sg', PER=1]}
+Feature Bottom Up Predict Combine Rule:
+|.   [---]   .   .| [1:2] TV[AGR=[NUM='sg', PER=1], OBJCASE='dat'] -&gt; 'folge' *
+Feature Bottom Up Predict Combine Rule:
+|.   [---&gt;   .   .| [1:2] VP[AGR=?a] -&gt; TV[AGR=?a, OBJCASE=?c] * NP[CASE=?c] {?a: [NUM='sg', PER=1], ?c: 'dat'}
+Feature Bottom Up Predict Combine Rule:
+|.   .   [---]   .| [2:3] Det[AGR=[GND='masc', NUM='sg', PER=3], CASE='acc'] -&gt; 'den' *
+|.   .   [---]   .| [2:3] Det[AGR=[NUM='pl', PER=3], CASE='dat'] -&gt; 'den' *
+Feature Bottom Up Predict Combine Rule:
+|.   .   [---&gt;   .| [2:3] NP[AGR=?a, CASE=?c] -&gt; Det[AGR=?a, CASE=?c] * N[AGR=?a, CASE=?c] {?a: [NUM='pl', PER=3], ?c: 'dat'}
+Feature Bottom Up Predict Combine Rule:
+|.   .   [---&gt;   .| [2:3] NP[AGR=?a, CASE=?c] -&gt; Det[AGR=?a, CASE=?c] * N[AGR=?a, CASE=?c] {?a: [GND='masc', NUM='sg', PER=3], ?c: 'acc'}
+Feature Bottom Up Predict Combine Rule:
+|.   .   .   [---]| [3:4] N[AGR=[GND='fem', NUM='sg', PER=3]] -&gt; 'Katze' *</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Последние две строки <tt class="doctest"><span class="pre">Scanner</span></tt> в отладке показывают, что <span class="example">den</span> распознается как допускающий две возможные категории: <tt class="doctest"><span class="pre">Det[AGR =[GND=<span class="pysrc-string">'masc'</span>, NUM=<span class="pysrc-string">'sg'</span>, PER=3], CASE=<span class="pysrc-string">'acc'</span>]</span></tt> и <tt class="doctest"><span class="pre">Det[AGR=[NUM=<span class="pysrc-string">'pl'</span>, PER=3], CASE=<span class="pysrc-string">'dat'</span>]</span></tt>.
+Мы знаем из грамматики в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-germancfg">3.2</a>, что <tt class="doctest"><span class="pre">Katze</span></tt> имеет категорию <tt class="doctest"><span class="pre">N[AGR=[GND=FEM, NUM=sg, PER=3]]</span></tt>. Таким образом, нет никакой привязки для переменной <tt class="doctest"><span class="pre">?а</span></tt> в продуцировании <tt class="doctest"><span class="pre">NP[CASE=?с, AGR=?а] -&gt; Det[CASE=?с, AGR=?а] N[CASE=?с, AGR=?а]</span></tt>, которая будет удовлетворять этим ограничениям, так как значение <tt class="doctest"><span class="pre">AGR</span></tt> для <tt class="doctest"><span class="pre">Katze</span></tt> не будет объединяться ни с одним из значений <tt class="doctest"><span class="pre">AGR</span></tt> для <span class="example">den</span>, то есть, либо с <tt class="doctest"><span class="pre">[GND=<span class="pysrc-string">'masc'</span>, NUM=<span class="pysrc-string">'sg'</span>, PER=3]</span></tt>, либо с <tt class="doctest"><span class="pre">[NUM=<span class="pysrc-string">'pl'</span>, PER=3]</span></tt>.</p>
+</div>
+</div>
+<div class="section" id="summary">
+<h1>8 Резюме</h1>
+<ul class="simple">
+<li>Традиционные категории контекстно-свободной грамматики являются атомарные символы. Важным мотивом для структур свойств является захват мелких различий, которые в противном случае потребуют массивной мультипликации атомарных категорий.</li>
+<li>При использовании переменных над значениями свойств мы можем выразить ограничения в продуцированиях грамматики, что позволяет реализовать взаимозависимость спецификаций различных свойств.</li>
+<li>Обычно мы указываем фиксированные значения свойств на лексическом уровне и ограничиваем значения свойств во фразах, чтобы объединить их с соответствующими значениями у их детей.</li>
+<li>Значения свойств либо атомарные, либо комплексные. Особым случаем атомарного значения является логическое значение, представляемое по соглашению [+/-<tt class="doctest"><span class="pre">f</span></tt>].</li>
+<li>Два свойства могут разделять значение (атомарное или комплексное). Структуры с общими значениями, называются реентрантными. Общие значения представляются в виде числовых индексов (или меток) в AVM.</li>
+<li>Путь в структуре свойств представляет собой кортеж свойств, соответствующих меткам на последовательности дуг от корня графического представления.</li>
+<li>Два пути эквивалентны, если они имеют общее значение.</li>
+<li>Структуры свойств частично упорядочиваются посредством вбирания.
+<span class="math">FS</span><sub>0</sub> вбирает <span class="math">FS</span><sub>1</sub>, когда вся информация, содержащаяся в <span class="math">FS</span><sub>0</sub> также присутствует в <span class="math">FS</span><sub>1</sub>.</li>
+<li>Объединение двух структур <span class="math">FS</span><sub>0</sub> и <span class="math">FS</span><sub>1</sub> в случае успеха является структурой свойств <span class="math">FS</span><sub>2</sub>, которая содержит комбинированную информацию обоих <span class="math">FS</span><sub>0</sub> и <span class="math">FS</span><sub>1</sub>.</li>
+<li>Если объединение добавляет информацию к пути π в <span class="math">FS</span>, то оно также добавляет информацию к каждому пути π' эквивалентному π.</li>
+<li>Мы можем использовать структуры свойств для создания емких анализов широкого спектра языковых явлений, в том числе субкатегоризации глагола, конструкций с обратным порядком слов, конструкций неограниченной зависимости и падежного управления.</li>
+</ul>
+</div>
+<div class="section" id="further-reading">
+<span id="sec-featgram-further-reading"></span><h1>7 Дополнительные материалы</h1>
+<p>Пожалуйста, обратитесь к <tt class="doctest"><span class="pre">http://nltk.org/</span></tt> для получения дополнительных материалов по этой главе, в том числе по структурам свойств, грамматикам свойств и комплексам для тестирования грамматик.</p>
+<p>X-bar синтаксис: <a class="reference external" href="http://www.nltk.org/book/bibliography.html#chomsky1970rn" id="id9">(Jacobs &amp; Rosenbaum, 1970)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#jackendoff1977xs" id="id10">(Jackendoff, 1977)</a> (Простые числа, которые мы используем заменяют типографски более сложные горизонтальные полосы Хомского)</p>
+<p>Прекрасное введение в явление согласование см. в <a class="reference external" href="http://www.nltk.org/book/bibliography.html#corbett2006a" id="id11">(Corbett, 2006)</a>.</p>
+<p>Самое раннее использование свойств в теоретической лингвистике было разработано для схватывания фонологических свойства фонем. Например, звук, похожий на /<strong>b</strong>/ может быть разложен на структуру <tt class="doctest"><span class="pre">[+labial, +voice]</span></tt>. Важным мотивом было схватывание обобщений по классам сегментов; например, что /<strong>n</strong>/ реализуется как /<strong>m</strong>/, предшествуя любому <tt class="doctest"><span class="pre">+labial</span></tt> согласному.
+В грамматике Хомского, стандартом было использовать атомарные свойства для явлений, как согласование, а также схватывать обобщения синтаксических категорий по аналогии с фонологией.
+Радикальное расширение использования свойств в теоретическом синтаксисе отстаивалось грамматикой обобщеной фразовой структуры (GPSG; <a class="reference external" href="http://www.nltk.org/book/bibliography.html#gazdar1985gps" id="id12">(Gazdar, Klein, &amp; and, 1985)</a>), в частности использование свойств с комплексными значениями.</p>
+<p>Подходя больше с точки зрения вычислительной лингвистики, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#kay1984ug" id="id13">(Dahl &amp; Saint-Dizier, 1985)</a> предположил, что функциональные аспекты языка могут быть схвачены путем объединения структур атрибут-значение, аналогичный подход был разработан <a class="reference external" href="http://www.nltk.org/book/bibliography.html#shieber1983fip" id="id14">(Grosz &amp; Stickel, 1983)</a> в рамках формализма PATR-II. Ранняя работа по лексико-функциональной грамматике (LFG; <a class="reference external" href="http://www.nltk.org/book/bibliography.html#kaplan1982lfg" id="id15">(Bresnan, 1982)</a>) ввела понятие <a name="f_structure_index_term"></a><span class="termdef">f-структуры</span>, которая изначально была предназначена для представления грамматических отношений и структуры предикат-аргумент, связанной с разбором структуры конституента.  <a class="reference external" href="http://www.nltk.org/book/bibliography.html#shieber1986iub" id="id16">(Shieber, 1986)</a> обеспечивает превосходное введение в эту фазу исследований грамматик на основе свойств.</p>
+<p>Одна концептуальная трудность с алгебраическими подходами к структурам свойств возникла, когда исследователи попытались смоделировать отрицание. Альтернативная перспектива, впервые предложенная <a class="reference external" href="http://www.nltk.org/book/bibliography.html#kasper1986lsf" id="id17">(Kasper &amp; Rounds, 1986)</a> и <a class="reference external" href="http://www.nltk.org/book/bibliography.html#johnson1988avl" id="id18">(Johnson, 1988)</a>, утверждает, что грамматики включают <span class="emphasis">описания</span>  структур свойств, а не сами структуры. Эти описания объединяются с использованием логических операций, таких как конъюнкция, а отрицание - всего лишь обычная логическая операция над описаниями свойств. Это перспектива, ориентированная на описание, является неотъемлемой частью LFG с самого начала (cf. <a class="reference external" href="http://www.nltk.org/book/bibliography.html#kaplan1989fal" id="id19">(Huang &amp; Chen, 1989)</a>, а также была принята в более впоздних версиях грамматики фразовой структуры, ориентированной на главы (HPSG; <a class="reference external" href="http://www.nltk.org/book/bibliography.html#sag1999st" id="id20">(SAG &amp; Wasow, 1999)</a>). Всеобъемлющую библиографию HPSG литературы можно найти на сайте <tt class="doctest"><span class="pre">http://www.cl.uni-bremen.de/HPSG-Bib/</span></tt>.</p>
+<p>Структуры свойств, представленные в этой главе, не в состоянии схватить важные ограничения лингвистической информации. Например, нет никакого способа сказать, что единственные допустимые значения для <tt class="doctest"><span class="pre">NUM</span></tt> являются <tt class="doctest"><span class="pre">sg</span></tt> и <tt class="doctest"><span class="pre">pl</span></tt>, в то время как спецификация <tt class="doctest"><span class="pre">[NUM = masc]</span></tt> является аномальной. Точно так же мы не можем сказать, что комплексное значение <tt class="doctest"><span class="pre">AGR</span></tt> <span class="emphasis">должно</span> содержать спецификации для свойств <tt class="doctest"><span class="pre">PER</span></tt>, <tt class="doctest"><span class="pre">NUM</span></tt> и <tt class="doctest"><span class="pre">gnd</span></tt>, но <span class="emphasis">не может</span> содержать спецификации <tt class="doctest"><span class="pre">[SUBCAT=trans]</span></tt>.  <a name="typed_feature_structures_index_term"></a><span class="termdef">Структуры типизированных свойств</span> были разработаны, чтобы исправить этот недостаток. Начнем с того, что оговоримся, что значения свойств всегда типизированы. В случае атомарных значений, значения явлюятся только типами. Например, мы бы сказали, что значение <tt class="doctest"><span class="pre">NUM</span></tt> - это тип <tt class="doctest"><span class="pre">num</span></tt>. Кроме того, <tt class="doctest"><span class="pre">num</span></tt> - это самый общий тип значения для <tt class="doctest"><span class="pre">NUM</span></tt>.Поскольку типы организованы иерархически, мы можем быть более информативными, указав, что значение <tt class="doctest"><span class="pre">NUM</span></tt> - это <a name="subtype_index_term"></a><span class="termdef">подтип</span> <tt class="doctest"><span class="pre">num</span></tt>, а именно: либо <tt class="doctest"><span class="pre">sg</span></tt>, либо <tt class="doctest"><span class="pre">pl</span></tt>.</p>
+<p>В случае комплексных значений мы говорим, что структуры свойств сами типизированы. Так, например, значение <tt class="doctest"><span class="pre">AGR</span></tt> будет структурой свойств типа <tt class="doctest"><span class="pre">AGR</span></tt>.Оговоримся также, что все и только <tt class="doctest"><span class="pre">PER</span></tt>, <tt class="doctest"><span class="pre">NUM</span></tt> и <tt class="doctest"><span class="pre">GND</span></tt> являются <a name="appropriate_index_term"></a><span class="termdef">подходящими</span> свойствами для структуры типа <tt class="doctest"><span class="pre">AGR</span></tt>.  Хороший ранний обзор работы по типизированным структурам свойств - <a class="reference external" href="http://www.nltk.org/book/bibliography.html#emele1990tug" id="id21">(Emele &amp; Zajac, 1990)</a>. Более подробное изучение формальных основ можно найти в <a class="reference external" href="http://www.nltk.org/book/bibliography.html#carpenter1992ltf" id="id22">(Carpenter, 1992)</a>, в то время как <a class="reference external" href="http://www.nltk.org/book/bibliography.html#copestake2002itf" id="id23">(Copestake, 2002)</a> сосредотачивает внимание на реализации HPSG-ориентированного подхода к типизированным структурам свойств.</p>
+<p>Существует обильная литература по анализу немецкого языка в рамках грамматики на основе свойств. Работа <a class="reference external" href="http://www.nltk.org/book/bibliography.html#nerbonne1994ghd" id="id24">(Nerbonne, Netter, &amp; Pollard, 1994)</a> является хорошей отправной точкой для HPSG литературы по данной теме, в то время как <a class="reference external" href="http://www.nltk.org/book/bibliography.html#mueller2002cp" id="id25">(Мüller, 2002)</a> дает очень обширный и подробный анализ немецкого синтаксиса в HPSG.</p>
+<p>Глава 15 <a class="reference external" href="http://www.nltk.org/book/bibliography.html#jurafskymartin2008" id="id26">(Jurafsky &amp; Martin, 2008)</a> обсуждает структуры свойств, алгоритм объединения и интеграцию объединения в  алгоритмы синтаксического анализа.</p>
+</div>
+<div class="section" id="exercises">
+<h1>6 Упражнения</h1>
+<ol class="arabic">
+<li><p class="first">☼ Какие ограничения необходимы , чтобы правильно разобрать последовательности слов , как <span class="example">я счастлива</span> , и <span class="example">она счастлива</span> , но не <span class="example">* вы счастлив</span> или <span class="example">* они рад?</span> Реализовать два решения нынешней напряженной парадигмы глагола <span class="example">быть</span> на английском языке, сначала принимая грамматики <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agcfg1">(6)</a> в качестве отправной точки, а затем принимать грамматику <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-agr2">(18)</a> в качестве отправной точки.</p>
+</li>
+<li><p class="first">☼ Разработать вариант грамматики в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-feat0cfg">1.1</a> , которая использует <cite>подсчет</cite> функции , чтобы сделать различия как показано ниже:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">4,46%</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><p>Мальчик поет.</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><p>* Мальчик поет.</p>
+</td></tr></table></p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(55)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><p>Ребята поют.</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><p>Мальчики поют.</p>
+</td></tr></table></p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(56)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><p>Ребята поют.</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><p>Мальчики поют.</p>
+</td></tr></table></p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">4,46%</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><p>Вода является драгоценным.</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><p>Вода является драгоценным.</p>
+</td></tr></table></p>
+</td></tr></table></p>
+</li>
+<li><p class="first">☼ написать функцию <cite>вбирает ()</cite> , которая имеет двух художественных структур <tt class="doctest"><span class="pre">FS1</span></tt> и <tt class="doctest"><span class="pre">FS2</span></tt> на всякий случай <tt class="doctest"><span class="pre">FS1</span></tt> вбирает <tt class="doctest"><span class="pre">FS2.</span></tt></p>
+</li>
+<li><p class="first">☼ Изменить грамматика показано в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#ex-subcatgpsg">(28)</a> , чтобы включить функцию <cite>бар</cite> для работы с фразовые выступами.</p>
+</li>
+<li><p class="first">☼ Изменить немецкую грамматику в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-germancfg">3.2</a> , чтобы включить лечение подклассификации представлено в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#sec-extending-a-feature-based-grammar">3</a> .</p>
+</li>
+<li><p class="first">◑ Разработка на основе грамматики функции, которые будут правильно описать следующие испанские фразы существительного:</p>
+<div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+<p>Ошибка в "глянца" директивы: может содержать только одну таблицу.</p>
+</div>
+<div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+<p>Ошибка в "глянца" директивы: может содержать только одну таблицу.</p>
+</div>
+<div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+<p>Ошибка в "глянца" директивы: может содержать только одну таблицу.</p>
+</div>
+<div class="system-message">
+<p class="system-message-title">Системное сообщение: ОШИБКА/3 <tt class="docutils">(ch03.rst2</tt>, строка 2265)</p>
+<p>Ошибка в "глянца" директивы: может содержать только одну таблицу.</p>
+</div>
+</li>
+<li><p class="first">◑ Развивайте свою собственную версию <tt class="doctest"><span class="pre">EarleyChartParser</span></tt> , которая печатает только след , если входная последовательность не может разобрать.</p>
+</li>
+<li><p class="first">◑ Рассмотрим особенность структуры , показанные на <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-featstructures">6.1</a> .</p>
+<!-- XX NOTE: This example is somewhat broken - - nltk doesn&#39;t support
+reentrance for base feature values.  (See email ~7/23/08 to the
+nltk-users mailing list for details.)
+Now updated to avoid this problem. EK -->
+<span class="target" id="code-featstructures"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+FS1 = NLTK.FeatStruct ( <span class="pysrc-string">"[A =?х, B = [C =?х]] ")</span> FS2 = NLTK.FeatStruct ( <span class="pysrc-string">"[B = [D = d]]")</span> fs3 = NLTK.FeatStruct ( <span class="pysrc-string">"[B = [C = d]]")</span> FS4 = NLTK.FeatStruct ( <span class="pysrc-string">"[A = (1) [B = B], C -&gt; (1)]")</span> FS5 = NLTK.FeatStruct ( <span class="pysrc-string">"[А = (1) [D =?х], C = [E -&gt; (1), F =?х]] ")</span> FS6 = NLTK.FeatStruct ( <span class="pysrc-string">"[A = [D = d]]")</span> FS7 = NLTK.FeatStruct ( <span class="pysrc-string">"[A = [D = d], C = [F = [D = d]]]")</span> FS8 = NLTK.FeatStruct ( <span class="pysrc-string">"[А = (1) [D =?х, G =?х], C = [B =?х, Е -&gt; (1)]] ")</span> FS9 = NLTK.FeatStruct ( <span class="pysrc-string">"[A = [B = B], C = [E = [G = е]]]")</span> FS10 = NLTK.FeatStruct ( <span class="pysrc-string">"[А = (1) [В = Ь], С -&gt; (1)]")</span></pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_featstructures.py" type="text/x-python"><span class="caption-label">Пример 6.1 (code_featstructures.py)</span></a> : <span class="caption-label">Рисунок 6.1:</span> Изучение Feature Структуры</p></td></tr>
+</table></div>
+<p>Потренируйтесь на бумаге, что результат следующих унификации. (Подсказка: вы можете найти его полезным построить график структуры.)</p>
+<ol class="arabic simple">
+<li><tt class="doctest"><span class="pre">FS1</span></tt> и <tt class="doctest"><span class="pre">FS2</span></tt></li>
+<li><tt class="doctest"><span class="pre">FS1</span></tt> и <tt class="doctest"><span class="pre">fs3</span></tt></li>
+<li><tt class="doctest"><span class="pre">FS4</span></tt> и <tt class="doctest"><span class="pre">FS5</span></tt></li>
+<li><tt class="doctest"><span class="pre">FS5</span></tt> и <tt class="doctest"><span class="pre">FS6</span></tt></li>
+<li><tt class="doctest"><span class="pre">FS5</span></tt> и <tt class="doctest"><span class="pre">FS7</span></tt></li>
+<li><tt class="doctest"><span class="pre">FS8</span></tt> и <tt class="doctest"><span class="pre">FS9</span></tt></li>
+<li><tt class="doctest"><span class="pre">FS8</span></tt> и <tt class="doctest"><span class="pre">FS10</span></tt></li>
+</ol>
+<p>Проверьте свои ответы с помощью Python.</p>
+</li>
+<li><p class="first">◑ Список две художественные структуры, подводить [A =?х, В =?X</p>
+</li>
+<li><p class="first">◑ Не обращая внимания на совместное использование структуры, дать неформальный алгоритм для объединения двух художественных структур.</p>
+</li>
+<li><p class="first">◑ Продлить немецкую грамматику в <a class="reference internal" href="http://www.nltk.org/book/ch09.html#code-germancfg">3.2</a> , так что он может обрабатывать так называемые глаголом-вторых структур , как следующее:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(58)</td><td width="15"></td><td><p>Heute sieht дер Хунд умереть Катце.</p>
+</td></tr></table></p>
+</li>
+<li><p class="first">◑ Казалось бы , синонимичные глаголы имеют немного разные синтаксические свойства <a class="reference external" href="http://www.nltk.org/book/bibliography.html#levin1993" id="id27">(Levin, 1993)</a> .  Рассмотрим закономерности грамматичности для глаголов <span class="example">нагруженных,</span> <span class="example">заполненных</span> и <span class="example">затопленных</span> ниже.  Вы можете написать грамматические постановки для обработки таких данных?</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(59)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><p>Фермер <em>нагрузил</em> телегу с песком</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><p>Фермер <em>загружается</em> песок в корзину</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td><p>Фермер <em>заполнил</em> тележку с песком</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td><p>* Фермер <em>заполнен</em> песок в корзину</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">E</td><td width="15"></td><td><p>* Фермер <em>бросил</em> тележку с песком</p>
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">е.</td><td width="15"></td><td><p>Фермер <em>бросил</em> песок в корзину</p>
+</td></tr></table></p>
+</td></tr></table></p>
+</li>
+<li><p class="first">★ Морфологические парадигмы редко бывают полностью регулярными, в смысле каждой клетки в матрице, имеющей другую реализацию. Например, в настоящем времени конъюгация лексемы <span class="lex">прогулка</span> только две различные формы: <span class="example">прогулки</span> для 3 - го лица единственного числа, и <span class="example">ходить</span> для всех других комбинаций лица и числа. Успешный анализ не должен требовать избыточно указания, что 5 из 6 возможных комбинаций морфологических имеют одинаковую реализацию.  Предложить и реализовать способ борьбы с этим.</p>
+</li>
+<li><p class="first">★ Так называемые <a name="head_features_index_term"></a> <span class="termdef">особенности головы</span> распределяются между родительским узлом и головы ребенка. Например, <tt class="doctest"><span class="pre">TENSE</span></tt> является головной особенностью , которая разделяется между <tt class="doctest"><span class="pre">VP</span></tt> и его глава <tt class="doctest"><span class="pre">V</span></tt> ребенка. См <a class="reference external" href="http://www.nltk.org/book/bibliography.html#gazdar1985gps" id="id28">(Gazdar, Klein, &amp; и, 1985)</a> для более подробной информации. Большинство функций , мы рассмотрели главные особенности являются - исключениями являются <tt class="doctest"><span class="pre">подкатегорию</span></tt> и <tt class="doctest"><span class="pre">слэш.</span></tt> Поскольку разделение функций головы предсказуема, то не нужно быть указаны в явном виде в грамматике производств. Разработать подход, который автоматически учитывает этого регулярного поведения функций головы.</p>
+</li>
+<li><p class="first">★ Продлить лечение NLTK в художественных структур , чтобы позволить объединение в список многозначных функций, и использовать это , чтобы осуществить анализ HPSG-стиля подклассификации, в результате чего <tt class="doctest"><span class="pre">подкатегорию</span></tt> из категории головы является конкатенация категории своих комплементов 'со значением <tt class="doctest"><span class="pre">подкатегорию</span></tt> его непосредственного родителем.</p>
+</li>
+<li><p class="first">★ лечение Продлить NLTK в художественных структур для обеспечения производства с underspecified категорий, таких как <tt class="doctest"><span class="pre">S [-INV] -&gt;?х S /?X</p>
+</li>
+<li><p class="first">★ Продлить лечение NLTK в художественных структур для обеспечения типизированных функций структур.</p>
+</li>
+<li><p class="first">★ Выберите некоторые грамматические конструкции , описанные в <a class="reference external" href="http://www.nltk.org/book/bibliography.html#huddleston2002cge" id="id29">(Хаддлстон &amp; Pullum, 2002)</a> , а также разработать характерной чертой грамматики на основе учитывать их.</p>
+</li>
+</ol>
+<!-- Footer to be used in all chapters -->
+<div class="admonition-about-this-document admonition">
+<p class="first admonition-title">Об этом документе ...</p>
+<p>Обновлялся для NLTK 3.0.
+Это глава из книги <em>Обработка естественного языка с помощью Python</em> написанной <a class="reference external" href="http://estive.net/">Стивеном Бердом</a> , <a class="reference external" href="http://homepages.inf.ed.ac.uk/ewan/">Эваном Клайном</a> и <a class="reference external" href="http://ed.loper.org/">Эдвардом Лопером</a> , Copyright © 2014 авторов.
+Он распространяется с <em>Набором инструментов для естественного языка</em> <tt class="doctest"><span class="pre">[http://nltk.org/],</span></tt> версия 3.0 в соответствии с условиями <em>Creative Commons Attribution-Noncommercial-No Derivative Works 3.0 Лицензии Соединенных Штатов</em> [ <a class="reference external" href="http://creativecommons.org/licenses/by-nc-nd/3.0/us/">http://creativecommons.org/licenses/by-nc-nd/3.0/us/</a>].</p>
+<p class="last">Этот документ был построен на ср 1 июля 2015 12:30:05 AEST</p>
+</div>
+</div>
+</div>
+</body>
+</html>

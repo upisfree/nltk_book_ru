@@ -1,0 +1,2140 @@
+﻿<html lang="ru" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ascii"></meta>
+<meta name="generator" content="Docutils 0.12: http://docutils.sourceforge.net/"></meta>
+<title>5.5 Категоризация и таггинг слов</title>
+<style type="text/css">/* :Author: Edward Loper, James Curran:Copyright: This stylesheet has been placed in the public domain.Stylesheet for use with Docutils.This stylesheet defines new css classes used by NLTK.It uses a Python syntax highlighting scheme that matchesthe colour scheme used by IDLE, which makes it easier forbeginners to check they are typing things in correctly. */
+/* Include the standard docutils stylesheet. */
+</style>
+</head>
+<body dir="ltr">
+<div class="document" id="categorizing-and-tagging-words">
+<span id="chap-tag"></span>
+<h1 class="title">5. 5 Категоризация и маркировка слов</h1>
+
+<!-- -*- mode: rst -*- -->
+<!-- -*- mode: rst -*- -->
+<!-- CAP abbreviations (map to small caps in LaTeX) -->
+<!-- Other candidates for global consistency -->
+<!-- PTB removed since it must be indexed -->
+<!-- WN removed since it must be indexed -->
+<!-- misc & punctuation -->
+<!-- cdots was unicode U+22EF but not working -->
+<!-- exercise meta-tags -->
+<!-- Unicode tests -->
+<!-- phonetic -->
+<!-- misc -->
+<!-- used in Unicode section -->
+<!-- arrows -->
+<!-- unification stuff -->
+<!-- Math & Logic -->
+<!-- sets -->
+<!-- Greek -->
+<!-- Chinese -->
+<!-- URLs -->
+<!-- Python example - a snippet of code in running text -->
+<!-- PlaceHolder example -  something that should be replaced by actual code -->
+<!-- Linguistic eXample - cited form in running text -->
+<!-- Emphasized (more declarative than just using *) -->
+<!-- Grammatical Category - e.g. NP and verb as technical terms
+.. role:: gc
+   :class: category -->
+<!-- Math expression - e.g. especially for variables -->
+<!-- Textual Math expression - for words &#39;inside&#39; a math environment -->
+<!-- Feature (or attribute) -->
+<!-- Raw LaTeX -->
+<!-- Raw HTML -->
+<!-- Feature-value -->
+<!-- Lexemes -->
+<!-- Replacements that rely on previous definitions :-) -->
+<!-- standard global imports
+
+>>> import nltk, re, pprint
+>>> from nltk import word_tokenize -->
+<!-- TODO: exercise on cascaded tagging -->
+<!-- TODO: motivate trigram tagging by showing some cases where bigram tagging doesn&#39;t work -->
+<!-- TODO: xref to unicode section in prog chapter -->
+<!-- TODO: * outstanding problems:
+- what are we doing with ConditionalFreqDist?
+- nltk.tag contains all of math library
+- nltk.corpus.brown.tagged_sents() is too verbose? -->
+<!-- TODO: type conversions: ``str()``, ``int()``, ``list()``. -->
+<!-- TODO: tagging for language analysis: find all pairs of nouns which occur in the same sentence -->
+<!-- TODO: possibly add section on exploring tagged corpora -->
+<!-- TODO: add back in short section on Brill and HMM tagging -->
+<!-- TODO: how to tag unknown words -->
+<!-- TODO: how POS tagging disambiguates the word "like" and this can be
+useful for sentiment detection -->
+<!-- TODO: classification of unknown words using string patterns. -->
+<p>Еще в начальной школе вы узнали разницу между существительными, глаголами, прилагательными и наречиями.  Эти "классы слов" не праздное изобретение грамматистов, а полезные категории для многих задач обработки языка.  Как мы увидим, они возникают из простого анализа распределения слов в тексте.  Цель этой главы заключается - ответить на следующие вопросы:</p>
+<ol class="arabic simple">
+<li>Что такое лексические категории и как они используются в обработке естественного языка?</li>
+<li>Какая структура данных Python подходит для хранения слов и их категорий?</li>
+<li>Как мы можем автоматически отметить для каждого слова текста его класс?</li>
+</ol>
+<p>Одновременно мы рассмотрим некоторые основные приемы НЛП, включая маркировку последовательности, модели с использованием n-грамм, отвалы, а также оценки.  Эти методы могут быть использованы во многих областях, а маркировка дает простой контекст для их представления.  Мы также увидим, что маркировка является вторым шагом в типичной последовательной схеме НЛП, следующим за токенизацией.</p>
+<p>Процесс классификации слов по <a name="parts_of_speech_index_term"></a><span class="termdef">частям речи</span> и их соответствующей маркировки известен как <a name="part_of_speech_tagging_index_term"></a><span class="termdef">частеречная разметка</span>, <a name="pos_tagging_index_term"></a><span class="termdef">POS-маркировка,</span> или просто <a name="tagging_index_term"></a> <span class="termdef">маркировка</span>.  Части речи также известны как <a name="word_classes_index_term"></a><span class="termdef">классы слов</span> или <a name="lexical_categories_index_term"></a><span class="termdef">лексические категории</span>.
+Набор тегов используемых для конкретной задачи известен как <a name="tagset_index_term"></a><span class="termdef">тагсет, или набор тэгов, или набор ярлыков</span>.  В этой главе мы уделим основное внимание использованию тегов и автоматической маркировке текста.</p>
+<div class="section" id="using-a-tagger">
+<span id="sec-using-a-tagger"></span><h1>1 Использование Таггера</h1>
+<p>Частеречный разметчик, или <a name="pos_tagger_index_term"></a><span class="termdef">POS-Tagger</span>, обрабатывает последовательность слов и присоединяет метку части речи каждому слову (не забудьте сделать <tt class="doctest"><span class="pre"><span class="pysrc-keyword">import</span> nltk</span></tt>):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text = word_tokenize("And now for something completely different")
+&gt;&gt;&gt; nltk.pos_tag(text)
+[('And', 'CC'), ('now', 'RB'), ('for', 'IN'), ('something', 'NN'),
+('completely', 'RB'), ('different', 'JJ')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Здесь мы видим, что <span class="example">and</span> - это <tt class="doctest"><span class="pre">CC</span></tt>, соединительный союз; <span class="example">now</span> и <span class="example">completely</span> - <tt class="doctest"><span class="pre">RB</span></tt>, или наречия; <span class="example">for</span> - <tt class="doctest"><span class="pre">IN</span></tt>, предлог; <span class="example">something</span> - <tt class="doctest"><span class="pre">NN</span></tt>, существительное; а <span class="example">different</span> - <tt class="doctest"><span class="pre">JJ</span></tt>, прилагательное.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">NLTK предоставляет документацию для каждого тега, которая может быть запрошена с помощью тега, например <tt class="doctest"><span class="pre">nltk.help.upenn_tagset(<span class="pysrc-string">'RB'</span>)</span></tt> или регулярное выражение, например, <tt class="doctest"><span class="pre">nltk.help.upenn_tagset(<span class="pysrc-string">'NN.*'</span>)</span></tt>.
+Некоторые корпусы имеют README файлы с документацией по набору ярлыков, см. <tt class="doctest"><span class="pre">nltk.corpus.???.readme()</span></tt>, заменяя знаки вопроса названием корпуса.</p>
+</div>
+<p>Давайте посмотрим на другой пример, на этот раз включающий некоторые омонимы:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text = word_tokenize("They refuse to permit us to obtain the refuse permit")
+&gt;&gt;&gt; nltk.pos_tag(text)
+[('They', 'PRP'), ('refuse', 'VBP'), ('to', 'TO'), ('permit', 'VB'), ('us', 'PRP'),
+('to', 'TO'), ('obtain', 'VB'), ('the', 'DT'), ('refuse', 'NN'), ('permit', 'NN')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание, что <span class="example">refuse</span> и <span class="example">permit</span> оба оказываются глаголами в настоящем времени <tt class="doctest"><span class="pre">(VBP)</span></tt> и существительными <tt class="doctest"><span class="pre">(NN)</span></tt>.
+Например, <span class="example">refUSE</span> - это глагол, который означает "отрицать", а <span class="example">REFuse</span> это существительное, которое означает "мусор" (т.е. они не являются омофонами).
+Таким образом, мы должны знать, какое слово используется для того, чтобы правильно произносить текст.  (По этой причине в системах преобразования текста в речь обычно выполняют маркировку частей речи.)</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>: 
+Многие слова, такие как <span class="example">ski</span> и <span class="example">race</span>, могут быть использованы в качестве существительных или глаголов без различия в произношении.  Можете ли вы вспомнить другие подобные слова?  Подсказка: перебирайте обычные объекты и пытайтесь поставить перед ними слово "to", чтобы увидеть, могут ли они также быть глаголами, или перебирайте действия и пытайтесь поставить перед ними "the", чтобы увидеть, могут ли они также быть существительными.  Теперь составьте предложение с обоими употреблениями одного слова и запустите частеречный разметчик на этом предложении.</p>
+</div>
+<p>Лексические категории, такие как "существительное", и частеречная метки, такие как <tt class="doctest"><span class="pre">NN</span></tt>, кажется, имеют свое применение, но детали будут неясными для многих читателей.  Вы можете спросить, какое оправдание есть для введения этого дополнительного уровня информации.
+Многие из этих категорий возникают из поверхностного анализа распределения слов в тексте.  Рассмотрим следующий анализ, включающий <span class="example">woman</span> (существительное), <span class="example">bought</span> (глагол), <span class="example">over</span> (предлог) и <span class="example">the</span> (артикль).
+Метод <tt class="doctest"><span class="pre">text.similar()</span></tt> принимает слово <span class="math">w</span>, находит все контексты <span class="math">w</span><sub>1</sub><span class="math">w</span><span class="math">w</span><sub>2</sub>, затем находит все слова <span class="math">w'</span>, которые появляются в том же контексте, т.е. <span class="math">w</span><sub>1</sub><span class="math">w'</span><span class="math">w</span><sub>2</sub>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text = nltk.Текст (word.lower () <span class="pysrc-keyword">для</span> слова <span class="pysrc-keyword">в</span> nltk.corpus.brown.words ()) <span class="pysrc-prompt">&gt;&gt;&gt;</span> text.similar ( <span class="pysrc-string">"женщина")</span> <span class="pysrc-output">Построение текстовой контекст индекс ...</span>
+<span class="pysrc-output">состояние</span> <span class="pysrc-output">год машина момент мир семейный дом мальчик ребенок страна работа</span> <span class="pysrc-output">девочка место войны путь случае вопрос</span> <span class="pysrc-output">человек</span> в <span class="pysrc-output">дневное время</span> <span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> Text.similar ( <span class="pysrc-string">'купил')</span> <span class="pysrc-output">сделал сделано положил упомянутый нашел видел данный левый услышал было доведено получил</span> <span class="pysrc-output">комплект был назван чувствовал</span> , <span class="pysrc-output">что сказал</span> <span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> Text.similar ( <span class="pysrc-string">"над")</span> <span class="pysrc-output">в к о и с с тем</span> , <span class="pysrc-output">что в в качестве вверх из вниз через</span> <span class="pysrc-output">все о</span> <span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> Text.similar ( далее <span class="pysrc-string">« ')</span> <span class="pysrc-output">а его это их его ей</span> , <span class="pysrc-output">что наши любые все одно это мое в вашем нет</span> <span class="pysrc-output">какой</span> - <span class="pysrc-output">то другой и</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Заметим , что в поисках <span class="example">женщины</span> находит существительные; в поисках <span class="example">купил</span> в основном находит глаголы; в поисках <span class="example">более</span> общем находит предлоги; в поисках находок несколько определители.
+Таггер может правильно определить теги на эти слова в контексте предложения, например, <span class="example">The woman bought over $150,000 worth of clothes</span>.</p>
+<p>Таггер также может моделировать наши знания о незнакомых словах, например, мы можем предположить, что <span class="example">scrobbling</span>, вероятно, глагол с корнем <span class="example">scrobble</span> и может появиться в таких контекстах, как <span class="example">he was scrobbling</span>.</p>
+</div>
+<div class="section" id="tagged-corpora">
+<span id="sec-tagged-corpora"></span><h1>2 Размеченные корпусы</h1>
+<div class="section" id="representing-tagged-tokens">
+<h2>2.1 Представление помеченных токенов</h2>
+<p>По соглашению в NLTK помеченный токен представляется с помощью кортежа, состоящего из токена и тега.
+Мы можем создать один из этих специальных кортежей из стандартного строкового представления помеченного токена с помощью функции <tt class="doctest"><span class="pre">str2tuple()</span></tt>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tagged_token = nltk.tag.str2tuple('fly/NN')
+&gt;&gt;&gt; tagged_token
+('fly', 'NN')
+&gt;&gt;&gt; tagged_token[0]
+'fly'
+&gt;&gt;&gt; tagged_token[1]
+'NN</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем построить список помеченых токенов непосредственно из строки.  Сначала необходимо токенизировать строку для того, чтобы получить доступ к отдельным <tt class="doctest"><span class="pre">слово/тег</span></tt> строкам, затем преобразовать каждую из них в кортеж (используя <tt class="doctest"><span class="pre">str2tuple())</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent = '''
+... The/AT grand/JJ jury/NN commented/VBD on/IN a/AT number/NN of/IN
+... other/AP topics/NNS ,/, AMONG/IN them/PPO the/AT Atlanta/NP and/CC
+... Fulton/NP-tl County/NN-tl purchasing/VBG departments/NNS which/WDT it/PPS
+... said/VBD ``/`` ARE/BER well/QL operated/VBN and/CC follow/VB generally/RB
+... accepted/VBN practices/NNS which/WDT inure/VB to/IN the/AT best/JJT
+... interest/NN of/IN both/ABX governments/NNS ''/'' ./.
+... '''
+&gt;&gt;&gt; [nltk.tag.str2tuple(t) for t in sent.split()]
+[('The', 'AT'), ('grand', 'JJ'), ('jury', 'NN'), ('commented', 'VBD'),
+('on', 'IN'), ('a', 'AT'), ('number', 'NN'), ... ('.', '.')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="reading-tagged-corpora">
+<h2>2.2 Чтение размеченных корпусов</h2>
+<p>В некоторых корпусах, включенных в NLTK, части речи были <a name="tagged_index_term"></a><span class="termdef">размечены</span>. Вот пример того, что вы могли бы увидеть, если бы открыли файл корпуса Брауна с помощью текстового редактора:</p>
+<blockquote>
+The/at Fulton/np-tl County/nn-tl Grand/jj-tl Jury/nn-tl
+said/vbd Friday/nr an/at investigation/nn of/in Atlanta's/np$
+recent/jj primary/nn election/nn produced/vbd / no/at
+evidence/nn ''/'' that/cs any/dti irregularities/nns took/vbd
+place/nn./.</blockquote>
+<p>Другие корпусы используют различные форматы для хранения частеречной разметки.
+Ридеры NLTK обеспечивают единый интерфейс, так что вам не придется иметь дело с различными форматами файлов.
+В отличие от фрагмента файла, показанного выше, ридер корпуса Брауна представляет данные, как показано ниже.
+Обратите внимание, что частеречные теги были преобразованы в верхний регистр, так как это стало стандартной практикой после того, как корпус Брауна был опубликован.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.corpus.brown.tagged_words()
+[('The', 'AT'), ('Fulton', 'NP-TL'), ...]
+&gt;&gt;&gt; nltk.corpus.brown.tagged_words(tagset='universal')
+[('The', 'DET'), ('Fulton', 'NOUN'), ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Всякий раз, когда корпус содержит текст с тегами, интерфейс NLTK будет иметь метод <tt class="doctest"><span class="pre">tagged_words()</span></tt>.
+Вот еще несколько примеров, использующих выходной формат, показанный для корпуса Брауна:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(nltk.corpus.nps_chat.tagged_words())
+[('now', 'RB'), ('im', 'PRP'), ('left', 'VBD'), ...]
+&gt;&gt;&gt; nltk.corpus.conll2000.tagged_words()
+[('Confidence', 'NN'), ('in', 'IN'), ('the', 'DT'), ...]
+&gt;&gt;&gt; nltk.corpus.treebank.tagged_words()
+[('Pierre', 'NNP'), ('Vinken', 'NNP'), (',', ','), ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Не все корпусы используют один и тот же набор тегов; см. help функции тагсетов и <tt class="doctest"><span class="pre">readme()</span></tt> методы, упомянутые выше для получения документации.
+В начале мы хотим избежать сложностей с этими тагсетами, поэтому мы используем встроенное отображение на универсальный набор ярлыков "Universal Tagset":</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.corpus.brown.tagged_words(tagset='universal')
+[('The', 'DET'), ('Fulton', 'NOUN'), ...]
+&gt;&gt;&gt; nltk.corpus.treebank.tagged_words(tagset='universal')
+[('Pierre', 'NOUN'), ('Vinken', 'NOUN'), (',', '.'), ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Размеченные корпусы для нескольких других языков поставляются вместе с NLTK, включая китайский, хинди, португальский, испанский, голландский и каталанский.
+Они, как правило, содержат текст в кодировке отличной от ASCII, и Python всегда отображает такой текст в шестнадцатеричной системе при выводе на экран более крупной структуры, такой как список.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.corpus.sinica_treebank.tagged_words()
+[('ä', 'Neu'), ('åæ', 'Nad'), ('åç', 'Nba'), ...]
+&gt;&gt;&gt; nltk.corpus.indian.tagged_words()
+[('মহিষের', 'NN'), ('সন্তান', 'NN'), (':', 'SYM'), ...]
+&gt;&gt;&gt; nltk.corpus.mac_morpho.tagged_words()
+[('Jersei', 'N'), ('atinge', 'V'), ('m\xe9dia', 'N'), ...]
+&gt;&gt;&gt; nltk.corpus.conll2002.tagged_words()
+[('Sao', 'NC'), ('Paulo', 'VMI'), ('(', 'Fpa'), ...]
+&gt;&gt;&gt; nltk.corpus.cess_cat.tagged_words()
+[('El', 'da0ms0'), ('Tribunal_Suprem', 'np0000o'), ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Если ваша среда настроена правильно с соответствующими редакторами и шрифтами, она должна быть в состоянии отображать отдельные строки в читаемом виде.
+Например, <a class="reference internal" href="http://www.nltk.org/book/ch05.html#fig-tag-indian">2.1</a> показывает данные, к которым можно получить доступ с помощью <tt class="doctest"><span class="pre">nltk.corpus.indian</span></tt>.</p>
+<span class="target" id="fig-tag-indian"></span><div class="figure" id="fig-tag-indian">
+<img alt="../images/tag-indian.png" src="http://www.nltk.org/images/tag-indian.png" style="width:800.4px;height:213.0px">
+<p class="caption"><span class="caption-label">Рисунок 2.1:</span> Данные с отмеченными частями речи из четырех индийских языков: бенгали, хинди, маратхи и телугу</p>
+</div>
+<!-- &#2311;&#2352;&#2366;&#2325;_NNP &#2325;&#2375;_PREP &#2357;&#2367;&#2342;&#2375;&#2358;_NNC &#2350;&#2306;&#2340;&#2381;&#2352;&#2368;_NN &#2344;&#2375;_PREP &#2309;&#2350;&#2352;&#2368;&#2325;&#2366;_NNP &#2325;&#2375;_PREP &#2313;&#2360;_PRP &#2346;&#2381;&#2352;&#2360;&#2381;&#2340;&#2366;&#2357;_NN &#2325;&#2366;_PREP &#2350;&#2332;&#2366;&#2325;_NVB &#2313;&#2396;&#2366;&#2351;&#2366;_VFM &#2361;&#2376;_VAUX ... -->
+<p>Если корпус также сегментирован на предложения, он будет иметь метод <tt class="doctest"><span class="pre">tagged_sents()</span></tt>, который делит помеченные слова на предложения, а не представляет их как один большой список.
+Это будет полезно, когда мы дойдем до разработки автоматических разметчиков, так как они обучаются и тестируются на списках предложений, а не слов.</p>
+</div>
+<div class="section" id="a-universal-part-of-speech-tagset">
+<h2>2.3 Универсальный набор частеречных ярлыков</h2>
+<p>Размеченные корпусы используют множество различных соглашений для пометки слов.
+Для начала мы будем рассматривать упрощенный набор ярлыков (который приведен в таблице <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-universal-tagset">2.1</a>).</p>
+<span class="target" id="tab-universal-tagset"></span><table border="1" class="docutils" id="tab-universal-tagset">
+<colgroup>
+<col width="11%">
+<col width="27%">
+<col width="62%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Ярлык</th>
+<th class="head">Значение</th>
+<th class="head">Английские примеры</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">ADJ</span></tt></td>
+<td>имя прилагательное</td>
+<td><span class="example">new, good, high, special, big, local</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">ADP</span></tt></td>
+<td>предлог</td>
+<td><span class="example">on, of, at, with, by, into, under</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">ADV</span></tt></td>
+<td>наречие</td>
+<td><span class="example">really, already, still, early, now</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">CONJ</span></tt></td>
+<td>союз</td>
+<td><span class="example">and, or, but, if, while, although</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">DET</span></tt></td>
+<td>определитель, артикль</td>
+<td><span class="example">the, a, some, most, every, no, which</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">NOUN</span></tt></td>
+<td>имя существительное</td>
+<td><span class="example">year, home, costs, time, Africa</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">NUM</span></tt></td>
+<td>числительное</td>
+<td><span class="example">twenty-four, fourth, 1991, 14:24</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">PRT</span></tt></td>
+<td>частица</td>
+<td><span class="example">at, on, out, over per, that, up, with</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">PRON</span></tt></td>
+<td>местоимение</td>
+<td><span class="example">he, their, her, its, my, I, us</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">VERB</span></tt></td>
+<td>глагол</td>
+<td><span class="example">is, say, told, given, playing, would</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">.</span></tt></td>
+<td>знаки препинания</td>
+<td><span class="example"> , ; !</span></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">X</span></tt></td>
+<td>другие</td>
+<td><span class="example">ersatz, esprit, dunno, gr8, univeristy</span></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.1</span>: <p>Универсальный набор частеречных ярлыков</p>
+</p>
+</td></table>
+<p>Давайте посмотрим, какие из этих ярлыков наиболее распространенны в новостной категории корпуса Брауна:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; brown_news_tagged = brown.tagged_words(categories='news', tagset='universal')
+&gt;&gt;&gt; tag_fd = nltk.FreqDist(tag for (word, tag) in brown_news_tagged)
+&gt;&gt;&gt; tag_fd.most_common()
+[('NOUN', 30640), ('VERB', 14399), ('ADP', 12355), ('.', 11928), ('DET', 11389),
+ ('ADJ', 6706), ('ADV', 3349), ('CONJ', 2717), ('PRON', 2535), ('PRT', 2264),
+ ('NUM', 2166), ('X', 106)]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Постройте зависимость выше приведенного распределения частот с помощью <tt class="doctest"><span class="pre">tag_fd.plot(cumulative=True)</span></tt>.
+Какой процент слов помечены первыми пятью метками в приведенном выше списке?</p>
+</div>
+<p>Мы можем использовать эти метки, чтобы сделать мощные поисковые запросы с использованием графического частеречного конкорданс инструмента <tt class="doctest"><span class="pre">nltk.app.concordance()</span></tt>.  Используйте его, чтобы найти любой комбинации слов и частеречных меток, например <tt class="doctest"><span class="pre">N N N N</span></tt>, <tt class="doctest"><span class="pre">hit/VD</span></tt>, <tt class="doctest"><span class="pre">hit/VN</span></tt> или <tt class="doctest"><span class="pre">the ADJ man</span></tt>.</p>
+<!-- Screenshot -->
+</div>
+<div class="section" id="nouns">
+<h2>2.4 Существительные</h2>
+<p>Существительные в целом отсылают к людям, местам, вещам или понятиям, например: <span class="example">женщина, Шотландия, книга, интеллект</span>.  Существительные могут появляться после определителей и прилагательных, а также могут быть субъектом или объектом глагола, как показано в таблице <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-syntax-nouns">2.2</a>.</p>
+<span class="target" id="tab-syntax-nouns"></span><table border="1" class="docutils" id="tab-syntax-nouns">
+<colgroup>
+<col width="11%">
+<col width="42%">
+<col width="47%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Слово</th>
+<th class="head">После определителя</th>
+<th class="head">Субъект глагола</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>woman</td>
+<td><em>the</em> woman who I saw yesterday...</td>
+<td>the woman <em>sat</em> down</td>
+</tr>
+<tr><td>Scotland</td>
+<td><em>the</em> Scotland I remember as a child...</td>
+<td>Scotland <em>has</em> five million people</td>
+</tr>
+<tr><td>book</td>
+<td><em>the</em> book I bought yesterday...</td>
+<td>this book <em>recounts</em> the colonization of Australia</td>
+</tr>
+<tr><td>intelligence</td>
+<td><em>the</em> intelligence displayed by the child...</td>
+<td>Mary's intelligence <em>impressed</em> her teachers</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.1</span>: <p>Синтаксические модели, включающие некоторые существительные</p>
+</p>
+</td></table>
+<p>Упрощенными метками существительных являются <tt class="doctest"><span class="pre">N</span></tt> для имен нарицательных, как <span class="example">книги</span>, и <tt class="doctest"><span class="pre">NP</span></tt> для имен собственных, как <span class="example">Шотландия</span>.</p>
+<p>Давайте проверим какой-нибудь маркированный текст, чтобы увидеть, какие части речи возникают перед существительным, начиная с наиболее часто встречающихся. Для начала мы построим список биграмм, члены которых сами являются парами слово-метка, такими как <tt class="doctest"><span class="pre">((<span class="pysrc-string">'The'</span>, <span class="pysrc-string">'DET'</span>), (<span class="pysrc-string">'Fulton'</span>, <span class="pysrc-string">'NP'</span>))</span></tt> и <tt class="doctest"><span class="pre">((<span class="pysrc-string">'Fulton'</span>, <span class="pysrc-string">'NP'</span>), (<span class="pysrc-string">'County'</span>, <span class="pysrc-string">'N '</span>))</span></tt>.
+Затем мы построим <tt class="doctest"><span class="pre">FreqDist</span></tt> из частей биграммов, которые являются метками.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; word_tag_pairs = nltk.bigrams(brown_news_tagged)
+&gt;&gt;&gt; noun_preceders = [a[1] for (a, b) in word_tag_pairs if b[1] == 'NOUN']
+&gt;&gt;&gt; fdist = nltk.FreqDist(noun_preceders)
+&gt;&gt;&gt; [tag for (tag, _) in fdist.most_common()]
+['NOUN', 'DET', 'ADJ', 'ADP', '.', 'VERB', 'CONJ', 'NUM', 'ADV', 'PRT', 'PRON', 'X']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Это подтверждает наше утверждение, что существительные появляются после определителей и прилагательных, включая числительные (помеченные, как <tt class="doctest"><span class="pre">NUM</span></tt>).</p>
+<!-- TO-DO say something about some of the other contexts? -->
+</div>
+<div class="section" id="verbs">
+<h2>2.5 Глаголы</h2>
+<p>Глаголы - это слова, которые описывают события и действия, например, <span class="example">падать</span>, <span class="example">есть</span> в таблице <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-syntax-verbs">2.3</a>.
+В контексте предложения, глаголы, как правило, выражают отношение с участием референтов одного или нескольких словосочетаний с существительными.</p>
+<span class="target" id="tab-syntax-verbs"></span><table border="1" class="docutils" id="tab-syntax-verbs">
+<colgroup>
+<col width="7%">
+<col width="22%">
+<col width="70%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Word</th>
+<th class="head">Simple</th>
+<th class="head">С модификаторами и обстоятельствами (выделены курсивом)</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>fall</td>
+<td>Rome fell</td>
+<td>Dot com stocks <em>suddenly</em> fell <em>like a stone</em></td>
+</tr>
+<tr><td>eat</td>
+<td>Mice eat cheese</td>
+<td>John ate the pizza <em>with gusto</em></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.1</span>: <p>Синтаксические шаблоны, включающие некоторые глаголы</p>
+</p>
+</td></table>
+<p>Каковы наиболее распространенные глаголы в новостном тексте?  Давайте отсортируем все глаголы по частоте:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wsj = nltk.corpus.treebank.tagged_words(tagset='universal')
+&gt;&gt;&gt; word_tag_fd = nltk.FreqDist(wsj)
+&gt;&gt;&gt; [wt[0] for (wt, _) in word_tag_fd.most_common() if wt[1] == 'VERB']
+['is', 'said', 'are', 'was', 'be', 'has', 'have', 'will', 'says', 'would',
+ 'were', 'had', 'been', 'could', "'s", 'can', 'do', 'say', 'make', 'may',
+ 'did', 'rose', 'made', 'does', 'expected', 'buy', 'take', 'get', 'might',
+ 'sell', 'added', 'sold', 'help', 'including', 'should', 'reported', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание, что элементы, которые подсчитываются в распределении частот, - это пары слово-метка.
+Так как слова и метки соединены в пару, мы можем рассматривать слово как условие, а метку как событие и инициализировать условное распределение частот со списком пар условие-событие.  Это позволяет нам видеть упорядоченный по частоте список меток данного слова:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd1 = nltk.ConditionalFreqDist(wsj)
+&gt;&gt;&gt; cfd1['yield'].most_common()
+[('VERB', 28), ('NOUN', 20)]
+&gt;&gt;&gt; cfd1['cut'].most_common()
+[('VERB', 25), ('NOUN', 3)]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем изменить порядок пар, чтобы метки были условиями, а слова событиями.  Теперь мы можем видеть возможные слова для данной метки. Мы будем делать это для набора меток WSJ, а не универсального набора меток:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; wsj = nltk.corpus.treebank.tagged_words()
+&gt;&gt;&gt; cfd2 = nltk.ConditionalFreqDist((tag, word) for (word, tag) in wsj)
+&gt;&gt;&gt; list(cfd2['VBN'])
+['been', 'expected', 'made', 'compared', 'based', 'priced', 'used', 'sold',
+'named', 'designed', 'held', 'fined', 'taken', 'paid', 'traded', 'said', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Для того, чтобы прояснить различие между <tt class="doctest"><span class="pre">VBD</span></tt> (прошедшее время) и <tt class="doctest"><span class="pre">VBN</span></tt> (причастие прошедшего времени), давайте найдем слова, которые могут быть как <tt class="doctest"><span class="pre">VBD</span></tt>, так и <tt class="doctest"><span class="pre">VBN</span></tt>, и посмотрим на контекст:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; [w for w in cfd1.conditions() if 'VBD' in cfd1[w] and 'VBN' in cfd1[w]]
+['Asked', 'accelerated', 'accepted', 'accused', 'acquired', 'added', 'adopted', ...]
+&gt;&gt;&gt; idx1 = wsj.index(('kicked', 'VBD'))
+&gt;&gt;&gt; wsj[idx1-4:idx1+1]
+[('While', 'IN'), ('program', 'NN'), ('trades', 'NNS'), ('swiftly', 'RB'),
+ ('kicked', 'VBD')]
+&gt;&gt;&gt; idx2 = wsj.index(('kicked', 'VBN'))
+&gt;&gt;&gt; wsj[idx2-4:idx2+1]
+[('head', 'NN'), ('of', 'IN'), ('state', 'NN'), ('has', 'VBZ'), ('kicked', 'VBN')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В этом случае мы видим, что причастию прошедшего времени <span class="example">kicked</span> предшествует форма вспомогательного глагола <span class="example">have</span>. Всегда ли это так?</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>:Для данного списка причастий прошедшего времени, производимого <tt class="doctest"><span class="pre">(cfd2[<span class="pysrc-string">'VN'</span>])</span></tt>, попытайтесь собрать список всех пар слово-тег, которые непосредственно предшествуют элемента первого списка.</p>
+</div>
+</div>
+<div class="section" id="adjectives-and-adverbs">
+<h2>2.6 Прилагательные и наречия</h2>
+<p>Два других важных класса слов - это <a name="adjectives_index_term"></a><span class="termdef">прилагательные</span> и <a name="adverbs_index_term"></a><span class="termdef">наречия</span>.
+Прилагательные описывают существительные и могут быть использованы в качестве модификаторов (например, <span class="example">large</span> in <span class="example">large pizza</span>), или в предикатах (например, <span class="example">pizza is large</span>).  Английские прилагательные могут иметь внутреннюю структуру (например, <span class="example">fall+ing</span> в <span class="example">falling stocks</span>).  Наречия изменяют глаголы, чтобы указать время, способ, место или направление события, описываемого глаголом (например, <span class="example">quickly</span> в <span class="example">the stocks fell quickly)</span>.  Наречия могут также изменять прилагательные (например, на <span class="example">really</span> в <span class="example">Marry's teacher was really nice)</span>.</p>
+<p>Английский, помимо предлогов, имеет несколько категорий закрытых классов слов, таких как <a name="articles_index_term"></a><span class="termdef">артикли</span> (также часто называемые <a name="determiners_index_term"></a><span class="termdef">определителями</span>) (например, <span class="example">the, a</span>), <a name="modals_index_term"></a><span class="termdef">модальные глаголы</span> (например, <span class="example">should</span>, <span class="example">may</span>) и <a name="personal_pronouns_index_term"></a><span class="termdef">личные местоимения</span> (например, <span class="example">she</span>, <span class="example">they</span>).
+Каждый словарь и грамматика классифицирует эти слова по-разному.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>: 
+Если вы не уверены в отношении некоторых из этих частей речи, изучите их с помощью <tt class="doctest"><span class="pre">nltk.app.concordance()</span></tt>, или посмотрите несколько грамматических видео <em>Schoolhouse Rock!</em> на YouTube, или обратитесь к разделу дополнительные материалы в конце этой главы.</p>
+</div>
+</div>
+<div class="section" id="unsimplified-tags">
+<h2>2.7 Неупрощенные метки</h2>
+<p>Давайте найдем наиболее часто встречающиеся существительные каждого типа частеречной метки существительного.
+Программа в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#code-findtags">2.2</a> находит все метки, начинающиеся с <tt class="doctest"><span class="pre">NN</span></tt>, а также предоставляет несколько примеров слов для каждого из них.  Вы увидите, что есть много вариантов <tt class="doctest"><span class="pre">NN</span></tt>; наиболее важные содержат <tt class="doctest"><span class="pre">$</span></tt> для притяжательных имен, <tt class="doctest"><span class="pre">S</span></tt> для множественного числа существительных (так как существительные во множественном числе, как правило, заканчиваются на <span class="example">s</span>) и <tt class="doctest"><span class="pre">P</span></tt> для имен собственных.  Кроме того, большинство меток имеют суффиксные модификаторы: <tt class="doctest"><span class="pre">-NC</span></tt> для цитат, <tt class="doctest"><span class="pre">-HL</span></tt> для слов в заголовках и <tt class="doctest"><span class="pre">-TL</span></tt> для заголовков (особенность таблиц Брауна).</p>
+<span class="target" id="code-findtags"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-keyword">Защиту</span> <span class="pysrc-defname">findtags</span> (tag_prefix, tagged_text): = NLTK ЦФО.ConditionalFreqDist ((тэг, слово) <span class="pysrc-keyword">для</span> (слово, тег) <span class="pysrc-keyword">в</span> tagged_text , <span class="pysrc-keyword">если</span> tag.startswith (tag_prefix)) возвращение ДИКТ ((бирка, CFD [тег] .most_common (5)) <span class="pysrc-keyword">для</span> тега <span class="pysrc-keyword">в</span> cfd.conditions ()) <span class="pysrc-prompt">&gt;&gt; &gt;</span> tagdict = findtags ( <span class="pysrc-string">'NN',</span> nltk.corpus.brown.tagged_words ( <span class="pysrc-string">'новости'</span> категориях =)) <span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">для</span> тега <span class="pysrc-keyword">в</span> отсортированном (tagdict): <span class="pysrc-more">...</span> <span class="pysrc-keyword">печать</span> (бирка, tagdict [тег]) <span class="pysrc-more">...</span>
+NN [( <span class="pysrc-string">'год',</span> 137), ( <span class="pysrc-string">'время',</span> 97), ( <span class="pysrc-string">'состояние',</span> 88), ( <span class="pysrc-string">'неделя',</span> 85), ( <span class="pysrc-string">'человек',</span> 72)] NN $ [( <span class="pysrc-string">"году",</span> 13), ( <span class="pysrc-string">"мира",</span> 8), ( <span class="pysrc-string">"государства",</span> 7), ( <span class="pysrc-string">"нации",</span> 6), ( <span class="pysrc-string">"компании",</span> 6)] NN $ -HL [( <span class="pysrc-string">"гольфу",</span> 1), ( <span class="pysrc-string">" флот ",</span> 1)] NN $ -TL <span class="pysrc-string">[(" президента ",</span> 11), <span class="pysrc-string">(" армии ",</span> 3), <span class="pysrc-string">(" галереи ",</span> 3), <span class="pysrc-string">(" университета ",</span> 3), <span class="pysrc-string">(" Лиги ",</span> 3) ] NN-HL [( <span class="pysrc-string">'зр.,</span> 2), <span class="pysrc-string">(' проблема ',</span> 2), <span class="pysrc-string">(' Вопрос ',</span> 2), <span class="pysrc-string">(' бизнес ',</span> 2 ' ), ( <span class="pysrc-string">'зарплата',</span> 2)] NN-НК [ ( <span class="pysrc-string">'ева',</span> 1), ( <span class="pysrc-string">'Ая',</span> 1), ( <span class="pysrc-string">'ОВА',</span> 1)] NN-ТЛ [( <span class="pysrc-string">'президент',</span> 88), ( <span class="pysrc-string">'дом',</span> 68), ( <span class="pysrc-string">«Состояние»,</span> 59 ), ( <span class="pysrc-string">'университет',</span> 42), ( <span class="pysrc-string">'Город',</span> 41)] NN-TL-HL [( <span class="pysrc-string">'Форт',</span> 2), ( <span class="pysrc-string">'доктор',</span> 1), ( <span class="pysrc-string">'Дуб',</span> 1), ( <span class="pysrc-string">'Улица',</span> 1), ( <span class="pysrc-string">'бассейна',</span> 1)] NNS [( <span class="pysrc-string">'лет',</span> 101), ( <span class="pysrc-string">«членами»,</span> 69), ( <span class="pysrc-string">'люди',</span> 52), ( <span class="pysrc-string">'Sales',</span> 51), ( <span class="pysrc-string">'мужчины',</span> 46)] NNS $ [( <span class="pysrc-string">"детский",</span> 7), ( <span class="pysrc-string">"женская",</span> 5), ( <span class="pysrc-string">"дворников" ",</span> 3), <span class="pysrc-string">(" мужские ",</span> 3), <span class="pysrc-string">(" налогоплательщики ",</span> 2 )] NNS $ -HL [( <span class="pysrc-string">"Дилеры" ",</span> 1), <span class="pysrc-string">(" Идолы ","</span> 1)] NNS $ -tl [( <span class="pysrc-string">"женская",</span> 4), ( <span class="pysrc-string">" 'государства",</span> 3), ( <span class="pysrc-string">"Гиганты ' ",</span> 2), <span class="pysrc-string">(" Бразерс ",</span> 1), <span class="pysrc-string">(" писателей ",</span> 1)] NNS-HL <span class="pysrc-string">[(' комментарии ',</span> 1), <span class="pysrc-string">(' Правонарушения ',</span> 1), <span class="pysrc-string">(« Жертвоприношения »,</span> 1), ( <span class="pysrc-string">'фонды',</span> 1), ( <span class="pysrc-string">'Результаты',</span> 1)] NNS-TL [( <span class="pysrc-string">'государства',</span> 38), ( <span class="pysrc-string">'Наций',</span> 11), ( <span class="pysrc-string">'Мастера',</span> 10), ( <span class="pysrc-string">"Правила ',</span> 9), <span class="pysrc-string">(' коммунисты ',</span> 9)] NNS-TL-HL <span class="pysrc-string">[(' Наций ',</span> 1)]</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_findtags.py" type="text/x-python"><span class="caption-label">Пример 2.2 (code_findtags.py)</span></a> : <span class="caption-label">Рисунок 2.2:</span> Программа для поиска наиболее часто встречающихся существительного Теги</p></td></tr>
+</table></div>
+<p>Когда мы приходим к построению частичной из речи Taggers далее в этой главе, мы будем использовать unsimplified теги.</p>
+</div>
+<div class="section" id="exploring-tagged-corpora">
+<h2>2.8 Исследование Tagged Corpora</h2>
+<p>Давайте кратко возвращение к видам разведки, которые мы видели корпусов в предыдущих главах, на этот раз используя POS-теги.</p>
+<p>Предположим, что мы изучаем слово <span class="example">often</span> и хотим увидеть, как оно используется в тексте.  Мы могли бы попросить увидеть слова, которые следуют за <span class="example">often</span></p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; brown_learned_text = brown.words(categories='learned')
+&gt;&gt;&gt; sorted(set(b for (a, b) in nltk.bigrams(brown_learned_text) if a == 'often'))
+[',', '.', 'accomplished', 'analytically', 'appear', 'apt', 'associated', 'assuming',
+'became', 'become', 'been', 'began', 'call', 'called', 'carefully', 'chose', ...]
+</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Однако, вероятно, более инструктивно использовать метод <tt class="doctest"><span class="pre">tagged_words()</span></tt>, чтобы посмотреть на метку части речи следующих за ним слов:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; brown_lrnd_tagged = brown.tagged_words(categories='learned', tagset='universal')
+&gt;&gt;&gt; tags = [b[1] for (a, b) in nltk.bigrams(brown_lrnd_tagged) if a[0] == 'often']
+&gt;&gt;&gt; fd = nltk.FreqDist(tags)
+&gt;&gt;&gt; fd.tabulate()
+ PRT  ADV  ADP    . VERB  ADJ
+   2    8    7    4   37    6</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание, что самые часто встречаемые части речи, которые следуют за <span class="example">often</span> - это глаголы.
+Существительные никогда не появляются в этом положении (в данном корпусе).</p>
+<p>Далее, давайте рассмотрим более широкий контекст, и найдем слова, отвечающие определенным последовательностям меток и слов (в данном случае <tt class="doctest"><span class="pre"><span class="pysrc-string">"&lt;Verb&gt; to &lt;Verb&gt;"</span></span></tt>).
+В листинге ниже мы рассматриваем каждое словосочетание из тех слов в предложении <a class="reference internal" href="http://www.nltk.org/book/ch05.html#three-word"><span id="ref-three-word"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a> и проверяем, отвечает ли оно нашим критериям <a class="reference internal" href="http://www.nltk.org/book/ch05.html#verb-to-verb"><span id="ref-verb-to-verb"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.  Если метки совпадают, мы выводим соответствующие слова <a class="reference internal" href="http://www.nltk.org/book/ch05.html#print-words"><span id="ref-print-words"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>.</p>
+<span class="target" id="code-three-word-phrase"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+from nltk.corpus import brown
+def process(sentence):
+    for (w1,t1), (w2,t2), (w3,t3) in nltk.trigrams(sentence): 
+        if (t1.startswith('V') and t2 == 'TO' and t3.startswith('V')): 
+            print(w1, w2, w3) 
+
+&gt;&gt;&gt; for tagged_sent in brown.tagged_sents():
+...     process(tagged_sent)
+...
+combined to achieve
+continue to place
+serve to protect
+wanted to wait
+allowed to place
+expected to become
+...</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_three_word_phrase.py" type="text/x-python"><span class="caption-label">Пример 2.3 (code_three_word_phrase.py)</span></a> : <span class="caption-label">Листинг 2.3:</span> Поиск словосочетаний из трех слов с использованием меток частей речи.</p></td></tr>
+</table></div>
+<p>И, наконец, давайте найдем слова, которые являются весьма неоднозначными в отношении их метки части речи.
+Понимание того, почему такие слова помечаются, когда они находятся в каждом контексте, может помочь нам прояснить различия между метками.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; brown_news_tagged = brown.tagged_words(categories='news', tagset='universal')
+&gt;&gt;&gt; data = nltk.ConditionalFreqDist((word.lower(), tag)
+...                                 for (word, tag) in brown_news_tagged)
+&gt;&gt;&gt; for word in sorted(data.conditions()):
+...     if len(data[word]) &gt; 3:
+...         tags = [tag for (tag, _) in data[word].most_common()]
+...         print(word, ' '.join(tags))
+...
+best ADJ ADV NP V
+better ADJ ADV V DET
+close ADV ADJ V N
+cut V N VN VD
+even ADV DET ADJ V
+grant NP N V -
+hit V VD VN N
+lay ADJ V NP VD
+left VD ADJ N VN
+like CNJ V ADJ P -
+near P ADV ADJ DET
+open ADJ V N ADV
+past N ADJ DET P
+present ADJ ADV V N
+read V VN VD NP
+right ADJ N DET ADV
+second NUM ADV DET N
+set VN V VD N -
+that CNJ V WH DET</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваш очередь</strong>: 
+Откройте инструмент частеречного конкорданса <tt class="doctest"><span class="pre">nltk.app.concordance()</span></tt>  и загрузите полный корпус Брауна (упрощенный набор меток).  Теперь возьмите некоторые из приведенных выше слов и посмотрите, как метка слова соотносится с контекстом этого слова.
+Например выполните поиск слова <tt class="doctest"><span class="pre">near</span></tt>, чтобы увидеть все формы вместе, <tt class="doctest"><span class="pre">near/ADJ</span></tt>, чтобы увидеть, как оно используется в качестве прилагательного, <tt class="doctest"><span class="pre">near N</span></tt>, чтобы увидеть только те случаи, когда за ним следует существительное и так далее.
+Для получения более широкого набора примеров, измените прилагаемый код, чтобы он выводил список слов, имеющих три различные метки.</p>
+</div>
+</div>
+</div>
+<div class="section" id="mapping-words-to-properties-using-python-dictionaries">
+<span id="sec-dictionaries"></span><h1>3 Использование Python словарей для соответствий слово-свойство</h1>
+<p>Как мы уже видели, помеченное слово вида <tt class="doctest"><span class="pre">(word, tag)</span></tt> представляет собой ассоциацию между словом и меткой части речи.
+Как только мы начнем делать маркировку частей речи, мы будем создавать программы, которые присваивают некоторый тег слову, а именно тег, который наиболее вероятен в данном контексте.  Мы можем думать об этом процессе, как о <a name="mapping_index_term"></a><span class="termdef">соответствии</span> меток словам.  Самый естественный способ хранения соответствий в Python использует так называемый тип данных <a name="dictionary_index_term"></a><span class="termdef">словарь</span> (также известный на других языках программирования как <a name="associative_array_index_term"></a><span class="termdef">ассоциативный массив</span> или <a name="hash_array_index_term"></a><span class="termdef">хэш</span>-<span class="termdef">массив</span>).
+В этом разделе мы рассмотрим словари и увидим, как они могут представлять различную языковую информацию, в том числе части речи.</p>
+<div class="section" id="indexing-lists-vs-dictionaries">
+<h2>3.1 Индексация списков и словари</h2>
+<p>Текст, как мы уже видели, рассматривается в Python как список слов.
+Важным свойством списков является то, что мы можем "посмотреть" конкретный пункт, указав его индекс, например <tt class="doctest"><span class="pre">text1[100]</span></tt>.  Обратите внимание на то, как мы указываем номер и получиаем обратно слово.  Мы можем думать о списке как о простом виде таблицы, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#fig-maps01">3.1</a>.</p>
+<span class="target" id="fig-maps01"></span><div class="figure" id="fig-maps01">
+<img alt="../images/maps01.png" src="http://www.nltk.org/images/maps01.png" style="width:136.8px;height:113.4px">
+<p class="caption"><span class="caption-label">Рисунок 3.1:</span> Поиск по списку: мы получаем доступ к содержимому списка Python с помощью целочисленного индекса.</p>
+</div>
+<p>Сравните эту ситуацию с распределением частот (<a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-simple-statistics">3</a>), где мы указываем слово и получаем обратно число, например , <tt class="doctest"><span class="pre">fdist[<span class="pysrc-string">'monstrous']</span></span></tt>, которое говорит нам, сколько раз данное слово появилось в тексте.  Поиск по слову знаком любому, кто использовал словарь.  Некоторые другие примеры приведены в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#fig-maps02">3.2</a> .</p>
+<span class="target" id="fig-maps02"></span><div class="figure" id="fig-maps02">
+<img alt="../images/maps02.png" src="http://www.nltk.org/images/maps02.png" style="width:719.62px;height:170.5px">
+<p class="caption"><span class="caption-label">Рисунок 3.2:</span> Поиск по словарю: мы получаем доступ к записи словаря с помощью ключа, такого как чье-то имя, сетевой домен или английское слово; другие названия для словаря карта, хэшкарта, хэш и ассоциативный массив.</p>
+</div>
+<p>В случае телефонной книги, мы ищем запись по <span class="emphasis">имени</span>, а получаем обратно номер.  Когда мы вводим доменное имя в веб-браузере, компьютер ищет его в DNS таблице, чтобы получить обратно IP-адрес.  Таблица частот слов позволяет искать слово и находить его частоту в коллекции текстов.  Во всех этих случаях мы находим по именам номера, а не наоборот, как со списком.
+В общем, мы хотели бы иметь возможность сопоставлять любые типы информации.  Таблица <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-linguistic-objects">3.1</a> перечисляет различные языковые объекты, наряду с тем, что они отображают.</p>
+<span class="target" id="tab-linguistic-objects"></span><table border="1" class="docutils" id="tab-linguistic-objects">
+<colgroup>
+<col width="26%">
+<col width="14%">
+<col width="60%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Лингвистический объект</th>
+<th class="head">Из</th>
+<th class="head">В</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>Индекс документа</td>
+<td>Слово</td>
+<td>Список страниц (где находится слово)</td>
+</tr>
+<tr><td>Тезаурус</td>
+<td>Значение слово</td>
+<td>Список синонимов</td>
+</tr>
+<tr><td>Словарь</td>
+<td>Зглавное слово</td>
+<td>Вступление (часть-из-речи, определения смысла, этимология)</td>
+</tr>
+<tr><td>Сравнительный словарь</td>
+<td>Член глоссария</td>
+<td>Близкие по значению слова (список слов, по одному на язык)</td>
+</tr>
+<tr><td>Морфологический Анализатор</td>
+<td>Поверхностная форма</td>
+<td>Морфологический анализ (список морфем)</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.1</span>: <p>Лингвистические объекты как отображения множества ключей на множестве значений</p>
+</p>
+</td></table>
+<p>Чаще всего, мы отображаем "слово" на множестве структурированных объектов.
+Например, индекс документа соединяет слово (которое можно представить в виде строки) и список страниц (представленный в виде списка целых чисел).
+В этом разделе мы рассмотрим, как представить это отображения в Python.</p>
+</div>
+<div class="section" id="dictionaries-in-python">
+<h2>3.2 Словари в Python</h2>
+<p>Python предоставляет тип данных <a name="dictionary_index_term_2"></a><span class="termdef">словарь</span>, который может быть использован для отображения между произвольными типами.  Это как традиционный словарь, в том, что он дает вам эффективный способ искать вещи.  Тем не менее, как мы видим из <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-linguistic-objects">3.1</a>, он имеет гораздо более широкий спектр применения.</p>
+<p>Чтобы проиллюстрировать, мы определяем <tt class="doctest"><span class="pre">pos</span></tt> как пустой словарь, а затем добавляем четыре записи к нему, указывая части речи некоторых слов.  Добавим записи в словарь, используя знакомую запись с квадратными скобками:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos = {}
+&gt;&gt;&gt; pos
+{}
+&gt;&gt;&gt; pos['colorless'] = 'ADJ' 
+&gt;&gt;&gt; pos
+{'colorless': 'ADJ'}
+&gt;&gt;&gt; pos['ideas'] = 'N'
+&gt;&gt;&gt; pos['sleep'] = 'V'
+&gt;&gt;&gt; pos['furiously'] = 'ADV'
+&gt;&gt;&gt; pos 
+{'furiously': 'ADV', 'ideas': 'N', 'colorless': 'ADJ', 'sleep': 'V'}</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Так, например, <a class="reference internal" href="http://www.nltk.org/book/ch05.html#pos-colorless"><span id="ref-pos-colorless"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a> говорит о том, что часть речи <span class="example">colorless</span> - прилагательное, или, более конкретно, что в словаре <tt class="doctest"><span class="pre">pos</span></tt> <a name="key_index_term"></a> <span class="termdef">ключу</span> <tt class="doctest"><span class="pre"><span class="pysrc-string">'colorless'</span></span></tt> присвоено <a name="value_index_term"></a><span class="termdef">значение</span> <tt class="doctest"><span class="pre"><span class="pysrc-string">'ADJ'</span></span></tt>.
+Когда мы исследуем значение <tt class="doctest"><span class="pre">pos</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch05.html#pos-inspect"><span id="ref-pos-inspect"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, мы видим набор пар ключ-значение.  После того как мы заполнили словарь таким образом, мы можем использовать ключи для извлечения значений:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos['ideas']
+'N'
+&gt;&gt;&gt; pos['colorless']
+'ADJ'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Конечно, мы могли бы случайно использовать ключ, которому не было присвоено значение.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos['green']
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in ?
+KeyError: 'green'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В этой связи возникает важный вопрос.  В отличие от списков и строк, где мы можем использовать <tt class="doctest"><span class="pre">len()</span></tt>, чтобы выяснить, какие целые числа будут допустимыми индексами, как мы определяем допустимые ключи для словаря?  Если словарь не слишком большой, мы можем просто просмотреть его содержимое путем оценки переменной <tt class="doctest"><span class="pre">pos</span></tt>.  Как мы видели выше (строка <a class="reference internal" href="http://www.nltk.org/book/ch05.html#pos-inspect"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></a>), это дает нам пары ключ-значение.  Обратите внимание на то, что они не находятся в том же порядке, как они были первоначально введены; это происходит потому, что словари являются не последовательностями, а отображениями (см. <a class="reference internal" href="http://www.nltk.org/book/ch05.html#fig-maps02">3.2</a>), поэтому ключи по своей природе неупорядочены.</p>
+<p>В качестве альтернативы, чтобы просто найти ключи, мы можем преобразовать словарь в список <a class="reference internal" href="http://www.nltk.org/book/ch05.html#dict-to-list"><span id="ref-dict-to-list"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a> - или использовать словарь в контексте, где ожидается список - в качестве параметра функции <tt class="doctest"><span class="pre">sorted()</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch05.html#dict-sorted"><span id="ref-dict-sorted"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a> или в цикле <tt class="doctest"><span class="pre">for</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch05.html#dict-for-loop"><span id="ref-dict-for-loop"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; list(pos) 
+['ideas', 'furiously', 'colorless', 'sleep']
+&gt;&gt;&gt; sorted(pos) 
+['colorless', 'furiously', 'ideas', 'sleep']
+&gt;&gt;&gt; [w for w in pos if w.endswith('s')] 
+['colorless', 'ideas']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">При вводе <tt class="doctest"><span class="pre">list(pos)</span></tt> вы можете увидеть другой порядок, отличный от показанного выше.  Если вы хотите увидеть ключи по порядку, просто отсортируйте их.</p>
+</div>
+<p>Подобно тому, как мы перебираем все ключи в словаре с помощью цикла <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt>, мы можем использовать цикл <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt> так же, как мы использовали его для печати списков:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for word in sorted(pos):
+...     print(word + ":", pos[word])
+...
+colorless: ADJ
+furiously: ADV
+sleep: V
+ideas: N</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>И, наконец, методы словаря <tt class="doctest"><span class="pre"><span class="pysrc-builtin">keys()</span></span></tt>, <tt class="doctest"><span class="pre"><span class="pysrc-builtin">значения()</span></span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-builtin">elements()</span></span></tt> позволяют получить доступ к ключам, значениям и парам ключ-значение в виде отдельных списков.
+Мы можем даже сортировать по кортежам <a class="reference internal" href="http://www.nltk.org/book/ch05.html#sort-tuples"><span id="ref-sort-tuples"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, которые упорядочиваются по первым элементам (а если первые элементы одинаковые, то используются вторые элементы).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; list(pos.keys())
+['colorless', 'furiously', 'sleep', 'ideas']
+&gt;&gt;&gt; list(pos.values())
+['ADJ', 'ADV', 'V', 'N']
+&gt;&gt;&gt; list(pos.items())
+[('colorless', 'ADJ'), ('furiously', 'ADV'), ('sleep', 'V'), ('ideas', 'N')]
+&gt;&gt;&gt; for key, val in sorted(pos.items()): 
+...     print(key + ":", val)
+...
+colorless: ADJ
+furiously: ADV
+ideas: N
+sleep: V</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы хотим быть уверены, что, когда мы ищем что-то в словаре, мы получаем только одно значение для каждого ключа. Теперь предположим, что мы пытаемся использовать словарь для хранения того факта, что слово <span class="example">sleep</span> может быть использовано и как глагол, и существительное:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos['sleep'] = 'V'
+&gt;&gt;&gt; pos['sleep']
+'V'
+&gt;&gt;&gt; pos['sleep'] = 'N'
+&gt;&gt;&gt; pos['sleep']
+'N'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Изначально <tt class="doctest"><span class="pre">pos[<span class="pysrc-string">'sleep'</span>]</span></tt> присваивается значение <tt class="doctest"><span class="pre"><span class="pysrc-string">'V'</span></span></tt>. Но оно сразу же перезаписывается новым значением <tt class="doctest"><span class="pre"><span class="pysrc-string">'N'</span></span></tt>.
+Другими словами, для <tt class="doctest"><span class="pre"><span class="pysrc-string">'sleep'</span></span></tt> может быть только одна запись в словаре. 
+Тем не менее, существует способ хранения нескольких значений в этой записи: мы используем список, например, <tt class="doctest"><span class="pre">pos[<span class="pysrc-string">'sleep'</span>] = [<span class="pysrc-string">'N'</span>, <span class="pysrc-string">'V'</span>]</span></tt>.  На самом деле, это то, что мы видели в <a class="reference external" href="http://www.nltk.org/book/ch02.html#sec-lexical-resources">4</a> для Словаря произношения CMU, который хранит несколько произношений одного слова.</p>
+</div>
+<div class="section" id="defining-dictionaries">
+<h2>3.3 Определение словарей</h2>
+<p>Мы можем использовать тот же формат пар ключ-значение для создания словаря.  Есть несколько способов сделать это, и мы обычно используем первый:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos = {'colorless': 'ADJ', 'ideas': 'N', 'sleep': 'V', 'furiously': 'ADV'}
+&gt;&gt;&gt; pos = dict(colorless='ADJ', ideas='N', sleep='V', furiously='ADV')</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание, что ключи словаря должны быть неизменными типами, такими как строки и кортежи.
+Если мы попытаемся определить словарь, используя изменяемый ключ, мы получим <tt class="doctest"><span class="pre">TypeError</span></tt>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos = {['ideas', 'blogs', 'adventures']: 'N'}
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+TypeError: list objects are unhashable</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="default-dictionaries">
+<h2>3.4 Словари со значением по умолчанию</h2>
+<p>Если мы попытаемся обратиться к ключу, которого нет в словаре, мы получим ошибку.
+Тем не менее, часто бывает полезно, если словарь может автоматически создать запись для этого нового ключа и придать ему значение по умолчанию, например, ноль или пустой список.  По этой причине доступен особый вид словаря, который называется <tt class="doctest"><span class="pre">defaultdict</span></tt>.
+Для того, чтобы использовать его, мы должны указать параметр, который может быть использован для создания значения по умолчанию, например, <tt class="doctest"><span class="pre">int</span></tt>, <tt class="doctest"><span class="pre">float</span></tt>, <tt class="doctest"><span class="pre">str</span></tt> <tt class="doctest"><span class="pre">list</span></tt>, <tt class="doctest"><span class="pre">dict</span></tt>, <tt class="doctest"><span class="pre">tuple</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from collections import defaultdict
+&gt;&gt;&gt; frequency = defaultdict(int)
+&gt;&gt;&gt; frequency['colorless'] = 4
+&gt;&gt;&gt; frequency['ideas']
+0
+&gt;&gt;&gt; pos = defaultdict(list)
+&gt;&gt;&gt; pos['sleep'] = ['NOUN', 'VERB']
+&gt;&gt;&gt; pos['ideas']
+[]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Эти значения по умолчанию фактически функции, которые преобразуют другие объекты в указанный тип (например, <tt class="doctest"><span class="pre">int (<span class="pysrc-string">"2"</span>)</span></tt>, <tt class="doctest"><span class="pre">list(<span class="pysrc-string">"2"</span>)</span></tt>).
+Когда они вызываются без параметров - <tt class="doctest"><span class="pre">int()</span></tt>, <tt class="doctest"><span class="pre">list()</span></tt> - они возвращают <tt class="doctest"><span class="pre">0</span></tt> и <tt class="doctest"><span class="pre">[]</span></tt> соответственно.</p>
+</div>
+<p>Приведенные выше примеры указали, что значение по умолчанию для словарной статьи должно быть значением по умолчанию определенного типа данных.  Однако мы можем указать любое значение по умолчанию, какое нам нравится, просто предоставляя имя функции, которую можно вызвать без аргументов для создания требуемого значения.
+Вернемся к нашему примеру с частями речи и создадим словарь, в котором значение по умолчанию для любой записи <tt class="doctest"><span class="pre"><span class="pysrc-string">'N'</span></span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch05.html#default-noun"><span id="ref-default-noun"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.
+Когда мы обращаемся к несуществующей записи <a class="reference internal" href="http://www.nltk.org/book/ch05.html#non-existent"><span id="ref-non-existent"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, она автоматически добавляется в словарь <a class="reference internal" href="http://www.nltk.org/book/ch05.html#automatically-added"><span id="ref-automatically-added"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos = defaultdict(lambda: 'NOUN') 
+&gt;&gt;&gt; pos['colorless'] = 'ADJ'
+&gt;&gt;&gt; pos['blog'] 
+'NOUN'
+&gt;&gt;&gt; list(pos.items())
+[('blog', 'NOUN'), ('colorless', 'ADJ')] # [_automatically-added]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p>В приведенном выше примере используется <span class="emphasis">ламбда-выражения</span>, введенное в <a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-functions">4.4</a>.  Это ламбда-выражение не определяет никаких параметров, поэтому мы вызываем его с круглыми скобками без аргументов.
+Таким образом, определения <tt class="doctest"><span class="pre">f</span></tt> и <tt class="doctest"><span class="pre">g</span></tt> ниже эквивалентны:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; f = lambda: 'NOUN'
+&gt;&gt;&gt; f()
+'NOUN'
+&gt;&gt;&gt; def g():
+...     return 'NOUN'
+&gt;&gt;&gt; g()
+'NOUN'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<p>Давайте посмотрим, как словари со значениями по умолчанию могут быть использованы в более существенной задаче обработки языка.
+Многие задачи по обработке языка - включая разметку - с трудом обрабатывают гапаксы (уникальные слова) текста.  Они могут работать лучше с фиксированным словарем и гарантией того, что никакие новые слова не будут появляться.  Мы можем предварительно обработать текст, чтобы заменить низкочастотные слова особым "внесловарным" маркером <tt class="doctest"><span class="pre">UNK</span></tt> с помощью словаря со значением по умолчанию.  (Можете ли вы придумать, как сделать это, не читая дальше?)</p>
+<p>Нам нужно создать словарь со значением по умолчанию, который ставит в соответствие каждому слову его замену.
+Наиболее частым <span class="math">n</span> словам будут поставлены в соответствие они сами.
+Всему остальному будет поставлено в соответствие <tt class="doctest"><span class="pre">UNK</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> Алиса = nltk.corpus.gutenberg.words ( <span class="pysrc-string">'Кэрролл-alice.txt')</span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> Vocab = NLTK.FreqDist (Алис) <span class="pysrc-prompt">&gt;&gt;&gt;</span> V1000 = [слово (слово, _) <span class="pysrc-keyword">в</span> vocab.most_common (1000)] <span class="pysrc-prompt">&gt;&gt;&gt;</span> отображение = defaultdict <span class="pysrc-keyword">(лямбда:</span> <span class="pysrc-string">'УНК')</span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">для</span> V <span class="pysrc-keyword">в</span> V1000: <span class="pysrc-more">...</span> отображение [v] = V <span class="pysrc-more">...</span>
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> Alice2 = [отображение [v] <span class="pysrc-keyword">для</span> V <span class="pysrc-keyword">в</span> Алисе] <span class="pysrc-prompt">&gt;&gt;&gt;</span> alice2 [: 100] <span class="pysrc-output">[ 'УНК', 'Алиса', " '",' s ',' УНК ',' в ',' УНК ',' от ',' УНК ',' УНК ',' УНК <span class="pysrc-output">','</span></span> <span class="pysrc-output">УНК ',' Chapter ',' I ',' ',' УНК ',' The ',' Кролик ',' -. ', "УНК", "Алиса",</span> <span class="pysrc-output">"был", "начало", "к", "получить", "очень", "устал", "из", "сидит", "на",</span> <span class="pysrc-output">"ее", "сестра ',' на ',' в ',' УНК ',', ',' и ',' из ',' имея не ',' ничего <span class="pysrc-output">','</span></span> <span class="pysrc-output">к ',' делать ',': ',' один раз ', 'или', 'дважды', 'она', 'была', 'UNK', 'в', 'в',</span> <span class="pysrc-output">'книги', 'ее', 'сестра', 'был', 'УНК', ', ',' но ',' она ',' была ',' нет <span class="pysrc-output">','</span></span> <span class="pysrc-output">картинки ',' или ',' УНК ',' в ',' это ',', ', "'", 'и', "что", "есть", "тем",</span> <span class="pysrc-output">"использование", "из", "в", "книги", ",", "мысль", "Алиса", " '",' без</span> <span class="pysrc-output"><span class="pysrc-output">','</span> картинки ',' или ',' разговор ', "?"...]</span>
+<span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> Len (комплект (alice2)) <span class="pysrc-output">1001</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- note: |TRY|
+Repeat the above example for different vocabulary sizes and different texts.
+How small a vocabulary can you tolerate while still getting something useful
+from the text? -->
+</div>
+<div class="section" id="incrementally-updating-a-dictionary">
+<h2>3.5 Инкрементально Обновление словаря</h2>
+<p>Мы можем использовать словари для подсчета вхождений, подражая методу подсчета слов, показанному в <a class="reference external" href="http://www.nltk.org/book/ch01.html#fig-tally">fig-tally</a>.
+Мы начинаем с инициализации пустого <tt class="doctest"><span class="pre">defaultdict</span></tt>, затем обрабатываем каждую метку части речи в тексте.  Если метка не была замечен раньше, она будет иметь нулевой счет по умолчанию.  Каждый раз, когда мы сталкиваемся с меткой, мы увеличиваем ее счет, используя оператор <tt class="doctest"><span class="pre">+=</span></tt>.</p>
+<span class="target" id="code-dictionary"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from collections import defaultdict
+&gt;&gt;&gt; counts = defaultdict(int)
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; for (word, tag) in brown.tagged_words(categories='news', tagset='universal'):
+...     counts[tag] += 1
+...
+&gt;&gt;&gt; counts['NOUN']
+30640
+&gt;&gt;&gt; sorted(counts)
+['ADJ', 'PRT', 'ADV', 'X', 'CONJ', 'PRON', 'VERB', '.', 'NUM', 'NOUN', 'ADP', 'DET']
+
+&gt;&gt;&gt; from operator import itemgetter
+&gt;&gt;&gt; sorted(counts.items(), key=itemgetter(1), reverse=True)
+[('NOUN', 30640), ('VERB', 14399), ('ADP', 12355), ('.', 11928), ...]
+&gt;&gt;&gt; [t for t, c in sorted(counts.items(), key=itemgetter(1), reverse=True)]
+['NOUN', 'VERB', 'ADP', '.', 'DET', 'ADJ', 'ADV', 'CONJ', 'PRON', 'PRT', 'NUM', 'X']</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_dictionary.py" type="text/x-python"><span class="caption-label">Пример 3.3 (code_dictionary.py)</span></a>: <span class="caption-label">Листинг 3.3</span>: Пошаговое обновление словаря и сортировка по значению</p></td></tr>
+</table></div>
+<p>Листинг <a class="reference internal" href="http://www.nltk.org/book/ch05.html#code-dictionary">3.3</a> иллюстрирует важную идиому для сортировки словаря по значениям записей для отображения слов в порядке убывания частоты.  Первый параметр функции <tt class="doctest"><span class="pre">soreted()</span></tt> это элементы, которые необходимо сортировать, список кортежей, состоящих из метки части речи и частоты.
+Второй параметр указывает ключ сортировки с помощью функции <tt class="doctest"><span class="pre">itemgetter()</span></tt>.
+В общем, <tt class="doctest"><span class="pre">itemgetter(n)</span></tt> возвращает функцию, которая может быть вызвана на другом  объекте-последовательности для получения <span class="math">n</span>-го элемента, например:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pair = ('NP', 8336)
+&gt;&gt;&gt; pair[1]
+8336
+&gt;&gt;&gt; itemgetter(1)(pair)
+8336</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Последний параметр функции <tt class="doctest"><span class="pre">sorted()</span></tt> указывает, что элементы должны быть возвращены в обратном порядке, то есть в порядке уменьшения частоты.</p>
+<p>В начале <a class="reference internal" href="http://www.nltk.org/book/ch05.html#code-dictionary">3.3</a> есть еще одна полезная идиома программирования - там, где мы инициализируем <tt class="doctest"><span class="pre">defaultdict</span></tt>, а затем используем цикл <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt> для обновления его значений. Вот схематическая версия:</p>
+<div class="line-block">
+<div class="line">&gt;&gt;&gt; my_dictionary = defaultdict(function to create default value)</div>
+<div class="line">&gt;&gt;&gt; for item in sequence:</div>
+<div class="line">...      my_dictionary[item_key] is updated with information about item</div>
+</div>
+<p>Вот еще один пример этого шаблона, где мы индексируем слова по последним двум буквам:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; last_letters = defaultdict(list)
+&gt;&gt;&gt; words = nltk.corpus.words.words('en')
+&gt;&gt;&gt; for word in words:
+...     key = word[-2:]
+...     last_letters[key].append(word)
+...
+&gt;&gt;&gt; last_letters['ly']
+['abactinally', 'abandonedly', 'abasedly', 'abashedly', 'abashlessly', 'abbreviately',
+'abdominally', 'abhorrently', 'abidingly', 'abiogenetically', 'abiologically', ...]
+&gt;&gt;&gt; last_letters['zy']
+['blazy', 'bleezy', 'blowzy', 'boozy', 'breezy', 'bronzy', 'buzzy', 'Chazy', ...]
+</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В следующем примере используется тот же шаблон для создания словаря-анаграммы.
+(Вы можете поэкспериментировать с третьей строкой, чтобы получить представление о том, почему эта программа работает.)</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; anagrams = defaultdict(list)
+&gt;&gt;&gt; for word in words:
+...     key = ''.join(sorted(word))
+...     anagrams[key].append(word)
+...
+&gt;&gt;&gt; anagrams['aeilnrt']
+['entrail', 'latrine', 'ratline', 'reliant', 'retinal', 'trenail']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Поскольку накопление слов подобным образом такая распространенная задача, NLTK обеспечивает более удобный способ создания <tt class="doctest"><span class="pre">defaultdict(list)</span></tt>, в виде <tt class="doctest"><span class="pre">nltk.Index()</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; anagrams = nltk.Index((''.join(sorted(w)), w) for w in words)
+&gt;&gt;&gt; anagrams['aeilnrt']
+['entrail', 'latrine', 'ratline', 'reliant', 'retinal', 'trenail']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><tt class="doctest"><span class="pre">nltk.Index</span></tt> - это <tt class="doctest"><span class="pre">defaultdict(list)</span></tt> с дополнительной поддержкой инициализации.  Точно так же, <tt class="doctest"><span class="pre">nltk.FreqDist</span></tt> по существу <tt class="doctest"><span class="pre">defaultdict(int)</span></tt> с дополнительной поддержкой инициализации (наряду с методами сортировки и построения зависимостей).</p>
+</div>
+</div>
+<div class="section" id="complex-keys-and-values">
+<h2>3.6 Сложные ключи и значения</h2>
+<p>Мы можем использовать словари со значениями по умолчанию со сложными ключами и значениями.
+Давайте изучим диапазон возможных меток для слова, учитывая само слово и метку предыдущего слова.  Мы увидим, как эта информация может быть использована ЧР разметчиком.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos = defaultdict(lambda: defaultdict(int))
+&gt;&gt;&gt; brown_news_tagged = brown.tagged_words(categories='news', tagset='universal')
+&gt;&gt;&gt; for ((w1, t1), (w2, t2)) in nltk.bigrams(brown_news_tagged): 
+...     pos[(t1, w2)][t2] += 1 
+...
+&gt;&gt;&gt; pos[('DET', 'right')] 
+defaultdict(&lt;class 'int'&gt;, {'ADJ': 11, 'NOUN': 5})</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В этом примере используется словарь, в котором значение по умолчанию для записи представляет собой словарь (в котором значение по умолчанию для записи <tt class="doctest"><span class="pre">int()</span></tt>, то есть ноль).
+Обратите внимание на то, как мы перебирали биграммы помеченного корпуса, обработывая пару пар слово-метка для каждой итерации <a class="reference internal" href="http://www.nltk.org/book/ch05.html#processing-pairs"><span id="ref-processing-pairs"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.
+Каждый раз, проходя через цикл, мы обновляли запись нашего <tt class="doctest"><span class="pre">pos</span></tt> словаря для ключа <tt class="doctest"><span class="pre">(t1, w2)</span></tt>, метку и <em>следующее</em> за ней слово <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tag-word-update"><span id="ref-tag-word-update"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.
+Когда мы ищем элемент в <tt class="doctest"><span class="pre">pos</span></tt> мы должны указать сложный ключ <a class="reference internal" href="http://www.nltk.org/book/ch05.html#compound-key"><span id="ref-compound-key"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>, обратно мы получаем объект-словарь.
+ЧР разметчик может использовать такую информацию, чтобы решить, что слово <span class="example">справа</span>, когда ему предшествует определитель, должно быть помечено как <tt class="doctest"><span class="pre">ADJ</span></tt>.</p>
+</div>
+<div class="section" id="inverting-a-dictionary">
+<h2>3.7 Инвертирование словаря</h2>
+<p>Словари поддерживают эффективный поиск, пока вы хотите получить значение для ключа.  Если <tt class="doctest"><span class="pre">d</span></tt> является словарем, а <tt class="doctest"><span class="pre">k</span></tt> ключом, мы вводим <tt class="doctest"><span class="pre">d[k]</span></tt> и сразу же получаем значение.  Нахождение ключа для данного значения является более медленным и громоздким:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; counts = defaultdict(int)
+&gt;&gt;&gt; for word in nltk.corpus.gutenberg.words('milton-paradise.txt'):
+...     counts[word] += 1
+...
+&gt;&gt;&gt; [key for (key, value) in counts.items() if value == 32]
+['brought', 'Him', 'virtue', 'Against', 'There', 'thine', 'King', 'mortal',
+'every', 'been']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Если мы ожидаем выполнение этого вида "обратного поиска", часто полезно построить словарь, который ставит в соответствие значениям ключи.  Если значение ни одного ключа не повторяется, это легко сделать.  Мы просто получаем все пары ключ-значение из исходного словаря и создаем новый словарь пар значение-ключ. Следующий пример также иллюстрирует  еще один способ инициализации словаря <tt class="doctest"><span class="pre">pos</span></tt> c парами ключ-значение.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+ 	
+&gt;&gt;&gt; pos = {'colorless': 'ADJ', 'ideas': 'N', 'sleep': 'V', 'furiously': 'ADV'}
+&gt;&gt;&gt; pos2 = dict((value, key) for (key, value) in pos.items())
+&gt;&gt;&gt; pos2['N']
+'ideas'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте сначала сделаем наш словарь частей речи немного более реалистичным и добавим еще несколько слов в <tt class="doctest"><span class="pre">pos</span></tt> с помощью метода словаря <tt class="doctest"><span class="pre"><span class="pysrc-builtin">update</span>()</span></tt>, чтобы создать ситуацию, когда несколько ключей имеют одинаковое значение. Тогда метод, показанный только что для обратного поиска, больше работать не будет (почему нет?).  Вместо этого мы должны использовать <tt class="doctest"><span class="pre">append()</span></tt> для накопления слов для каждой части речи следующим образом :</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos.update({'cats': 'N', 'scratch': 'V', 'peacefully': 'ADV', 'old': 'ADJ'})
+&gt;&gt;&gt; pos2 = defaultdict(list)
+&gt;&gt;&gt; for key, value in pos.items():
+...     pos2[value].append(key)
+...
+&gt;&gt;&gt; pos2['ADV']
+['peacefully', 'furiously']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь мы перевернули словарь <tt class="doctest"><span class="pre">pos</span></tt> и можем искать любую часть речи и найти все слова, имеющие эту часть речи.  Мы можем сделать то же самое еще проще, используя поддержку NLTK для индексации следующим образом:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos2 = nltk.Index((value, key) for (key, value) in pos.items())
+&gt;&gt;&gt; pos2['ADV']
+['peacefully', 'furiously']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Краткое изложение методов словаря языка Python приведено в таблице <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-dict">3.2</a>.</p>
+<span class="target" id="tab-dict"></span><table border="1" class="docutils" id="tab-dict">
+<colgroup>
+<col width="37%">
+<col width="63%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Пример</th>
+<th class="head">Описание</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">d = {}</span></tt></td>
+<td>создать пустой словарь и присвоить его <tt class="doctest"><span class="pre">d</span></tt></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">d[key] = value</span></tt></td>
+<td>присвоить значение данному ключу словаря</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">d.keys()</span></tt></td>
+<td>список ключей словаря</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">list(d)</span></tt></td>
+<td>список ключей словаря</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">sorted(d)</span></tt></td>
+<td>ключи словаря, отсортированно</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">key in d</span></tt></td>
+<td>проверить, есть ли конкретный ключ в словаре</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">for key in d</span></tt></td>
+<td>перебирать ключи словаря</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">d.values()</span></tt></td>
+<td>список значений в словаре</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">dict([(k1,v1), (k2,v2), ...])</span></tt></td>
+<td>создать словарь из списка пар ключ-значение</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">d1.update(d2)</span></tt></td>
+<td>добавить все элементы из <tt class="doctest"><span class="pre">d2</span></tt> в <tt class="doctest"><span class="pre">d1</span></tt></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">defaultdict(int)</span></tt></td>
+<td>словарь, в котором значение по умолчанию равно нулю</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 3.2</span>: <p>Методы словаря Python: Краткое описание наиболее часто используемых методов и идиом, связанных со словарями.</p>
+</p>
+</td></table>
+</div>
+</div>
+<div class="section" id="automatic-tagging">
+<span id="sec-automatic-tagging"></span><h1>4 Автоматическая разметка</h1>
+<p>В оставшейся части этой главы мы рассмотрим различные способы автоматического добавления меток частей речи к тексту.  Мы увидим, что тег слова зависит от самого слова и его контекста внутри предложения.  По этой причине мы будем работать с данными на уровне (размеченных) предложений, а не слов.
+Начнем с загрузки данных, которые мы будем использовать.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; brown_tagged_sents = brown.tagged_sents(categories='news')
+&gt;&gt;&gt; brown_sents = brown.sents(categories='news')</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="section" id="the-default-tagger">
+<h2>4.1 Разметчик по умолчанию</h2>
+<p>Самый простой разметчик ставит одну и ту же метку для каждого токена.  Это может показаться довольно банальным шагом, но это создает важную основу для работы разметчика.  Для того, чтобы получить наилучший результат, мы помечаем каждое слово наиболее вероятной меткой.  Давайте узнаем, какой тег наиболее вероятен (теперь с использованием неупрощенного множества ярлыков):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tags = [tag for (word, tag) in brown.tagged_words(categories='news')]
+&gt;&gt;&gt; nltk.FreqDist(tags).max()
+'NN'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь мы можем создать разметчик, который отмечает все как <tt class="doctest"><span class="pre">NN</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; raw = 'I do not like green eggs and ham, I do not like them Sam I am!'
+&gt;&gt;&gt; tokens = word_tokenize(raw)
+&gt;&gt;&gt; default_tagger = nltk.DefaultTagger('NN')
+&gt;&gt;&gt; default_tagger.tag(tokens)
+[('I', 'NN'), ('do', 'NN'), ('not', 'NN'), ('like', 'NN'), ('green', 'NN'),
+('eggs', 'NN'), ('and', 'NN'), ('ham', 'NN'), (',', 'NN'), ('I', 'NN'),
+('do', 'NN'), ('not', 'NN'), ('like', 'NN'), ('them', 'NN'), ('Sam', 'NN'),
+('I', 'NN'), ('am', 'NN'), ('!', 'NN')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Неудивительно, что этот метод показывает весьма слабые результаты.
+На типичном корпусе он отметит правильно только около одной восьмой токенов, как мы видим ниже:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; default_tagger.evaluate(brown_tagged_sents)
+0.13089484257215028</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Разметчики по умолчанию присваивают свою метку каждому слову, даже словам, которые никогда не встречались раньше.  Как и есть, на самом деле, если мы обработаем несколько тысяч слов английского текста, большинство новых слов будут существительными.
+Как мы увидим, это означает, что по разметчики по умолчанию могут помочь улучшить надежность системы обработки языка.  Мы вернемся к ним в ближайшее время.</p>
+</div>
+<div class="section" id="the-regular-expression-tagger">
+<h2>4.2 Разметчики, использующие регулярные выражения</h2>
+<p>Разметчики, использующие регулярные выражения, присваивают метки токенам на основе сопоставления с шаблоном.  Например, мы могли бы предположить, что любое слово, заканчивающееся на <span class="example">ed</span> является причастием прошедшего времени глагола, а любое слово, заканчивающееся на <span class="example">'s</span> является притяжательным существительным.  Мы можем выразить это в виде списка регулярных выражений:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; patterns = [
+...     (r'.*ing$', 'VBG'),               # gerunds
+...     (r'.*ed$', 'VBD'),                # simple past
+...     (r'.*es$', 'VBZ'),                # 3rd singular present
+...     (r'.*ould$', 'MD'),               # modals
+...     (r'.*\'s$', 'NN$'),               # possessive nouns
+...     (r'.*s$', 'NNS'),                 # plural nouns
+...     (r'^-?[0-9]+(.[0-9]+)?$', 'CD'),  # cardinal numbers
+...     (r'.*', 'NN')                     # nouns (default)
+... ]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание, что эти выражения обрабатываются по порядку, и первый, который соответствует, применяется.
+Теперь мы можем создать разметчик и использовать его, чтобы разметить предложение.  Теперь он прав примерно пятую часть времени.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; regexp_tagger = nltk.RegexpTagger(patterns)
+&gt;&gt;&gt; regexp_tagger.tag(brown_sents[3])
+[('``', 'NN'), ('Only', 'NN'), ('a', 'NN'), ('relative', 'NN'), ('handful', 'NN'),
+('of', 'NN'), ('such', 'NN'), ('reports', 'NNS'), ('was', 'NNS'), ('received', 'VBD'),
+("''", 'NN'), (',', 'NN'), ('the', 'NN'), ('jury', 'NN'), ('said', 'NN'), (',', 'NN'),
+('``', 'NN'), ('considering', 'VBG'), ('the', 'NN'), ('widespread', 'NN'), ...]
+&gt;&gt;&gt; regexp_tagger.evaluate(brown_tagged_sents)
+0.20326391789486245</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Окончательное регулярное выражение <tt class="doctest"><span class="pre">«.*»</span></tt> является всеохватывающим и помечает все как существительное.
+Это эквивалентно разметчику по умолчанию (только гораздо менее эффективно).
+Вместо того, чтобы повторно указывать это как часть разметчика, использующего  регулярные выражения, есть ли способ совместить разметчика по умолчанию с этим разметчиком?  Мы увидим, как сделать это в ближайшее время.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Посмотрите, можете ли вы придумать шаблоны, чтобы улучшить производительность выше приведенного разметчика регулярных выражений.  (Обратите внимание, что <a class="reference external" href="http://www.nltk.org/book/ch06.html#sec-supervised-classification">1</a> описывает способ частично автоматизировать такую работу).</p>
+</div>
+</div>
+<div class="section" id="the-lookup-tagger">
+<h2>4.3 Разметчик, использующий поисковую таблицу</h2>
+<p>Много высокочастотных слов не имеют метку <tt class="doctest"><span class="pre">NN</span></tt>.
+Давайте найдем сотню наиболее часто встречающихся слов и сохраним их наиболее вероятную метку.
+Затем мы сможем использовать эту информацию в качестве модели для "поискового разметчика" (<tt class="doctest"><span class="pre">UnigramTagger</span></tt> входящего в NLTK):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fd = nltk.FreqDist(brown.words(categories='news'))
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(brown.tagged_words(categories='news'))
+&gt;&gt;&gt; most_freq_words = fd.most_common(100)
+&gt;&gt;&gt; likely_tags = dict((word, cfd[word].max()) for (word, _) in most_freq_words)
+&gt;&gt;&gt; baseline_tagger = nltk.UnigramTagger(model=likely_tags)
+&gt;&gt;&gt; baseline_tagger.evaluate(brown_tagged_sents)
+0.45578495136941344</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>К этому моменту нас уже не должно удивлять, что простое знание меток для 100 самых частых слов позволяет пометить большую часть токенов правильно (почти половину, на самом деле).
+Давайте посмотрим, что он делает на некотором не помеченном тексте:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent = brown.sents(categories='news')[3]
+&gt;&gt;&gt; baseline_tagger.tag(sent)
+[('``', '``'), ('Only', None), ('a', 'AT'), ('relative', None),
+('handful', None), ('of', 'IN'), ('such', None), ('reports', None),
+('was', 'BEDZ'), ('received', None), ("''", "''"), (',', ','),
+('the', 'AT'), ('jury', None), ('said', 'VBD'), (',', ','),
+('``', '``'), ('considering', None), ('the', 'AT'), ('widespread', None),
+('interest', None), ('in', 'IN'), ('the', 'AT'), ('election', None),
+(',', ','), ('the', 'AT'), ('number', None), ('of', 'IN'),
+('voters', None), ('and', 'CC'), ('the', 'AT'), ('size', None),
+('of', 'IN'), ('this', 'DT'), ('city', None), ("''", "''"), ('.', '.')]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Многим словам была присвоена метка <tt class="doctest"><span class="pre">None</span></tt>, потому что они не были в числе 100 самых частых слов.
+В этих случаях мы хотели бы присвоить метку по умолчанию <tt class="doctest"><span class="pre">NN</span></tt>. Другими словами, мы хотим сначала использовать таблицу поиска, а если это не позволяет назначить метку, затем использовать разметчик по умолчанию, процесс, известный как <a name="backoff_index_term"></a><span class="termdef">"отвал"</span> (<a class="reference internal" href="http://www.nltk.org/book/ch05.html#sec-n-gram-tagging">5</a>).
+Мы делаем это, указывая один разметчик в качестве параметра другого, как показано ниже.  Теперь поисковый разметчик будет хранить только пары слово-метка для слов отличных от существительных, и всякий раз, когда он не может присвоить метку слову, он будет вызывать разметчик по умолчанию.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; baseline_tagger = nltk.UnigramTagger(model=likely_tags,
+...                                      backoff=nltk.DefaultTagger('NN'))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Давайте соберем все это вместе и напишем программу для создания и оценки поисковых разметчиков для некоторого диапозона размеров в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#code-baseline-tagger">4.1</a>.</p>
+<span class="target" id="code-baseline-tagger"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def performance(cfd, wordlist):
+    lt = dict((word, cfd[word].max()) for word in wordlist)
+    baseline_tagger = nltk.UnigramTagger(model=lt, backoff=nltk.DefaultTagger('NN'))
+    return baseline_tagger.evaluate(brown.tagged_sents(categories='news'))
+
+def display():
+    import pylab
+    word_freqs = nltk.FreqDist(brown.words(categories='news')).most_common()
+    words_by_freq = [w for (w, _) in word_freqs]
+    cfd = nltk.ConditionalFreqDist(brown.tagged_words(categories='news'))
+    sizes = 2 ** pylab.arange(15)
+    perfs = [performance(cfd, words_by_freq[:size]) for size in sizes]
+    pylab.plot(sizes, perfs, '-bo')
+    pylab.title('Lookup Tagger Performance with Varying Model Size')
+    pylab.xlabel('Model Size')
+    pylab.ylabel('Performance')
+    pylab.show()</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; display()                                   </pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_baseline_tagger.py" type="text/x-python"><span class="caption-label">Пример 4.1 (code_baseline_tagger.py)</span></a>: <span class="caption-label">Листинг 4.1:</span> Прозводительность поискового разметчика с переменным размером модели</p></td></tr>
+</table></div>
+<span class="target" id="fig-tag-lookup"></span><div class="figure" id="fig-tag-lookup">
+<img alt="../images/tag-lookup.png" src="http://www.nltk.org/images/tag-lookup.png" style="width:490.40000000000003px;height:370.40000000000003px">
+<p class="caption"><span class="caption-label">Рисунок 4.2:</span> Поиск Таггер</p>
+</div>
+<p>Заметим, что производительность первоначально быстро увеличивается по мере роста размера модели, в конечном счете достигая плато, когда значительное увеличение размера модели дает небольшое улучшение результатов.  (В этом примере был использован пакет <tt class="doctest"><span class="pre">pylab</span></tt>, который обсуждался в <a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-libraries">4.8</a>.)</p>
+</div>
+<div class="section" id="evaluation">
+<h2>4.4 Оценка</h2>
+<p>В приведенных выше примерах, вы заметили акцент на точности оценки.  На самом деле, оценка эффективности таких инструментов является центральной темой в НЛП.  Вспомним последовательную схему обработки в <a class="reference external" href="http://www.nltk.org/book/ch01.html#fig-sds">fig-sds</a>; любые ошибки в выходе одного модуля значительно умножаются в последующих модулях.</p>
+<p>Мы оцениваем производительность разметчика по отношению к меткам, которые бы назначил человек-эксперт.  Так как мы не всегда имеем доступ к эксперту и беспристрастному человеческому суду, мы вместо этого сравниваем результаты разметчика с <a name="gold_standard_index_term"></a><span class="termdef">золотым стандартом</span> тестовых данных. Это корпус, который был вручную аннотирован и который принят в качестве стандарта, по которому оцениваются догадки автоматической системы. Разметчик рассматривается как корректный, если метка, которую он предлагает для данного слова, является такой же, как метка золотого стандарта.</p>
+<p>Конечно, люди, которые разработали и провели первоначальную аннотацию золотого стандарта, были всего лишь людьми. Дальнейший анализ может показать ошибки в золотом стандарте или может в конечном итоге привести к пересмотру набора ярлыков и более разработанным руководящим принципам.
+Тем не менее, золотой стандарт по определению "правильный", когда дело касается оценки автоматического разметчика.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Разработка аннотированного корпуса является важным мероприятием.
+Помимо данных, она генерирует сложные инструменты, документацию и практики, обеспечивающие высококачественную аннотацию.  Наборы ярлыков и другие схемы кодирования неизбежно зависят от теоретической позиции, которая разделяется не всеми, однако создатели корпусов часто прикладывают большие усилия, чтобы сделать свою работу настолько теоретически нейтральной, насколько это возможно для того, чтобы максимизировать полезность своей работы.  Мы будем обсудим эти проблемы создания в корпус <a class="reference external" href="http://www.nltk.org/book/ch11.html#chap-data">11.</a>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="n-gram-tagging">
+<span id="sec-n-gram-tagging"></span><h1>5 N-грамм разметка</h1>
+<div class="section" id="unigram-tagging">
+<h2>5.1 Юниграмм разметка</h2>
+<p>Юниграмм разметчики основаны на простом статистическом алгоритме: каждому токену присваивается метка, которая наиболее вероятна для этого конкретного токена. Например, он присвоит метку <tt class="doctest"><span class="pre">JJ</span></tt> любому вхождению слова <span class="example">frequent</span>, так как <span class="example">frequent</span> используется в качестве прилагательного <span class="example">(например, a frequent word)</span> чаще, чем оно используется в качестве глагола (например, <span class="example">I frequent this cafe)</span>.
+Юниграмм разметчик ведет себя так же, как поисковый разметчик (<a class="reference internal" href="http://www.nltk.org/book/ch05.html#sec-automatic-tagging">4</a>) за исключением того, что есть более удобный метод для его настройки, который называется <a name="training_index_term"></a><span class="termdef">обучением</span>.  В следующем примере кода мы обучаем Юниграмм разметчик, используем его для разметки предложения а затем оцениваем его:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; brown_tagged_sents = brown.tagged_sents(categories='news')
+&gt;&gt;&gt; brown_sents = brown.sents(categories='news')
+&gt;&gt;&gt; unigram_tagger = nltk.UnigramTagger(brown_tagged_sents)
+&gt;&gt;&gt; unigram_tagger.tag(brown_sents[2007])
+[('Various', 'JJ'), ('of', 'IN'), ('the', 'AT'), ('apartments', 'NNS'),
+('are', 'BER'), ('of', 'IN'), ('the', 'AT'), ('terrace', 'NN'), ('type', 'NN'),
+(',', ','), ('being', 'BEG'), ('on', 'IN'), ('the', 'AT'), ('ground', 'NN'),
+('floor', 'NN'), ('so', 'QL'), ('that', 'CS'), ('entrance', 'NN'), ('is', 'BEZ'),
+('direct', 'JJ'), ('.', '.')]
+&gt;&gt;&gt; unigram_tagger.evaluate(brown_tagged_sents)
+0.9349006503968017</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы <a name="train_index_term"></a><span class="termdef">обучаем</span> <tt class="doctest"><span class="pre">UnigramTagger</span></tt> путем указания данных с помеченными предложениями в качестве параметра при инициализации  разметчика.  Процесс обучения включает в себя изучение метки каждого слова и сохранение наиболее вероятного тега для каждого слова из словаря, который хранится внутри разметчика.</p>
+</div>
+<div class="section" id="separating-the-training-and-testing-data">
+<h2>5.2 Разделение тренировочных и тестовых данных</h2>
+<p>Теперь, когда мы обучаем разметчик на некоторых данных, мы должны быть осторожны, чтобы не проверить его на тех же данных, как мы это делали в приведенном выше примере.  Разметчик, который просто запомнил свои обучающие данные и не предпринял никаких попыток построить общую модель получит высший балл, но при этом будет бесполезен для разметки нового текста.  Вместо этого мы должны разделить данные, для обучения - 90%, а для тестирования - оставшиеся 10%:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; size = int(len(brown_tagged_sents) * 0.9)
+&gt;&gt;&gt; size
+4160
+&gt;&gt;&gt; train_sents = brown_tagged_sents[:size]
+&gt;&gt;&gt; test_sents = brown_tagged_sents[size:]
+&gt;&gt;&gt; unigram_tagger = nltk.UnigramTagger(train_sents)
+&gt;&gt;&gt; unigram_tagger.evaluate(test_sents)
+0.811721...</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Хотя оценка хуже, теперь мы имеем лучшее представление о полезности этого разметчика, т.е. о его результатах на тексте, который он ранее не видел.</p>
+</div>
+<div class="section" id="general-n-gram-tagging">
+<h2>5.3 Обобщенная N-грамм разметка</h2>
+<p>Когда мы выполняем задачу обработки языка, основанной на юниграммах, мы используем один элемент контекста.  В случае разметки, мы рассматриваем только текущий токен в отрыве от любого более широкого контекста.  С такой моделью лучшее, что мы можем сделать , пометить каждое слово его <em>априорной</em> наиболее вероятной меткой.
+Это означает, что мы бы отметили такое слово, как <span class="example">wind</span>, одной и той же меткой независимо от того, появится оно в контексте <span class="example">the wind</span> или <span class="example">to wind</span>.</p>
+<p>Подобный <a name="n_gram_tagger_index_term"></a><span class="termdef">n-грамм разметчик</span> является обобщением юниграмм разметчика, чей контекст включает текущее слово вместе с метками части речи <em>n-1</em> предшествующих токенов, как показано на <a class="reference internal" href="http://www.nltk.org/book/ch05.html#fig-tag-context">5.1</a>. Метка, которая будет выбрана, <em>t</em><sub>n</sub>, обведена, а контекст затенен серым цветом. В примере n-грамм разметчика, показанного на <a class="reference internal" href="http://www.nltk.org/book/ch05.html#fig-tag-context">5.1</a>, мы имеем <em>n</em>=3; то есть мы учитываем метки двух предыдущих слов в дополнение к текущему слову.  Подобный n-грамм разметчик выбирает метку, которая наиболее вероятна в данном контексте.</p>
+<span class="target" id="fig-tag-context"></span><div class="figure" id="fig-tag-context">
+<img alt="../images/tag-context.png" src="http://www.nltk.org/images/tag-context.png" style="width:542.4px;height:162.4px">
+<p class="caption"><span class="caption-label">Рисунок 5.1:</span> Контекст разметчика</p>
+</div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">1-грамм разметчик это еще один термин для юниграмм разметчика: то есть, контекстом для данного разметчика является только текст самого токена.
+2-грамм разметчики также называются <em>биграмм разметчики</em>, а 3-грамм разметчики называются <em>триграмм разметчики</em>.</p>
+</div>
+<p>Класс <tt class="doctest"><span class="pre">NgramTagger</span></tt> использует помеченный тренировочный корпус, чтобы определить, какая метка части речи наиболее вероятна для каждого контекста.  Здесь мы видим частный случай n-грамм разметчика, а именно биграмм разметчик.
+Сначала мы тренируем его, а затем используем, чтобы пометить не размеченные предложения:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; bigram_tagger = nltk.BigramTagger(train_sents)
+&gt;&gt;&gt; bigram_tagger.tag(brown_sents[2007])
+[('Various', 'JJ'), ('of', 'IN'), ('the', 'AT'), ('apartments', 'NNS'),
+('are', 'BER'), ('of', 'IN'), ('the', 'AT'), ('terrace', 'NN'),
+('type', 'NN'), (',', ','), ('being', 'BEG'), ('on', 'IN'), ('the', 'AT'),
+('ground', 'NN'), ('floor', 'NN'), ('so', 'CS'), ('that', 'CS'),
+('entrance', 'NN'), ('is', 'BEZ'), ('direct', 'JJ'), ('.', '.')]
+&gt;&gt;&gt; unseen_sent = brown_sents[4203]
+&gt;&gt;&gt; bigram_tagger.tag(unseen_sent)
+[('The', 'AT'), ('population', 'NN'), ('of', 'IN'), ('the', 'AT'), ('Congo', 'NP'),
+('is', 'BEZ'), ('13.5', None), ('million', None), (',', None), ('divided', None),
+('into', None), ('at', None), ('least', None), ('seven', None), ('major', None),
+('``', None), ('culture', None), ('clusters', None), ("''", None), ('and', None),
+('innumerable', None), ('tribes', None), ('speaking', None), ('400', None),
+('separate', None), ('dialects', None), ('.', None)]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание на то, что биграмм разметчику удается пометить каждое слово в предложении, которое он видел во время тренировки, но он плохо работает предложении, которое он ранее не видел.  Как только он встречает новое слово (то есть, <span class="example">13.5</span>), он не может присвоить метку.  Он не может пометить следующее слово (т.е. <span class="example">million)</span>, даже если оно было во время тренировки, просто потому, что никогда не видел его во время тренировки с меткой <tt class="doctest"><span class="pre">None</span></tt> на предыдущем слове.  Следовательно, разметчику не удается пометить остальную часть предложения.  Его общая оценка точности очень низкая:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; bigram_tagger.evaluate(test_sents)
+0.102063...</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- expand the following discussion if possible: -->
+<p>По мере того, как <em>n</em> становится больше, специфика контекстов увеличивается, равно как и вероятность того, что данные, которые мы хотим пометить содержит контексты, которые не присутствовали в тренировочных данных. Это известно как проблема <em>разреженных данных</em>, и она является весьма распространенной в NLP. Как следствие, существует компромисс между точностью и охватом наших результатов (и это связано с компромиссом <a name="precision_recall_trade_off_index_term"></a><span class="termdef">точность/возврат</span> в возвращении информации).</p>
+<div class="caution">
+<p class="first admonition-title">Внимание!</p>
+<p class="last">N-грамм разметчики не должны учитывать контекст, который пересекает границу предложения.  Поэтому NLTK разметчики разработаны для работы со списками предложений, где каждое предложение представляет собой список слов.  В начале предложения, <em>t</em><sub>n-1</sub> и предыдущие метки получают значение <tt class="doctest"><span class="pre">None</span></tt>.</p>
+</div>
+</div>
+<div class="section" id="combining-taggers">
+<h2>5.4 Объединение разметчиков</h2>
+<p>Одним из способов решения компромисса между точностью и охватом заключается в использовании более точных алгоритмов, когда мы можем, но возвращаться обратно к алгоритмам с более широким охватом, когда это необходимо. Например, мы могли бы объединить результаты биграмм-, юниграмм- и разметчика по умолчанию следующим образом:</p>
+<ol class="arabic simple">
+<li>Попробовать пометить токен с помощью биграмм-разметчика.</li>
+<li>Если биграмм-разметчик не может найти метку для токена, попробовать юниграм-разметчик.</li>
+<li>Если юниграмм-разметчик также не может найти метку, использовать разметчик по умолчанию.</li>
+</ol>
+<p>Большинство разметчиков NLTK позволяют указать бэкофф-разметчик.
+Бэкофф-разметчик может сам иметь бэкофф-разметчик:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; t0 = nltk.DefaultTagger('NN')
+&gt;&gt;&gt; t1 = nltk.UnigramTagger(train_sents, backoff=t0)
+&gt;&gt;&gt; t2 = nltk.BigramTagger(train_sents, backoff=t1)
+&gt;&gt;&gt; t2.evaluate(test_sents)
+0.844513...</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>: 
+Расширьте приведенный выше пример, определив <tt class="doctest"><span class="pre">TrigramTagger</span></tt> под названием <tt class="doctest"><span class="pre">t3</span></tt>, который в случае неудачи вызывает <tt class="doctest"><span class="pre">t2</span></tt>.</p>
+</div>
+<p>Обратите внимание, что мы указываем бэкофф-разметчик, когда разметчик инициализируется, так что обучение может воспользоваться бэкофф-разметчиком.
+Так, если биграмм-разметчик присваивает ту же метку, что и юниграмм-разметчик в качестве бэкофф-разметчика в определенном контексте, тогда биграмм-разметчик отбрасывает данный тренировочный пример.
+Это позволяет сделать модель биграмм-разметчика как можно более компактной.  Далее мы можем указать, что разметчик должен увидеть более одного экземпляра контекста для того, чтобы сохранить его, например , <tt class="doctest"><span class="pre">nltk.BigramTagger (sents, cutoff=2, backoff= t1)</span></tt> будет отбрасывать контексты, которые встретились только один или два раза.</p>
+</div>
+<div class="section" id="tagging-unknown-words">
+<h2>5.5 Разметка неизвестных слов</h2>
+<p>Наш подход к разметке неизвестных слов все равно использует бэкофф-разметчик для разметчика регулярных выражений или разметчик по умолчанию.  Они разметчики не могут использовать контекст.  Так, если бы наш разметчик встретил слово <span class="example">blog</span>, которое он не видел во время тренировки, он бы присвоил ему ту же метку независимо от того, появилось ли это слово в контексте <span class="example">the blog</span> или <span class="example">to blog</span>.
+Что еще мы можем сделать с этими неизвестными словами, или <a name="out_of_vocabulary_index_term"></a> <span class="termdef">внесловарными</span> элементами?</p>
+<p>Полезный метод помечать неизвестные слова в зависимости от контекста заключается в том, чтобы ограничить словарь разметчика <span class="math">n</span> наиболее частыми словами, и заменить любое другое слово особым словом <span class="example">UNK</span>, используя метод, показанный в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#sec-dictionaries">3</a>.
+Во время обучения, юниграмм-разметчик, вероятно, выучит, что <span class="example">UNK</span> обычно существительное.
+Однако n-грамм-разметчики обнаружат контексты, в которых оно имеет какую-либо другую метку.
+Например, если предыдущим словом является to (помеченное как <tt class="doctest"><span class="pre">TO</span></tt>), тогда <span class="example">UNK</span>, вероятно, будет помечено как глагол.</p>
+<!-- XXX TODO: classification of unknown words based on string patterns -->
+</div>
+<div class="section" id="storing-taggers">
+<h2>5.6 Сохранение разметчиков</h2>
+<p>Обучение разметчика на большом корпусе может занять значительное время.  Вместо того, чтобы обучать разметчик каждый раз, когда он нам нужен, удобно сохранить обученный разметчик в файл для последующего повторного использования.
+Давайте сохраним наш разметчик <tt class="doctest"><span class="pre">t2</span></tt> в файл <tt class="doctest"><span class="pre">t2.pkl</span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from pickle import dump
+&gt;&gt;&gt; output = open('t2.pkl', 'wb')
+&gt;&gt;&gt; dump(t2, output, -1)
+&gt;&gt;&gt; output.close()</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь, в отдельном процессе Python, мы можем загрузить наш сохраненный разметчик.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from pickle import load
+&gt;&gt;&gt; input = open('t2.pkl', 'rb')
+&gt;&gt;&gt; tagger = load(input)
+&gt;&gt;&gt; input.close()</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь давайте проверим, что он может быть использован для разметки.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text = """The board's action shows what free enterprise
+...     is up against in our complex maze of regulatory laws ."""
+&gt;&gt;&gt; tokens = text.split()
+&gt;&gt;&gt; tagger.tag(tokens)
+[('The', 'AT'), ("board's", 'NN$'), ('action', 'NN'), ('shows', 'NNS'),
+('what', 'WDT'), ('free', 'JJ'), ('enterprise', 'NN'), ('is', 'BEZ'),
+('up', 'RP'), ('against', 'IN'), ('in', 'IN'), ('our', 'PP$'), ('complex', 'JJ'),
+('maze', 'NN'), ('of', 'IN'), ('regulatory', 'NN'), ('laws', 'NNS'), ('.', '.')]
+</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="performance-limitations">
+<h2>5.7 Ограничения производительности</h2>
+<p>Каков верхний предел производительности n-грамм разметчика?
+Рассмотрим случай триграмм-разметчика.  Сколько случаев неоднозначности частей речи он встретил?  Мы можем определить ответ на этот вопрос эмпирически:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; cfd = nltk.ConditionalFreqDist(
+...            ((x[1], y[1], z[0]), z[1])
+...            for sent in brown_tagged_sents
+...            for x, y, z in nltk.trigrams(sent))
+&gt;&gt;&gt; ambiguous_contexts = [c for c in cfd.conditions() if len(cfd[c]) &gt; 1]
+&gt;&gt;&gt; sum(cfd[c].N() for c in ambiguous_contexts) / cfd.N()
+0.049297702068029296</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Таким образом, один из двадцати триграммов неоднозначен [ПРИМЕРЫ].  Для заданного текущего слова и предыдущих двух меток в 5% случаев есть больше чем одна метка, которая может быть правомерно назначена для текущего слова в соответствии с тренировочными данными.  Предположив, что мы всегда выбираем наиболее вероятную метку в таких неоднозначных контекстах, мы можем вывести нижнюю границу  производительности триграмм-разметчика.</p>
+<!-- be more specific about this bound? -->
+<p>Другой способ исследовать производительность разметчика - изучение его ошибок.  Некоторые метки может быть сложнее назначить, чем другие, с ними можно было бы поступить особым образом путем предварительной или последующей обработки данных.  Удобный способ представить ошибки в метках - <a name="confusion_matrix_index_term"></a><span class="termdef">матрица ошибок</span>.  Она изображает ожидавшиеся метки (золотой стандарт) против фактических меток, сгенерированных разметчиком:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; test_tags = [tag for sent in brown.sents(categories='editorial')
+...                  for (word, tag) in t2.tag(sent)]
+&gt;&gt;&gt; gold_tags = [tag for (word, tag) in brown.tagged_words(categories='editorial')]
+&gt;&gt;&gt; print(nltk.ConfusionMatrix(gold_tags, test_tags))           </pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- XXX EXAMPLE OF CONFUSION MATRIX -->
+<p>На основе такого анализа мы можем принять решение изменить множество меток.  Возможно, различие между метками, которые трудно сделать, можно опустить, так как это не важно в контексте какой-то более крупной задачи обработки.</p>
+<p>Другой способ анализа границ производительности разметчика идет от не 100% согласия между людьми-аннотаторами.  [БОЛЬШЕ]</p>
+<p>В целом, обратите внимание, что процесс разметки сворачивает различия: например, лексическая идентичность обычно теряется, когда все личные местоимения помечаются <tt class="doctest"><span class="pre">PRP</span></tt>.  В то же время, процесс разметки вводит новые различия и устраняет неоднозначности: например, <span class="example">deal</span> помеченное как <tt class="doctest"><span class="pre">VB</span></tt> или <tt class="doctest"><span class="pre">NN</span></tt>. Это свойство сворачивания определенных различий и введения новых различий является важной особенностью разметки, которая облегчает классификацию и прогнозирование.
+Когда мы вводим более тонкие различия в набор ярлыков, n-грамм разметчик получает более подробную информацию о левом контексте, когда он решает, какую метку присвоить конкретному слову.
+Однако разметчик в то же время должен проделать больше работы, чтобы классифицировать текущий токен просто потому, что становится больше меток, из которых необходимо сделать выбор.
+С другой стороны, с меньшим количеством различий (как с упрощенным набором меток), разметчик имеет меньше информации о контексте и меньший диапазон выбора при классификации текущего токена.</p>
+<p>Мы видели, что неоднозначность в обучающих данных приводит к верхнему пределу производительности разметчика.  Иногда больше контекста разрешит неоднозначность.  В других случаях, однако, как отмечает <a class="reference external" href="http://www.nltk.org/book/bibliography.html#abney1996pst" id="id1">(Church, Young, &amp; Bloothooft, 1996)</a>, неоднозначность может быть разрешена только со ссылкой на синтаксис или знание мира.  Несмотря на эти недостатки, разметка частей речи играет центральную роль в развити статистических подходов к обработке естественного языка.  В начале 1990-х годов удивительная точность статистических разметчиков была яркой демонстрацией того, что можно было решить одну небольшую часть проблемы понимания языка, а именно неоднозначность частей речи без ссылки на более глубокие источников лингвистических знаний.  Может ли эта идея быть продвинута еще дальше?  В <a class="reference external" href="http://www.nltk.org/book/ch07.html#chap-chunk">7.</a> мы увидим, что может.</p>
+</div>
+</div>
+<div class="section" id="transformation-based-tagging">
+<span id="sec-transformation-based-tagging"></span><h1>6 Разметка, основанная на трансформации</h1>
+<p>Потенциальная проблема с n-грамм разметчиками является размер их n-грамм таблицы (или языковой модели).  Если разметка должна использоваться в различных языковых технологиях, развернутых на мобильных вычислительных устройствах, важно найти баланс между размером модели и результативностью разметчика.  N-грамм разметчик с "отвалом" может хранить триграмм- и биграмм-таблицы, большие разреженные массивы, которые могут иметь сотни миллионов записей.</p>
+<p>Второй вопрос касается контекста.  Единственная информация из предыдущего контекста, которую n-грамм разметчик учитывает, - это метки, хотя сами слова могли бы быть полезным источником информации.  Это просто непрактично для n-грамм моделей иметь условием индивидуальные слова в определенном контексте.  В этом разделе мы рассмотрим Brill разметку, индуктивный метод разметки, который показывает очень хорошие результаты с использованием моделей, размер которых намного меньше размера n-грамм разметчиков.</p>
+<p>Brill-разметка является своего рода <em>основанным на трансформации обучением</em>, названным в честь его изобретателя.  Общая идея очень проста: угадать метку каждого слова, затем вернуться и исправить ошибки.  Таким образом, Brill-разметчик последовательно превращает плохую разметку текста в хорошую.  Как и в случае с n-грамм разметкой, это <em>контролируемый метод обучения</em>, так как нам нужны аннотированные тренировочные данные, чтобы выяснить, является ли догадка разметчика ошибкой или нет.  Однако в отличие от n-грамм разметки, она не учитывает наблюдения, а составляет список трансформационных правил коррекции.</p>
+<p>Процесс Brill-разметки обычно объясняется по аналогии с живописью.  Предположим, что мы рисовали дерево, со всеми его деталями сучьев, веток, сучьев и листьев на однородном фоне небесно-голубого цвета.  Вместо того, чтобы сначала раскрасить дерево, а потом пытаться нарисовать синий в промежутках, проще закрасить весь холст синим, а затем "исправить" участок дерева закрасив синий фон.  Таким же образом мы могли бы закрасить ствол равномерным коричневым цветом, прежде чем вернуться к закрашиванию дальнейших деталей с помощью более тонких кистей.  Brill-разметка использует ту же идею: начать широкими мазками, затем подправить детали с помощью последовательности более мелких изменений.  Давайте посмотрим на пример, содержащий следующее предложение:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(1)</td><td width="15"></td><td>The President said he will ask Congress to increase grants to states
+for vocational rehabilitation</td></tr></table></p>
+<p>Мы рассмотрим работу двух правил: 
+(а) Заменить <tt class="doctest"><span class="pre">NN</span></tt> на <tt class="doctest"><span class="pre">VB</span></tt>, когда предыдущее слово <tt class="doctest"><span class="pre">TO</span></tt>; 
+(б) Заменить <tt class="doctest"><span class="pre">TO</span></tt> на <tt class="doctest"><span class="pre">IN</span></tt>, когда следующая метка <tt class="doctest"><span class="pre">NNS</span></tt>. 
+<a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-brill-tagging">6.1</a> иллюстрирует этот процесс, сначала размечая с помощью юниграмм-разметчика, а затем применяя правила, чтобы исправить ошибки.</p>
+<span class="target" id="tab-brill-tagging"></span><table border="1" class="docutils" id="tab-brill-tagging">
+<colgroup>
+<col width="17%">
+<col width="3%">
+<col width="13%">
+<col width="9%">
+<col width="6%">
+<col width="9%">
+<col width="5%">
+<col width="16%">
+<col width="22%">
+</colgroup>
+<tbody valign="top">
+<tr><td><strong>Фраза</strong></td>
+<td>to</td>
+<td>increase</td>
+<td>grants</td>
+<td>to</td>
+<td>states</td>
+<td>for</td>
+<td>vocational</td>
+<td>rehabilitation</td>
+</tr>
+<tr><td><strong>Юниграмм</strong></td>
+<td>TO</td>
+<td><em>NN</em></td>
+<td>NNS</td>
+<td><em>TO</em></td>
+<td>NNS</td>
+<td>IN</td>
+<td>JJ</td>
+<td>NN</td>
+</tr>
+<tr><td><strong>Правило 1</strong></td>
+<td> </td>
+<td><em>VB</em></td>
+<td> </td>
+<td> </td>
+<td> </td>
+<td> </td>
+<td> </td>
+<td> </td>
+</tr>
+<tr><td><strong>Правило 2</strong></td>
+<td> </td>
+<td> </td>
+<td> </td>
+<td><em>IN</em></td>
+<td> </td>
+<td> </td>
+<td> </td>
+<td> </td>
+</tr>
+<tr><td><strong>Вывод</strong></td>
+<td>TO</td>
+<td>VB</td>
+<td>NNS</td>
+<td>IN</td>
+<td>NNS</td>
+<td>IN</td>
+<td>JJ</td>
+<td>NN</td>
+</tr>
+<tr><td><strong>Золото</strong></td>
+<td>TO</td>
+<td>VB</td>
+<td>NNS</td>
+<td>IN</td>
+<td>NNS</td>
+<td>IN</td>
+<td>JJ</td>
+<td>NN</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.1</span>: <p>Шаги в Brill-разметке</p>
+</p>
+</td></table>
+<p>В этой таблице мы видим два правила.  Все такие правила генерируются из шаблона следующего вида: "заменить <em>T</em><sub>1</sub> на <em>Т</em><sub>2</sub> в контексте <em>C</em>".  Типичными контекстами являются индивидуальность или метка предыдущего или следующего слова или появление определенной метки в пределах 2-3 слов от текущего слова.  В ходе своей тренировочной фазы разметчик угадывает значения для <em>T</em><sub>1</sub>, <em>T</em><sub>2</sub> и <em>C</em>, чтобы создать тысячи правил - кандидатов.
+Каждое правило оценивается в соответствии с его чистой выгодой: количество неправильных меток, которые он исправляет, меньше количества правильных меток, которые он неправильно модифицирует.</p>
+<!-- XXX How Brill tagger rules are learnt -->
+<p>Brill-разметчики имеют еще одно интересное свойство: правила лингвистически интерпретируемы.  Сравните с  n-грамм разметчиками, которые используют потенциально массивную таблицу из n-грамм.  Мы не много узнаем от непосредственного просмотра такой таблицы, по сравнению с правилами, которые устанавливает Brill-разметчик.
+<a class="reference internal" href="http://www.nltk.org/book/ch05.html#code-brill-demo">6.1</a> демонстрирует Brill-разметчик NLTK.</p>
+<span class="target" id="code-brill-demo"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; nltk.tag.brill.demo()
+Training Brill tagger on 80 sentences...
+Finding initial useful rules...
+    Found 6555 useful rules.
+
+           B      |
+   S   F   r   O  |        Score = Fixed - Broken
+   c   i   o   t  |  R     Fixed = num tags changed incorrect -&gt; correct
+   o   x   k   h  |  u     Broken = num tags changed correct -&gt; incorrect
+   r   e   e   e  |  l     Other = num tags changed incorrect -&gt; incorrect
+   e   d   n   r  |  e
+------------------+-------------------------------------------------------
+  12  13   1   4  | NN -&gt; VB if the tag of the preceding word is 'TO'
+   8   9   1  23  | NN -&gt; VBD if the tag of the following word is 'DT'
+   8   8   0   9  | NN -&gt; VBD if the tag of the preceding word is 'NNS'
+   6   9   3  16  | NN -&gt; NNP if the tag of words i-2...i-1 is '-NONE-'
+   5   8   3   6  | NN -&gt; NNP if the tag of the following word is 'NNP'
+   5   6   1   0  | NN -&gt; NNP if the text of words i-2...i-1 is 'like'
+   5   5   0   3  | NN -&gt; VBN if the text of the following word is '*-1'
+   ...
+&gt;&gt;&gt; print(open("errors.out").read())
+             left context |    word/test-&gt;gold     | right context
+--------------------------+------------------------+--------------------------
+                          |      Then/NN-&gt;RB       | ,/, in/IN the/DT guests/N
+, in/IN the/DT guests/NNS |       '/VBD-&gt;POS       | honor/NN ,/, the/DT speed
+'/POS honor/NN ,/, the/DT |    speedway/JJ-&gt;NN     | hauled/VBD out/RP four/CD
+NN ,/, the/DT speedway/NN |     hauled/NN-&gt;VBD     | out/RP four/CD drivers/NN
+DT speedway/NN hauled/VBD |      out/NNP-&gt;RP       | four/CD drivers/NNS ,/, c
+dway/NN hauled/VBD out/RP |      four/NNP-&gt;CD      | drivers/NNS ,/, crews/NNS
+hauled/VBD out/RP four/CD |    drivers/NNP-&gt;NNS    | ,/, crews/NNS and/CC even
+P four/CD drivers/NNS ,/, |     crews/NN-&gt;NNS      | and/CC even/RB the/DT off
+NNS and/CC even/RB the/DT |    official/NNP-&gt;JJ    | Indianapolis/NNP 500/CD a
+                          |     After/VBD-&gt;IN      | the/DT race/NN ,/, Fortun
+ter/IN the/DT race/NN ,/, |    Fortune/IN-&gt;NNP     | 500/CD executives/NNS dro
+s/NNS drooled/VBD like/IN |  schoolboys/NNP-&gt;NNS   | over/IN the/DT cars/NNS a
+olboys/NNS over/IN the/DT |      cars/NN-&gt;NNS      | and/CC drivers/NNS ./.</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_brill_demo.py" type="text/x-python"><span class="caption-label">Пример 6.1 (code_brill_demo.py)</span></a> : Листинг 6.1: Демонстрация Brill-разметчика: разметчик имеет коллекцию шаблонов вида <span class="caption-label">X -&gt; Y, если предыдущее слово является Z</span>; переменные в этих шаблонах заменяются конкретными словами и метками для создания "правил"; счет для правила - это число неправильных случаев, которые он корректирует, минус число правильных случаев, которые он делает неправильными; помимо обучения разметчика, демонстрация отображает остаточные ошибки.</p></td></tr>
+</table></div>
+<!-- XXX saving a Brill tagger to a file, reloading -->
+<!-- XXX comment on performance -->
+</div>
+<div class="section" id="how-to-determine-the-category-of-a-word">
+<span id="sec-how-to-determine-the-category-of-a-word"></span><h1>7 Как определить категорию слова</h1>
+<p>Теперь, когда мы рассмотрели классы слов в деталях, мы обратимся к более фундаментальному вопросу: как мы определяем, к какой категории слово принадлежит в первую очередь? В целом лингвисты используют морфологические, синтаксические и семантические подсказки для определения категории слова.</p>
+<div class="section" id="morphological-clues">
+<h2>7.1 Морфологические подсказки</h2>
+<p>Внутренняя структура слова может дать полезные ключи к пониманию категории слова. Например, <span class="example">-ness</span> является суффиксом, который соединяется с прилагательным, чтобы произвести существительное, например, <span class="example">happy</span> → <span class="example">happiness</span>, <span class="example">ill</span> → <span class="example">illness</span>. Так что, если мы сталкиваемся со словом, которое заканчивается на <span class="example">-ness</span>, очень вероятно что это будет существительное.  Точно так же <span class="example">-ment</span> является суффиксом, который соединяется с некоторыми глаголами, чтобы произвести существительное, например, <span class="example">govern</span> → <span class="example">govenment</span> и <span class="example">establish</span> → <span class="example">establishment</span>.</p>
+<p>Английские глаголы также могут быть морфологически сложными.  Так, например, <a name="present_participle_index_term"></a> <span class="termdef">причастие настоящего времени</span> глагола оканчивается на <span class="example">-ing</span> и выражает идею продолжающегося, незаконченного действия (например , <span class="example">falling</span>, <span class="example">eating</span>).
+Суффикс <span class="example">-ing</span> также появляется в существительных, полученных из глаголов, <span class="example">например, falling of leaves</span> (эта форма известна как <a name="gerund_index_term"></a><span class="termdef">герундий</span>).</p>
+</div>
+<div class="section" id="syntactic-clues">
+<h2>7.2 Синтаксические Улики</h2>
+<p>Другим источником информации являются типичные контексты, в которых может появиться слово. Например, предположим, что мы уже определили категорию существительных. Тогда мы могли бы сказать, что синтаксическим критерием для прилагательного в английском языке является то, что оно может возникнуть непосредственно перед существительным или сразу же после слов <span class="example">be</span> или <span class="example">very</span>. Согласно этим тестам, <span class="example">near</span> должны быть классифицировано как прилагательное:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(2)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>the near window
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>The end is (very) near.
+</td></tr></table></p>
+</td></tr></table></p>
+</div>
+<div class="section" id="semantic-clues">
+<h2>7.3 Семантические Улики</h2>
+<p>И, наконец, значение слова является полезным ключ к пониманию его лексической категории.  Например, самое известное определение существительного - семантическое: "имя человека, места или вещи". В современной лингвистике семантические критерии классов слов рассматриваются с подозрением в основном потому, что их трудно формализовать. Тем не менее, семантические критерии лежат в основе многих наших интуитивных знаний о классах слов и дают нам возможность сделать хорошее предположение о категориях слов в языках, с которыми мы не знакомы.  Например, если все, что мы знаем о голландском слове <span class="example">verjaardag</span> является то, что оно означает то же самое, что и английское слово <span class="example">birthday</span>, то мы можем предположить, что в голландском языке <span class="example">verjaardag</span> это существительное. Тем не менее, некоторая осторожность необходима: хотя мы могли бы перевести <span class="example">zij is vandaag jarig</span> как <span class="example">it's her birthday today</span>, слово <span class="example">jarig</span> на самом деле прилагательное на голландском языке и не имеет точного эквивалента в английском языке.</p>
+</div>
+<div class="section" id="new-words">
+<h2>7.4 Новые слова</h2>
+<p>Все языки приобретают новые лексические единицы. Список слов, недавно добавленных в Оксфордский словарь английского языка включает в себя <span class="example">cyberslacker, fatoush, blamestorm, SARS, cantopop, bupkis, noughties, muggle</span> и <span class="example">robata</span>. Обратите внимание на то, что все эти новые слова существительные, и это нашло отражение в том, что существительные называют <a name="open_class_index_term"></a><span class="termdef">открытым классом</span>. В противоположность им предлоги рассматриваются как <a name="closed_class_index_term"></a> <span class="termdef">закрытый класс</span>. То есть существует ограниченный набор слов, принадлежащих к этому классу (например, <span class="example">above, аlong, at, below, beside, between, during, for, from, in, near, on, outside, over, past, through, towards, under, up, with)</span>, членство в этом наборе изменяется только очень медленно с течением времени.</p>
+</div>
+<div class="section" id="morphology-in-part-of-speech-tagsets">
+<h2>7.5 Морфология в наборах меток частей речи</h2>
+<!-- TODO: Modal verbs, e.g. `would`:lx: ... -->
+<p>Общие наборы меток часто включают некоторую <a name="morpho_syntactic_index_term"></a><span class="termdef">морфо-синтаксическую</span> информацию; то есть информацию о виде морфологических маркировок, которые слова получают в силу своей синтаксической роли.  Рассмотрим, например, выбор различных грамматических форм слова <span class="example">go</span>, представленный в следующих предложениях:</p>
+<span class="target" id="ex-go"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(3)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><em>Go</em> away!</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>He sometimes <em>goes</em> to the cafe.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>All the cakes have <em>gone</em>.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td>We <em>went</em> on the excursion.</td></tr></table></p>
+</td></tr></table></p>
+<p>Каждая из этих форм - <span class="example">go</span>, <span class="example">goes</span>, <span class="example">gone</span> и <span class="example">went</span> - морфологически отличается от других. Рассмотрим форму <span class="example">goes</span> Она появляется в ограниченном наборе грамматических контекстов и требует субъекта третьего лица единственного числа. Таким образом, следующие предложения являются неграмматическими.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(4)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>*They sometimes <em>goes</em> to the cafe.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*I sometimes <em>goes</em> to the cafe.</td></tr></table></p>
+</td></tr></table></p>
+<p>В отличие от них <span class="example">gone</span> - это форма причастия прошедшего времени; она необходима после <span class="example">have</span> (и не может быть заменена в этом контексте на <span class="example">goes</span>) и не может появиться в качестве основного глагола предложения.</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(5)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>*All the cakes have <em>goes</em>.
+</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>*He sometimes <em>gone</em> to the cafe.
+</td></tr></table></p>
+</td></tr></table></p>
+<p>Мы можем легко представить себе набор меток, в котором все четыре различные грамматические формы, о которых мы только что говорили, были помечены как <tt class="doctest"><span class="pre">VB</span></tt>. Несмотря на то, что этого будет достаточно для некоторых целей, более дробные множества меток дают полезную информацию об этих формах, которая может помочь другим обработчикам, которые пытаются обнаружить закономерности в последовательности меток.  Набор меток корпуса Брауна учитывает эти различия, как обобщено в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-morphosyntax">7.1</a>.</p>
+<span class="target" id="tab-morphosyntax"></span><table border="1" class="docutils" id="tab-morphosyntax">
+<colgroup>
+<col width="21%">
+<col width="65%">
+<col width="15%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Форма</th>
+<th class="head">Категория</th>
+<th class="head">Метка</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>go</td>
+<td>базовая</td>
+<td>VB</td>
+</tr>
+<tr><td>goes</td>
+<td>3-е лицо единственное число настоящее</td>
+<td>VBZ</td>
+</tr>
+<tr><td>gone</td>
+<td>причастие прошедшего времени</td>
+<td>VBN</td>
+</tr>
+<tr><td>going</td>
+<td>герундий</td>
+<td>VBG</td>
+</tr>
+<tr><td>went</td>
+<td>простое прошедшее</td>
+<td>VBD</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 7.1</span>: <p>Некоторые морфосинтаксические различия в наборе меток корпуса Брауна</p>
+</p>
+</td></table>
+<p>В дополнение к этому набору меток глаголов, различные формы глагола <span class="example">to be</span> имеют специальные метки: <tt class="doctest"><span class="pre">be/BE, being/BEG, am/BEM, are/BER, <span class="pysrc-keyword">is</span>/BEZ, been/BEN, were/BED</span></tt> и <tt class="doctest"><span class="pre">was/BEDZ</span></tt> (плюс дополнительные метки для отрицательных форм этого глагола).   Учитывая все сказанное, эта дробная разметка глаголов означает, что автоматический разметчик, который использует это множество меток фактически осуществляет ограниченный <a name="morphological_analysis_index_term"></a><span class="termdef">морфологический анализ</span>.</p>
+<p>Большая часть наборов меток частей речи использует одни и те же основные категории, такие как существительное, глагол, прилагательное и предлог. Однако наборы меток различаются тем, как тонко они делят слова на категории, и тем, как они определяют их. Например, слово <span class="example">is</span> может быть помечено просто как глагол в одном наборе меток; и в качестве отдельной формы лексемы <span class="example">be</span> в другом (как в корпусе Брауна).  Это различие в наборах меток является неизбежным, так как метки частей речи используются по-разному для различных задач. Другими словами, нет ни одного "правильного пути" присвоения меток, только более или менее полезные способы в зависимости от целей.</p>
+<!-- TODO: tagging other languages -->
+</div>
+</div>
+<div class="section" id="summary">
+<h1>8 Резюме</h1>
+<ul class="simple">
+<li>Слова могут быть сгруппированы в классы, такие как существительные, глаголы, прилагательные и наречия.
+Эти классы известны как лексические категории или части речи.
+Частям речи присваиваются короткие метки, или теги, такие как <tt class="doctest"><span class="pre">NN</span></tt>, <tt class="doctest"><span class="pre">VB</span></tt>,</li>
+<li>Процесс автоматического назначения частей речи словам в тексте называется частеречная разметка, ЧР разметка, или просто разметка.</li>
+<li>Автоматическая разметка является важным шагом в последовательной схеме NLP и полезна в различных ситуациях, в том числе: предсказания поведения ранее не встречавшихся слов, анализ использования слов в корпусе, в системах преобразования текста в речь.</li>
+<li>Некоторые лингвистические корпусы, такие как корпус Брауна, получили разметку частей речи.</li>
+<li>Многие методы разметки возможны, например, по умолчанию, с помощью регулярных выражений, юниграмм, n-грамм.
+Они могут быть объединены с помощью метода, известного как "бэкофф" ("отвал").</li>
+<li>Разметчики могут быть обучены и оценены с использованием размеченных корпусов.</li>
+<li>Бэкофф представляет собой способ для объединения моделей: когда более специализированные модели (например, биграмм) не может присвоить метку в данном контексте, мы возвращаемся к более общей модели (например, юниграмм).</li>
+<li>Частеречная разметка является важным, ранним примером задачи классификации последовательности в NLP: классификационное решение в любой точке в последовательности использует слова и метки в локальном контексте.</li>
+<li>Словарь используется для сопоставления произвольных типов информации, таких как строки и числа: <tt class="doctest"><span class="pre">freq[<span class="pysrc-string">'cat'</span>] = 12</span></tt>.  Мы создаем словари с помощью фигурных скобок: <tt class="doctest"><span class="pre">pos = {}</span></tt>, <tt class="doctest"><span class="pre">pos = {<span class="pysrc-string">'furiously'</span>: <span class="pysrc-string">'adv'</span>, <span class="pysrc-string">'ideas'</span>: <span class="pysrc-string">'n'</span>, <span class="pysrc-string">'colorless'</span>: <span class="pysrc-string">'adj'</span>}</span></tt>.</li>
+<li>N-грамм разметчики могут быть определены при больших значениях <em>n</em>, но когда <em>n</em> больше 3 мы обычно сталкиваемся с проблемой разреженных данных; даже при большом количестве тренировочных данных, мы видим лишь незначительную часть возможных контекстов.</li>
+<li>Разметка, основанная на трансформации, включает в себя нахождение ряда улучшающих правил вида "изменить тег <span class="math">s</span>, чтобы пометить <span class="math">t</span> в контексте <span class="math">c"</span>, где каждое правило фиксирует ошибки и, возможно, вводит некоторое (меньшее) количество ошибок.</li>
+</ul>
+</div>
+<div class="section" id="further-reading">
+<span id="sec-tag-further-reading"></span><h1>7 Дополнительные материалы</h1>
+<p>Дополнительные материалы для этой главы размещены на странице <tt class="doctest"><span class="pre">http://nltk.org/,</span></tt> в том числе ссылки на свободно доступные ресурсы в сети.
+Для получения дополнительных примеров разметки с помощью NLTK, обратитесь к HOWTO по разметке на <tt class="doctest"><span class="pre">http://nltk.org/howto.
+</span></tt> Главы 4 и 5 <a class="reference external" href="http://www.nltk.org/book/bibliography.html#jurafskymartin2008" id="id2">(Jurafsky &amp; Martin, 2008)</a> содержат более продвинутый материал по n-граммам и частеречной разметке.
+"Универсальный набор меток" описывается <a class="reference external" href="http://www.nltk.org/book/bibliography.html#petrov2011" id="id3">(Petrov, Das, &amp; McDonald, 2012)</a>.
+Другие подходы к разметке включают методы машинного обучения (<a class="reference external" href="http://www.nltk.org/book/ch06.html#chap-data-intensive">chap-data-intensive</a>).
+В <a class="reference external" href="http://www.nltk.org/book/ch07.html#chap-chunk">7.</a> мы увидим обобщение разметки, которое называется <em>chunking</em>, в котором непрерывной последовательности слов присваивается единственная метка.</p>
+<p>Для получения документации по набору меток см. <tt class="doctest"><span class="pre">nltk.help.upenn_tagset()</span></tt> и <tt class="doctest"><span class="pre">nltk.help.brown_tagset()</span></tt>.
+Лексические категории объясняются в учебниках по лингвистике, в том числе в тех, которые перечислены в <a class="reference external" href="http://www.nltk.org/book/ch01.html#chap-introduction">1.</a>.</p>
+<p>Есть много других видов маркировки.
+Слова могут быть помечены с директивами синтезатору речи, указывая, какие слова следует подчеркнуть.  Слова могут быть помечены номерами значений, с указанием значения, которое было использовано.  Слова могут быть также помечены морфологическими признаками.
+Примеры каждого из этих видов меток показаны ниже.
+Для экономии места, мы показываем тег только для одного слова. Отметим также, что первые два примера используют теги в XML-стиле, где слово помеченное слово заключено в элементы в угловых скобках.</p>
+<ol class="arabic simple">
+<li>Speech Synthesis Markup Language (W3C SSML):
+That is a &lt;emphasis&gt;big&lt;/emphasis&gt; car!</li>
+<li>SemCor: Brown Corpus tagged with WordNet senses:
+Space in any &lt;wf pos="NN" lemma="form" wnsn="4"&gt;form&lt;/wf&gt;
+is completely measured by the three dimensions.
+(Wordnet form/nn sense 4: "shape, form, configuration,
+contour, conformation")</li>
+<li>Morphological tagging, from the Turin University Italian Treebank:
+E' italiano , come progetto e realizzazione , il
+primo (PRIMO ADJ ORDIN M SING) porto turistico dell' Albania .</li>
+</ol>
+<p>Обратите внимание, что разметка также выполняется на более высоких уровнях.  Вот пример разметки акта диалога из NPS Chat Corpus <a class="reference external" href="http://www.nltk.org/book/bibliography.html#forsyth2007" id="id4">(Forsyth &amp; Martell, 2007)</a> включенного в NLTK.  Каждая реплика диалога классифицирована в соответствии с ее коммуникативной функцией:</p>
+<pre class="literal-block">
+Statement  User117 Dude..., I wanted some of that
+ynQuestion User120 m I missing something?
+Bye        User117 I'm gonna go fix food, I'll be back later.
+System     User122 JOIN
+System     User2   slaps User122 around a bit with a large trout.
+Statement  User121 18/m pm me if u tryin to chat
+</pre>
+</div>
+<div class="section" id="exercises">
+<h1>10 Упражнения</h1>
+<ol class="arabic simple">
+<li>☼ Искать в Интернете "фальсификацию газетных заголовков", чтобы найти такие драгоценные камни , как: <span class="example">British Left Вафли на Фолклендских островах,</span> и <span class="example">суд</span> по <span class="example">делам несовершеннолетних пострелять ответчиком.</span>
+Вручную пометить эти заголовки, чтобы увидеть, если знание тегов неполный из речи снимает двусмысленность.</li>
+<li>☼ Работая с кем - то еще, по очереди , чтобы выбрать слово , которое может быть либо существительное или глагол (например , <span class="example">конкурс);</span> противник должен предсказать, какой из них, вероятно, будет наиболее частым в корпусе Брауна; проверить предсказание противника, и подсчитывать счет в течение нескольких ходов.</li>
+<li>☼ разметить и пометить следующее предложение: <span class="example">Они ветер часы назад,</span> в <span class="example">то время как мы гоняться за ветром.</span>
+Какие различные произношения и части речи участвуют?</li>
+<li>☼ Обзор отображений в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#tab-linguistic-objects">3.1</a> .  Обсудите любые другие примеры отображений вы можете думать.  Какой тип информации они карту от и до?</li>
+<li>☼ Использование интерпретатора Python в интерактивном режиме, эксперимент со словарем примеров в этой главе.  Создание словаря <tt class="doctest"><span class="pre">D,</span></tt> а также добавить некоторые элементы.  Что произойдет , если вы пытаетесь получить доступ к несуществующей записи, например , <tt class="doctest"><span class="pre">d [ <span class="pysrc-string">'хуг']?</span></span></tt></li>
+<li>☼ Попробуйте удалить элемент из словаря <tt class="doctest"><span class="pre">D,</span></tt> используя синтаксис <tt class="doctest"><span class="pre"><span class="pysrc-keyword">дель</span> d [ <span class="pysrc-string">'ABC'].</span></span></tt>  Убедитесь, что элемент был удален.</li>
+<li>☼ Создание двух словарей, <tt class="doctest"><span class="pre">Д1</span></tt> и <tt class="doctest"><span class="pre">Д2,</span></tt> а также добавить некоторые записи к каждому.  Теперь выполните команду <tt class="doctest"><span class="pre">d1.update (d2).</span></tt>  Что это делать?
+Что это может быть полезно?</li>
+<li>☼ Создание словаря <tt class="doctest"><span class="pre">е,</span></tt> чтобы представлять одну лексическую запись для некоторого слова по вашему выбору.
+Определить ключи как <tt class="doctest"><span class="pre">заглавное слово,</span></tt> <tt class="doctest"><span class="pre">часть из-речи,</span></tt> <tt class="doctest"><span class="pre">смысл,</span></tt> и <tt class="doctest"><span class="pre">пример,</span></tt> и назначить им подходящие значения.</li>
+<li>☼ Удовлетворить себя , что существуют ограничения на распределение <span class="example">идти</span> и <span class="example">пошел,</span> в том смысле , что они не могут свободно поменять местами в видах контекстах , показанных на <a class="reference internal" href="http://www.nltk.org/book/ch05.html#ex-go">(3d)</a> в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#sec-how-to-determine-the-category-of-a-word">7</a> .</li>
+<li>☼ Поезд Юниграмма Tagger и запустить его на какой-то новый текст.
+Заметим, что некоторые слова не присвоен тег.  Почему нет?</li>
+<li>☼ Узнайте о аффикса Tagger (тип <tt class="doctest"><span class="pre">справки (NLTK.AffixTagger)).</span></tt>
+Поезд аффикс Tagger и запустить его на какой-то новый текст.
+Поэкспериментируйте с различными настройками для длины аффикса и минимальной длины слова.  Обсудите свои выводы.</li>
+<li>☼ Поезд Биграммные Tagger без каких-либо отсрочки Tagger, и запустить его на некоторые из обучающих данных.  Затем запустите его на некоторых новых данных.
+Что происходит с исполнения Tagger?  (Почему?)</li>
+<li>☼ Мы можем использовать словарь, чтобы указать значения должны быть подставлены в строке форматирования.  Прочитайте документацию библиотеки языка Python для форматирования строк <tt class="doctest"><span class="pre">http://docs.python.org/lib/typesseq-strings.html</span></tt> и использовать этот метод , чтобы отобразить текущую дату в двух различных форматах.</li>
+<li>◑ Используйте <tt class="doctest"><span class="pre">сортируется ()</span></tt> и <tt class="doctest"><span class="pre">установите ()</span></tt> , чтобы получить отсортированный список тегов , используемых в корпусе Брауна, удаление дубликатов.</li>
+<li>◑ писать программы для обработки Брауна корпус и найти ответы на следующие вопросы:<ol class="arabic">
+<li>Какие имена являются более распространенными в их форме множественного числа, а не их особой форме? (Только учтите , регулярные множественном, сформированные с <span class="example">-s</span> суффикса.)</li>
+<li>Какое слово имеет наибольшее число различных тегов.  Что они, и что они представляют?</li>
+<li>Список тегов в порядке убывания частоты.  Что 20 наиболее частые теги представляют?</li>
+<li>Какие теги существительные наиболее часто встречаются после?  Что эти теги представляют?</li>
+</ol>
+</li>
+<li>◑ Исследуйте следующие вопросы, которые возникают в связи с поиска Tagger:<ol class="loweralpha">
+<li>Что происходит с производительностью Таггер для различных размеров модели, когда потери мощности Таггер опускается?</li>
+<li>Рассмотрим кривую в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#fig-tag-lookup">4,2</a> ; предложить хороший размер для поиска Tagger, уравновешивающей памяти и производительность.
+Можете ли вы придумать сценарии, в которых было бы предпочтительнее, чтобы минимизировать использование памяти, или для достижения максимальной производительности без учета использования памяти?</li>
+</ol>
+</li>
+<li>◑ Каков верхний предел производительности для поиска Tagger, не предполагая никаких ограничений на размер его таблицы?  (Подсказка: написать программу для работы, какой процент маркеров одного слова назначаются наиболее вероятный тег для этого слова, в среднем.)</li>
+<li>◑ Сформировать некоторые статистические данные для меченых данных, чтобы ответить на следующие вопросы:<ol class="loweralpha">
+<li>Какая доля типов слов всегда назначаются той же части, в речи тег?</li>
+<li>Сколько слов неоднозначен, в том смысле, что они появляются по крайней мере с двумя метками?</li>
+<li>Какой процент слов <em>маркеров</em> в Brown Corpus связаны эти неоднозначные слова?</li>
+</ol>
+</li>
+<li>◑ Метод <tt class="doctest"><span class="pre">оценки ()</span></tt> работает , насколько точно Таггер выполняет по этому тексту.  Например, если предоставленный текст с тегами был <tt class="doctest"><span class="pre">[( <span class="pysrc-string">'The',</span> <span class="pysrc-string">'DT'),</span> ( <span class="pysrc-string">'собака',</span> <span class="pysrc-string">'NN')]</span></span></tt> и Таггер произвел выход <tt class="doctest"><span class="pre">[( <span class="pysrc-string">'The',</span> <span class="pysrc-string">'NN'),</span> ( <span class="pysrc-string">'собака <span class="pysrc-string">','</span></span> <span class="pysrc-string">NN ')],</span></span></tt> то счет был бы <tt class="doctest"><span class="pre">0,5.</span></tt>
+Давайте попробуем выяснить, как работает метод оценки:<ol class="loweralpha">
+<li>Таггер <tt class="doctest"><span class="pre">т</span></tt> принимает список слов в качестве входных данных и выдает список слов , помеченных как выход.  Тем не менее, <tt class="doctest"><span class="pre">t.evaluate ()</span></tt> задается правильно маркированный текст в качестве единственного параметра.
+Что он должен делать с этим входом перед выполнением мечение?</li>
+<li>После того , как Таггер создал недавно подготовленный текст с тегами, как может <tt class="doctest"><span class="pre">оценить (метод)</span></tt> идти о сравнении его с оригинальным текстом помеченной и вычисления счет точности?</li>
+<li>Теперь рассмотрим исходный код, чтобы увидеть, как реализован метод.  Осмотрите <tt class="doctest"><span class="pre">nltk.tag.api .__ FILE__</span></tt> обнаружить местоположение исходного кода, и открыть этот файл с помощью редактора (не забудьте использовать файл <tt class="doctest"><span class="pre">api.py</span></tt> , а не скомпилированные <tt class="doctest"><span class="pre">api.pyc</span></tt> двоичный файл).</li>
+</ol>
+</li>
+<li>◑ написать код для поиска Brown Корпус для конкретных слов и фраз в соответствии с тегами, чтобы ответить на следующие вопросы:<ol class="loweralpha">
+<li>Подготовить в алфавитном порядке отсортированный список различных слов с тегом <tt class="doctest"><span class="pre">MD.</span></tt></li>
+<li>Определить слова , которые могут быть существительные или множественного числа третьего лица единственного числа глаголов (например , <span class="example">сделки,</span> <span class="example">мух).</span></li>
+<li>Определение трех слов предложных фраз вида IN + DET + NN (например. <span class="example">В лаборатории).</span></li>
+<li>Каково соотношение мужского к женским местоимений?</li>
+</ol>
+</li>
+<li>◑ В <a class="reference external" href="http://www.nltk.org/book/ch03.html#tab-absolutely">3.1</a> мы увидели таблицу с участием подсчета частот для глаголов <span class="example">обожаю,</span> <span class="example">любовь,</span> <span class="example">как,</span> <span class="example">предпочитают</span> и предшествующие отборочные <span class="example">абсолютно</span> и <span class="example">безусловно.</span>
+Изучить полный спектр наречий, которые появляются перед этими четырьмя глаголами.</li>
+<li>◑ Мы определили <tt class="doctest"><span class="pre">regexp_tagger</span></tt> , который может быть использован в качестве запасным Tagger для незнакомых слов.  Это Таггер проверяет только для кардинальных чисел.  Тестируя для конкретных префикс или суффикс строк, это должно быть возможно угадать другие теги.  Например, мы могли бы пометить любое слово , которое заканчивается <span class="example">-s</span> как множественное число существительного.
+Определим регулярное выражение Tagger (используя <tt class="doctest"><span class="pre">RegexpTagger ())</span></tt> , которая проверяет , по крайней мере , пять других моделей в написании слов.
+(Используйте инлайн документацию для объяснения правил.)</li>
+<li>◑ Рассмотрим регулярное выражение Tagger развитый в упражнениях в предыдущем разделе.  Оценка Tagger с помощью его метода <tt class="doctest"><span class="pre">точность (),</span></tt> и попытаться придумать способы улучшить свою производительность.  Обсудите свои выводы.
+Как объективную помощь в области оценки в процессе разработки?</li>
+<li>◑ Насколько серьезна проблема скудны данные?  Изучить эффективность п-грамм Taggers при увеличении <span class="math">п</span> от 1 до 6.
+Сведите счет точности.  Оценка обучающих данных , необходимых для этих Taggers, предполагая , что размер словаря из 10 <sup>5</sup> и размер множества ярлыков 10 <sup>2.</sup></li>
+<li>◑ Получить некоторые помечено данные для другого языка, а также обучать и оценивать различные Taggers на нем.  Если язык является морфологически сложным, или если есть какие-либо орфографические подсказки (например капитализации) к классам слов, рассмотреть вопрос о создании регулярного выражения Tagger для него (заказанный после Юниграмма Tagger, и перед Tagger по умолчанию).  Как точность вашего Tagger (ы) сравнить с теми же Taggers работать на английских данных?
+Обсудите любые вопросы, с которыми Вы сталкиваетесь в применении этих методов к языку.</li>
+<li>◑ <a class="reference internal" href="http://www.nltk.org/book/ch05.html#code-baseline-tagger">4.1</a> график кривой , показывающий изменение в производительности путём поиска Tagger как размер модели был увеличен.
+Участок кривой производительности для Юниграмма Tagger, поскольку количество обучающих данных изменяется.</li>
+<li>◑ Проверьте матрицу путаницы для биграмм Таггер <tt class="doctest"><span class="pre">t2</span></tt> , определенного в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#sec-n-gram-tagging">5</a> , а также определить один или несколько наборов тегов к коллапсу.  Определение словаря, чтобы сделать отображение и оценить Tagger на упрощенных данных.</li>
+<li>◑ Эксперимент с Taggers использованием упрощенного множества ярлыков (или сделать один из ваших собственных, отбрасывая все, кроме первого символа каждого имени тега).
+Такая Tagger имеет меньше различий, чтобы сделать, но гораздо меньше информации, на основе которой свою работу.  Обсудите свои выводы.</li>
+<li>◑ Вспомним пример Биграммные Tagger , который встречается слово , которое он не видел во время тренировки, а также помеченной остальную часть предложения как <tt class="doctest"><span class="pre">None.</span></tt>
+Это возможно для биграмм Таггер потерпеть неудачу часть пути через предложение, даже если оно не содержит невидимые слова (даже если приговор был использован в процессе обучения).  В каких обстоятельствах это может произойти?  Вы можете написать программу, чтобы найти некоторые примеры этого?</li>
+<li>◑ предобработки данных Браун Новости по замене низкочастотных слов с <span class="example">УНК,</span> но оставляя теги нетронутыми.  Теперь обучать и оценивать Биграммные Tagger по этим данным.  Насколько это поможет?  Каков вклад Юниграмма Tagger и Tagger по умолчанию теперь?</li>
+<li>◑ Изменить программу в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#code-baseline-tagger">4.1</a> , чтобы использовать логарифмическую шкалу на оси <em>х,</em> заменив <tt class="doctest"><span class="pre">pylab.plot ()</span></tt> с <tt class="doctest"><span class="pre">pylab.semilogx ().</span></tt>
+Что вы заметили о форме полученного участка?  Говорит ли градиент вам что-нибудь?</li>
+<li>◑ Обратитесь к документации по Brill Таггер демо - функции, с помощью <tt class="doctest"><span class="pre">справки (nltk.tag.brill.demo).</span></tt>
+Эксперимент с Tagger путем установки различных значений параметров.
+Есть ли компромисс между временем обучения (размер корпуса) и производительности?</li>
+<li>◑ писать код, который строит словарь словарей множеств.
+Используйте его , чтобы сохранить набор POS тегов , которые могут следовать за данное слово , имеющее заданную POS тег, то есть слово <sub>I</sub> → <sub>I</sub> → тег тега <sub>+ 1.</sub></li>
+<li>★ Есть 264 различных слов на Брауна корпус, имеющий ровно три возможных тегов.<ol class="loweralpha">
+<li>Вывести таблицу с целыми числами 1..10 в одном столбце, а число различных слов в корпусе, имеющий 1..10 различные теги в другой колонке.</li>
+<li>Ибо слово с наибольшим количеством различных тегов, распечатать предложения из корпуса, содержащие слово, по одному для каждого возможного тега.</li>
+</ol>
+</li>
+<li>★ Напишите программу для классификации контекстов с участием слово <span class="example">должно</span> в соответствии с тегом следующего слова.  Может ли это быть использовано для различения между эпистемных и деонтическими использования <span class="example">надо?</span></li>
+<li>★ Создание регулярных выражений Tagger и различные Юниграмма и п-граммовая Taggers, включая отсрочку передачи, и обучать их на части корпуса Брауна.<ol class="loweralpha">
+<li>Создайте три различные комбинации Taggers. Проверьте точность каждого комбинированного Tagger. Какая комбинация работает лучше всего?</li>
+<li>Попробуйте изменять размер учебного корпуса. Как это влияет на ваши результаты?</li>
+</ol>
+</li>
+<li>★ Наш подход для мечения неизвестное слово было рассмотреть буквы слова ( с помощью <tt class="doctest"><span class="pre">RegexpTagger ()),</span></tt> или игнорировать слово вообще и пометить его как существительное ( с использованием <tt class="doctest"><span class="pre">NLTK.DefaultTagger ()).</span></tt>  Эти методы не будут делать хорошо для текстов, имеющих новые слова, которые не являются существительными.
+Рассмотрим предложение <span class="example">мне нравится блог на блог Кима.</span>  Если <span class="example">блог</span> является новым словом, то , глядя на предыдущей метке <tt class="doctest"><span class="pre">(TO</span></tt> по сравнению с <tt class="doctest"><span class="pre">NP $),</span></tt> вероятно , будет полезно.
+Т.е. нам нужно Tagger по умолчанию, который чувствителен к предыдущему тегу.<ol class="loweralpha">
+<li>Создать новый вид Юниграмма Tagger, который смотрит на тег предыдущего слова, и игнорирует текущее слово.  (Лучший способ сделать это, чтобы изменить исходный код для <tt class="doctest"><span class="pre">UnigramTagger (),</span></tt> которая предполагает знание объектно-ориентированного программирования в Python.)</li>
+<li>Добавьте это Tagger к последовательности откатов Taggers (включая обычные триграмме и Биграммные Taggers, которые смотрят на словах), прямо перед обычной Tagger по умолчанию.</li>
+<li>Оценить вклад этого нового Юниграмма Tagger.</li>
+</ol>
+</li>
+<li>★ Рассмотрим код в <a class="reference internal" href="http://www.nltk.org/book/ch05.html#sec-n-gram-tagging">5</a> , который определяет верхнюю границу для точности в триграмме Tagger.
+Обсуждение Review Abney, касающееся невозможности точного мечения <a class="reference external" href="http://www.nltk.org/book/bibliography.html#abney1996pst" id="id5">(Church, Young, &amp; Bloothooft, 1996)</a> .  Объясните, почему правильно мечение этих примеров требует доступа к другим видам информации, чем просто слова и теги.  Как вы могли бы оценить масштаб этой проблемы?</li>
+<li>★ Используйте некоторые из методов оценки в <tt class="doctest"><span class="pre">nltk.probability,</span></tt> таких как <em>Лидстоуна</em> или оценки <em>Лапласа,</em> разработать статистическую Tagger , который делает работу лучше , чем п-грамм откатов Taggers в тех случаях , когда контексты , возникшие в ходе тестирования не были замечены во время тренировки.</li>
+<li>★ Проверьте диагностические файлы , созданные Таггер <tt class="doctest"><span class="pre">rules.out</span></tt> и <tt class="doctest"><span class="pre">errors.out</span></tt> Brill.  Получить демонстрационный код путем доступа к исходному коду (в <tt class="doctest"><span class="pre">http://www.nltk.org/code)</span></tt> и создать свою собственную версию Tagger Brill.
+Удалите некоторые из шаблонов правила, основанные на том, что вы узнали из осмотра <tt class="doctest"><span class="pre">rules.out.</span></tt>
+Добавьте несколько новых шаблонов правил которые используют контексты , которые могут помочь исправить ошибки , которые вы видели в <tt class="doctest"><span class="pre">errors.out.</span></tt></li>
+<li>★ Разработка отсрочки передачи Tagger н-грамм , которая позволяет "анти-н-г" , такие как <tt class="doctest"><span class="pre">[ <span class="pysrc-string">"The",</span> <span class="pysrc-string">"строка"]</span></span></tt> будет указано , когда Таггер инициализируется.
+Анти-Ngram присваивается отсчету нуля , и используется для предотвращения задержки дл этой н-грамм (например , чтобы избежать оценивающий P <span class="example">(далее</span> | <span class="example">к)</span> , как только Р <span class="example">(далее)).</span></li>
+<li>★ Исследуйте три различных способа определения раскола между обучения и тестирования данных при разработке Tagger с помощью Брауна Корпус: жанр <tt class="doctest"><span class="pre">(категория),</span></tt> источник <tt class="doctest"><span class="pre">(FILEID),</span></tt> и предложения.
+Сравните их относительную производительность и обсудить, какой метод является наиболее легитимной.  (Вы можете использовать п-кратная кросс валидации, обсуждаются в <a class="reference external" href="http://www.nltk.org/book/ch06.html#sec-evaluation">3</a> , чтобы повысить точность оценок.)</li>
+<li>★ Развивайте свой собственный класс <tt class="doctest"><span class="pre">NgramTagger</span></tt> , который наследует от класса NLTK, и который инкапсулирует метод разрушения лексики помеченного обучения и тестирования данных , который был описан в этой главе.  Убедитесь, что Юниграмма и по умолчанию Backoff Taggers имеют доступ к полному лексикона.</li>
+</ol>
+<!-- Footer to be used in all chapters -->
+<div class="admonition-about-this-document admonition">
+<p class="first admonition-title">Об этом документе ...</p>
+<p>Обновлялся для NLTK 3.0.
+Это глава из книги <em>Обработка естественного языка с помощью Python</em> написанной <a class="reference external" href="http://estive.net/">Стивеном Бердом</a> , <a class="reference external" href="http://homepages.inf.ed.ac.uk/ewan/">Эваном Клайном</a> и <a class="reference external" href="http://ed.loper.org/">Эдвардом Лопером</a> , Copyright © 2014 авторов.
+Он распространяется с <em>Набором инструментов для естественного языка</em> <tt class="doctest"><span class="pre">[http://nltk.org/],</span></tt> версия 3.0 в соответствии с условиями <em>Creative Commons Attribution-Noncommercial-No Derivative Works 3.0 Лицензии Соединенных Штатов</em> [ <a class="reference external" href="http://creativecommons.org/licenses/by-nc-nd/3.0/us/">http://creativecommons.org/licenses/by-nc-nd/3.0/us/</a>].</p>
+<p class="last">Этот документ был построен на ср 1 июля 2015 12:30:05 AEST</p>
+</div>
+</div>
+</div>
+</body>
+</html>

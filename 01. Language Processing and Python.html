@@ -1,0 +1,1910 @@
+﻿<html lang="ru" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ascii"></meta>
+<meta name="generator" content="Docutils 0.12: http://docutils.sourceforge.net/"></meta>
+<title>1.Обработка языка и Python</title>
+<style type="text/css">/* :Author: Edward Loper, James Curran:Copyright: This stylesheet has been placed in the public domain.Stylesheet for use with Docutils.This stylesheet defines new css classes used by NLTK.It uses a Python syntax highlighting scheme that matchesthe colour scheme used by IDLE, which makes it easier forbeginners to check they are typing things in correctly. */
+/* Include the standard docutils stylesheet. */
+</style>
+</head>
+<body dir="ltr">
+<div class="document" id="language-processing-and-python">
+<span id="chap-introduction"></span>
+<h1 class="title">1. Обработка языка и Python</h1>
+
+<!-- -*- mode: rst -*- -->
+<!-- -*- mode: rst -*- -->
+<!-- CAP abbreviations (map to small caps in LaTeX) -->
+<!-- Other candidates for global consistency -->
+<!-- PTB removed since it must be indexed -->
+<!-- WN removed since it must be indexed -->
+<!-- misc & punctuation -->
+<!-- cdots was unicode U+22EF but not working -->
+<!-- exercise meta-tags -->
+<!-- Unicode tests -->
+<!-- phonetic -->
+<!-- misc -->
+<!-- used in Unicode section -->
+<!-- arrows -->
+<!-- unification stuff -->
+<!-- Math & Logic -->
+<!-- sets -->
+<!-- Greek -->
+<!-- Chinese -->
+<!-- URLs -->
+<!-- Python example - a snippet of code in running text -->
+<!-- PlaceHolder example -  something that should be replaced by actual code -->
+<!-- Linguistic eXample - cited form in running text -->
+<!-- Emphasized (more declarative than just using *) -->
+<!-- Grammatical Category - e.g. NP and verb as technical terms
+.. role:: gc
+   :class: category -->
+<!-- Math expression - e.g. especially for variables -->
+<!-- Textual Math expression - for words &#39;inside&#39; a math environment -->
+<!-- Feature (or attribute) -->
+<!-- Raw LaTeX -->
+<!-- Raw HTML -->
+<!-- Feature-value -->
+<!-- Lexemes -->
+<!-- Replacements that rely on previous definitions :-) -->
+<!-- TODO: update cspy reference to more recent book -->
+<!-- TODO: add some literature references (esp to other intro linguistics textbooks) -->
+<!-- TODO: adopt simpler hacker example with only single character transpositions;
+move hacker example to later section (later chapter?) -->
+<!-- TODO: get URL hyperlinks to be fixed width -->
+<!-- TODO: websites with automatically generated language - - lobner prize... -->
+<p>Легко получить в свои руки миллионы слов текста.
+Что мы можем сделать с ним, предполагая, что мы можем написать несколько простых программ?
+В этой главе мы будем рассматривать следующие вопросы:</p>
+<ol class="arabic simple">
+<li>Что мы можем достичь путем сочетания простых методов программирования с большим количеством текста</li>
+<li>Как мы можем автоматически извлекать ключевые слова и фразы, которые характеризуют стиль и содержание текста?</li>
+<li>Какие инструменты и методы предоставляет язык программирования Python для такой работы?</li>
+<li>Каковы некоторые из интересных задач обработки естественного языка?</li>
+</ol>
+<p>Эта глава поделена на разделы, которые представляют два весьма различных стиля.  В разделах "вычислений с языком" мы будем решать некоторые лингвистически мотивированные задачи программирования без обязательного объяснения, как они работают.  В разделах "более пристальный взгляд на Python" мы будем систематически рассматривать ключевые концепции программирования.  Мы будем указывать на один из этих двух стилей в названиях разделов, но последующие главы будут смешивать оба стиля, не будучи столь принципиальными в этом вопросе.
+Мы надеемся, что этот стиль введения даст вам подлинный вкус того, что придет позже, охватывая при этом целый ряд элементарных понятий в области лингвистики и информатики.
+Если у вас есть базовые знания в обеих областях, вы можете перейти к <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-automatic-natural-language-understanding">5</a> ; мы будем повторять все важные моменты в последующих главах, и если вы пропустите что-нибудь, вы можете обратиться к онлайн справочным материалам по адресу <tt class="doctest"><span class="pre">http://nltk.org/.</span></tt> Если материал является абсолютно новым для вас, эта глава поднимет больше вопросов, чем даст ответов, эти вопросы будут рассмотрены в остальной части этой книги.</p>
+<div class="section" id="computing-with-language-texts-and-words">
+<span id="sec-computing-with-language-texts-and-words"></span><h1>1 Вычисления с языком: тексты и слова</h1>
+<p>Мы все хорошо знакомы с текстом, так как мы читаем и пишем тексты каждый день.
+Здесь мы будем рассматривать текст как <span class="emphasis">исходные данные</span> для программ, которые мы пишем, программ, которые манипулируют и анализируют его множеством интересных способов.
+Но прежде, чем мы сможем сделать это, мы должны приступить к работе с интерпретатором Python.</p>
+<div class="section" id="getting-started-with-python">
+<h2>1.1 Начало работы с Python</h2>
+<p>Одна из дружественных черт Python заключается в том, что он позволяет вводить непосредственно в интерактивный <a name="interpreter_index_term"></a> <span class="termdef">интерпретатор</span> - программу, которая будет выполнять ваши программы на Python.
+Вы можете получить доступ к интерпретатору Python, используя простой графический интерфейс, который называется Интерактивная среда разработки (IDLE).
+На Mac вы можете найти это в меню <em>Приложения</em> → <em>MacPython</em>, а на Windows в разделе <em>Все программы</em> → <em>Python</em>.
+В Unix вы можете запустить Python из командной строки, набрав в <tt class="doctest"><span class="pre">idle</span></tt> (если среда не установлена, попробуйте ввести <tt class="doctest"><span class="pre">Python</span></tt>).
+Переводчик выведет аннотацию о вашей версии Python; просто убедитесь, что Вы работаете в Python 3.2 или более поздней версии (здесь для 3.4.2):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+Python 3.4.2 (default, Oct 15 2014, 22:01:37)
+[GCC 4.2.1 Compatible Apple LLVM 5.1 (clang-503.0.40)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+<span class="pysrc-prompt">&gt;&gt;&gt;</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Если вы не можете запустить интерпретатор Python, у Вас, вероятно, нет правильно установленного Python.  Пожалуйста, посетите <tt class="doctest"><span class="pre">http://python.org/</span></tt> для получения подробных инструкции. NLTK 3.0 работает на Python 2.6 и 2.7. Если вы используете одну из этих старых версий, обратите внимание, что оператор <tt class="doctest"><span class="pre">/</span></tt> округляет дробные результаты вниз (так <tt class="doctest"><span class="pre">1/3</span></tt> даст вам <tt class="doctest"><span class="pre">0</span></tt>).
+Для того чтобы получить ожидаемое поведение деления вам нужно ввести: <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> __future__ <span class="pysrc-keyword">import division</span></span></tt></p>
+</div>
+<p>Подсказка <tt class="doctest"><span class="pre"><span class="pysrc-prompt">&gt;&gt;&gt;</span></span></tt> указывает, что интерпретатор Python теперь ожидает ввода.  При копировании примеров из этой книги, не вводите <tt class="doctest"><span class="pre"><span class="pysrc-prompt">"&gt;&gt;&gt;"</span></span></tt> самостоятельно.  Теперь давайте начнем с использования Python в качестве калькулятора:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> 1 + 5 * 2 - 3 
+<span class="pysrc-output">8</span> <span class="pysrc-output"></span> 
+<span class="pysrc-prompt">&gt;&gt;&gt;</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>После того, как интерпретатор закончит вычисление ответа и его отображение, подсказка появляется снова. Это означает, что интерпретатор Python ожидает другой инструкции.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> Введите несколько выражений самостоятельно. Вы можете использовать звездочку <tt class="doctest"><span class="pre">(*)</span></tt> для умножения и слэш <tt class="doctest"><span class="pre">(/)</span></tt> для деления и круглые скобки для заключения в скобки выражения.</p>
+</div>
+<!-- XXX The following example currently wraps over a page boundary, which
+makes it difficult to read, esp since you can&#39;t see where the "^" is
+pointing. -->
+<p>Приведенные выше примеры показывают, как вы можете работать в интерактивном режиме с интерпретатором Python, экспериментируя с различными выражениями на этом языке, чтобы увидеть, что они делают.
+А теперь давайте попробуем бессмысленное выражение, чтобы увидеть, как интерпретатор обрабатывает его:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; 1 +
+  File "&lt;stdin&gt;", line 1
+    1 +
+      ^
+SyntaxError: invalid syntax
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Это произвело <a name="syntax_error_index_term"></a> <span class="termdef">Синтаксическую ошибку</span>.  В Python окончание команды знаком плюс не имеет смысла. Интерпретатор Python указывает на строку, в которой возникла проблема (line 1 of &lt;stdin&gt;, что означает "стандартный ввод").</p>
+<p>Теперь, когда мы можем использовать интерпретатор Python, мы готовы приступить к работе с языковыми данными.</p>
+</div>
+<div class="section" id="getting-started-with-nltk">
+<h2>1.2 Начало работы с NLTK</h2>
+<p>Прежде чем идти дальше, вы должны установить NLTK 3.0, который можно загрузить бесплатно с <tt class="doctest"><span class="pre">http://nltk.org/</span></tt>. Следуйте приведенным там инструкциям, чтобы загрузить версию, необходимую для вашей платформы.</p>
+<p>После того, как вы установили NLTK, запустите интерпретатор Python, как и раньше, и установите данные необходимые для книги, введя следующие две команды в командной строке Python, а затем выберите коллекцию <tt class="doctest"><span class="pre">book</span></tt>, как показано на <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fig-nltk-downloader">1.1</a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; import nltk
+&gt;&gt;&gt; nltk.download()</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<span class="target" id="fig-nltk-downloader"></span><div class="figure" id="fig-nltk-downloader">
+<img alt="../images/nltk-downloader.png" src="http://www.nltk.org/images/nltk-downloader.png" style="width:668.0px;height:276.0px">
+<p class="caption"><span class="caption-label">Рисунок 1.1:</span> Загрузка NLTK Book Collection: просмотр доступных пакетов с помощью <tt class="doctest"><span class="pre">nltk.download()</span></tt>.  Закладка <strong>Collections</strong> в загрузчике показывает, как пакеты группируются в наборы, и вы должны выбрать строку, обозначенной <strong>book</strong>, чтобы получить все данные необходимые для примеров и упражнений из этой книги.  Она состоит из примерно 30 сжатых файлов, требующих примерно 100Mb дискового пространства.
+Полный коллекция данных (то есть, <strong>все</strong> в загрузчике) почти в десять раз больше этого объема (на момент написания) и продолжает расширяться.</p>
+</div>
+<p>После того, как данные будут скачены на ваш компьютер, вы можете загрузить некоторые из них с помощью интерпретатора Python.
+Первый шаг заключается в том, чтобы ввести специальную команду в командной строке Python, которая говорит интерпретатору загрузить некоторые тексты для нас для исследования: <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> <span class="pysrc-keyword">nltk.book</span> import *</span></tt>.
+Это означает "из <tt class="doctest"><span class="pre">book</span></tt> модуля NLTK загрузить все элементы". Этот <tt class="doctest"><span class="pre">book</span></tt> модуль содержит все данные, которые вам понадобятся по мере того, как вы будете читать эту главу.  После вывода приветственного сообщения, он загружает текст нескольких книг (это займет несколько секунд).  И вот опять команда вместе с выводом, который вы увидите.  Проверьте правильность орфографии и пунктуации и помните, что Вы не вводите <tt class="doctest"><span class="pre"><span class="pysrc-prompt">&gt;&gt;&gt;</span></span></tt>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+
+<span class="pysrc-output"></span>
+
+&gt;&gt;&gt; from nltk.book import *
+*** Introductory Examples for the NLTK Book ***
+Loading text1, ..., text9 and sent1, ..., sent9
+Type the name of the text or sentence to view it.
+Type: 'texts()' or 'sents()' to list the materials.
+text1: Moby Dick by Herman Melville 1851
+text2: Sense and Sensibility by Jane Austen 1811
+text3: The Book of Genesis
+text4: Inaugural Address Corpus
+text5: Chat Corpus
+text6: Monty Python and the Holy Grail
+text7: Wall Street Journal
+text8: Personals Corpus
+text9: The Man Who Was Thursday by G . K . Chesterton 1908
+&gt;&gt;&gt; </pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Каждый раз, когда мы хотим узнать что-нибудь об этих текстах, мы просто должны ввести их имена в командной строке Python:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text1
+&lt;Text: Moby Dick by Herman Melville 1851&gt;
+&gt;&gt;&gt; text2
+&lt;Text: Sense and Sensibility by Jane Austen 1811&gt;
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь, когда мы можем использовать интерпретатор Python и у нас есть данные для работы, мы готовы начать.</p>
+</div>
+<div class="section" id="searching-text">
+<h2>1.3 Поиск по тексту</h2>
+<p>Есть много способов, чтобы исследовать контекст текста, кроме просто чтения.  Вид concordance показывает нам каждое появление данного слова вместе с некоторым контекстом.  Здесь мы ищем слово <span class="example">monstrous</span> в <em>Моби Дике</em>, набрав <tt class="doctest"><span class="pre">text1</span></tt>, за которым следует точка, затем этот термин <tt class="doctest"><span class="pre">concordance</span></tt>, а затем помещая <tt class="doctest"><span class="pre"><span class="pysrc-string">"monstrous"</span></span></tt> в скобках:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text1.concordance("monstrous")
+Displaying 11 of 11 matches:
+ong the former , one was of a most monstrous size . ... This came towards us ,
+ON OF THE PSALMS . " Touching that monstrous bulk of the whale or ork we have r
+ll over with a heathenish array of monstrous clubs and spears . Some were thick
+d as you gazed , and wondered what monstrous cannibal and savage could ever hav
+that has survived the flood ; most monstrous and most mountainous ! That Himmal
+they might scout at Moby Dick as a monstrous fable , or still worse and more de
+th of Radney .'" CHAPTER 55 Of the monstrous Pictures of Whales . I shall ere l
+ing Scenes . In connexion with the monstrous pictures of whales , I am strongly
+ere to enter upon those still more monstrous stories of them which are to be fo
+ght have been rummaged out of this monstrous cabinet there is no telling . But
+of Whale - Bones ; for Whales of a monstrous size are oftentimes cast up dead u
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Первый раз, когда вы используете concordance на определенном тексте, требуется несколько дополнительных секунд, чтобы построить индекс для того, чтобы последующие поиски были быстрыми.
+</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> Попробуйте найти другие слова; чтобы повторно не печатать, Вы вероятно сможете использовать стрелку вверх, Ctrl + стрелка вверх или Alt + p, чтобы получить доступ к предыдущей команде и просто изменить слово, которое ищется.
+Вы также можете попробовать поиск на некоторых из других текстов, которые мы включили.
+Например, выполните поиск слова <em>affection</em> по <span class="example">Sense and Sensibility</span>, используя выражение <tt class="doctest"><span class="pre">text2.concordance(<span class="pysrc-string">"affection"</span>)</span></tt>.  Выполните поиск по книге Бытия, чтобы выяснить, как долго некоторые люди жили, используя <tt class="doctest"><span class="pre">text3.concordance(<span class="pysrc-string">"lived"</span>)</span></tt>.  Вы могли бы посмотреть на <tt class="doctest"><span class="pre">text4</span></tt>, <em>Inaugural Address Corpus</em>, чтобы увидеть примеры английского языка относящиеся к 1789 году, и выполнить поиск таких слов, как <span class="example">nation</span>, <span class="example">terror</span>, <span class="example">god</span>, чтобы увидеть, как эти слова изменили свое значение со временем.
+Мы также включили <tt class="doctest"><span class="pre">text5</span></tt>, <em>NPS Chat Corpus</em>: выполнить поиск по нему таких ненормативных слов, как <span class="example">im</span>, <span class="example">ur</span>, <span class="example">lol</span>.
+(Обратите внимание, что этот корпус не подвергся цензуре!)</p>
+</div>
+<p>После того, как вы провели некоторое время, исследуя эти тексты, мы надеемся, что у вас есть новое ощущение богатства и разнообразия языка.  В следующей главе вы узнаете, как получить доступ к более широкому диапазону текстов, в том числе к текстам на других языках.</p>
+<p>Метод concordance позволяет нам видеть слова в контексте.  Например, мы видели, что <span class="example">monstrous</span> появлялось в таких контекстах, как <span class="example">the___ picrtures</span> и <span class="example">a ___size</span>.  Какие еще слова появляются в похожем диапазоне контекстов?  Мы можем выяснить это, добавив термин <tt class="doctest"><span class="pre">similar</span></tt> к названию исследуемого текста, вставляя соответствующее слово в скобках:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+ 	
+&gt;&gt;&gt; text1.similar("monstrous")
+mean part maddens doleful gamesome subtly uncommon careful untoward
+exasperate loving passing mouldy christian few true mystifying
+imperial modifies contemptible
+&gt;&gt;&gt; text2.similar("monstrous")
+very heartily so exceedingly remarkably as vast a great amazingly
+extremely good sweet
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Заметим, что мы получим различные результаты для различных текстов.
+Austen использует это слово немного отлично от Melville; для нее, <span class="example">monstrous</span> имеет положительную коннотацию, а иногда функционирует в качестве усилителя, как слово <span class="example">very</span>.</p>
+<p>Термин <tt class="doctest"><span class="pre">common_contexts</span></tt> позволяет нам рассматривать только те контексты, которые совместно используются двумя или большим количеством слов, таких как <span class="example">monstrous</span> и <span class="example">very</span>. Мы должны заключить эти слова в квадратные скобки, а также в круглые скобки, разделив их запятой:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+
+&gt;&gt;&gt; text2.common_contexts(["monstrous", "very"])
+a_pretty is_pretty am_glad be_glad a_lucky
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>: 
+Выберите другую пару слов и сравните их использование в двух различных текстах, используя <tt class="doctest"><span class="pre">similar()</span></tt> и <tt class="doctest"><span class="pre">common_contexts()</span></tt> функции.</p>
+</div>
+<p>Автоматически обнаружить, что конкретное слово встречается в тексте, и отобразить некоторые слова, которые появляются в том же контексте - одно и то же.  Тем не менее, мы можем также определить <em>расположение</em> слова в тексте: сколько слов в тексте с начала до его появления.
+Эта позиционная информация может быть отображена с помощью <a name="dispersion_plot_index_term"></a> <span class="termdef">графика дисперсии</span>.
+Каждая вертикальная полоса представляет собой экземпляр слова, а каждая строка представляет весь текст.  В <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fig-inaugural">1.2</a> мы видим некоторые поразительные особенности словоупотребления за последние 220 лет (в искусственном тексте, построенного путем присоединения текстов Inaugural Address Corpus один к другому).
+Вы можете воспроивзести этот график, как показано ниже.
+Вы возможно захотите попробовать проанализировать больше слов (например, такие слова, как <span class="example">liberty</span>, <span class="example">constitution</span>), а также другие тексты.  Можете ли вы предсказать дисперсию слова, прежде чем ее увидете?  Как и прежде, позаботьтесь, чтобы правильно ввести кавычки, запятые, а также квадратные и круглые скобки.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+
+&gt;&gt;&gt; text4.dispersion_plot(["citizens", "democracy", "freedom", "duties", "America"])
+&gt;&gt;&gt;
+</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<span class="target" id="fig-inaugural"></span><div class="figure" id="fig-inaugural">
+<img alt="../images/inaugural.png" src="http://www.nltk.org/images/inaugural.png" style="width:738.0px;height:324.0px">
+<p class="caption"><span class="caption-label">Рисунок 1.2</span>: График лексической дисперсии для слов из Инаугурационных речей президентов США: Он может быть использован для изучения динамики использования языка с течением времени.</p>
+</div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Важно:</strong>
+Вы должны установить Python пакеты Numpy и Matplotlib для построения графиков, используемых в этой книге.
+Пожалуйста, посмотрите инструкции по установке на <tt class="doctest"><span class="pre">http://nltk.org/</span></tt>.</p>
+</div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Вы также можете построить график частоты использования слова во времени, используя <tt class="doctest"><span class="pre">https://books.google.com/ngrams</span></tt></p>
+</div>
+<p>Теперь, просто ради забавы, давайте попробуем создать некоторый произвольный текст в различных стилях, которые мы только что видели.  Для этого мы вводим название текста с последующим термином <tt class="doctest"><span class="pre">generate</span></tt>. (Мы должны включить круглые скобки, но между ними ничего нет.)</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text3.generate()
+In the beginning of his brother is a hairy man , whose top may reach
+unto heaven ; and ye shall sow the land of Egypt there was no bread in
+all that he was taken out of the month , upon the earth . So shall thy
+wages be ? And they made their father ; and Isaac was old , and kissed
+him : and Laban with his cattle in the midst of the hands of Esau thy
+first born , and Phichol the chief butler unto his son Isaac , she
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Метод <tt class="doctest"><span class="pre">generate()</span></tt> не доступен в NLTK 3.0, но будет восстановлен в последующих версиях.</p>
+</div>
+<!-- Note that the first time you run this command, it is slow because it gathers statistics
+about word sequences.  Each time you run it, you will get different output text.
+Now try generating random text in the style of an inaugural address or an
+Internet chat room.  Although the text is random, it re-uses common words and
+phrases from the source text and gives us a sense of its style and content.
+(What is lacking in this randomly generated text?) -->
+<!-- note
+When ``generate`` produces its output, punctuation is split off
+from the preceding word.  While this is not correct formatting
+for English text, we do it to make clear that words and
+punctuation are independent of one another. You will learn
+more about this in chap-words_. -->
+</div>
+<div class="section" id="counting-vocabulary">
+<h2>1.4 Словарный счет</h2>
+<p>Наиболее очевидный факт о текстах, который вытекает из предыдущих примеров, заключается в том, что они отличаются по словарю, который они используют.  В этом разделе мы рассмотрим, как использовать компьютер для подсчета слов в тексте различными полезными способами.
+Как и прежде, Вы начнете сразу экспериментировать с интерпретатором Python, даже несмотря на то, что Вы, возможно, еще не изучили Python систематически.  Проверьте свое понимание изменяя примеры и пытаясь выполнять упражнения в конце главы.</p>
+<p>Давайте начнем с того, что найдем длину текста от начала до конца, выраженную  в словах и знаках пунктуации.  Мы используем термин <tt class="doctest"><span class="pre">len</span></tt>, чтобы получить длину чего-нибудь, который мы применим здесь к книге Бытия:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; len(text3)
+44764
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Так Бытие имеет 44.764 слова и знака препинания, или "токена". <a name="token_index_term"></a><span class="termdef">токен</span> - это техническое название для последовательности символов - таких, как <tt class="doctest"><span class="pre">hairy</span></tt>, <tt class="doctest"><span class="pre">his</span></tt> или <tt class="doctest"><span class="pre">:)</span></tt> - которую мы хотим рассматривать как группу. Когда мы считаем количество токенов в тексте, скажем, во фразе <span class="example">to be or not to be</span>, мы считаем вхождения этих последовательностей. Таким образом, в нашем примере есть два вхождения <span class="example">to</span>, два <span class="example">be</span> и по одному <span class="example">or</span> и <span class="example">not</span>. Но есть только четыре различных словарных элемента в этой фразе.
+Сколько различных слов содержит Книга Бытия?
+Для того, чтобы решить эту проблему в Python, мы должны поставить вопрос немного по-другому.  Словарь текста это всего лишь <em>множество</em> токенов, которые он использует, так как во множестве все дубликаты свернуты. В Python мы можем получить элементы словаря для <tt class="doctest"><span class="pre">text3</span></tt> с помощью команды: <tt class="doctest"><span class="pre">set(text3)</span></tt>.  Когда вы сделаете это, сотни экранов, заполненных словами, пролетят перед Вашим глазами.  Теперь попробуйте следующее:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+
+&gt;&gt;&gt; sorted(set(text3)) 
+['!', "'", '(', ')', ',', ',)', '.', '.)', ':', ';', ';)', '?', '?)',
+'A', 'Abel', 'Abelmizraim', 'Abidah', 'Abide', 'Abimael', 'Abimelech',
+'Abr', 'Abrah', 'Abraham', 'Abram', 'Accad', 'Achbor', 'Adah', ...]
+&gt;&gt;&gt; len(set(text3)) 
+2789
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обертывая <tt class="doctest"><span class="pre">sorted()</span></tt> вокруг Python выражения <tt class="doctest"><span class="pre">set(text3))</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sorted-set"><span id="ref-sorted-set"><img src="http://www.nltk.org/book/callouts/callout1.gif" alt="[1]" class="callout" /></span></a>, мы получаем отсортированный список словарных элементов, начиная с различных знаков пунктуации и продолжая словами, начинающимися с <span class="example">А</span>.  Все слова с заглавной буквы предшествуют словам в нижнем регистре.
+Мы обнаруживаем размер словаря косвенно, запрашивая количество элементов  множества, и снова мы можем использовать <tt class="doctest"><span class="pre">len</span></tt>, чтобы получить это их число <a class="reference internal" href="http://www.nltk.org/book/ch01.html#len-set"><span id="ref-len-set"><img src="http://www.nltk.org/book/callouts/callout2.gif" alt="[2]" class="callout" /></span></a>.  Хотя книга имеет 44.764 токена, она имеет только 2.789 различных слов, или "словарных типов". <a name="word_type_index_term"></a> <span class="termdef">Словарный тип</span> - это форма, или написание, слова независящая от его конкретных вхождений в текст - то есть слово рассматривается как уникальный элемент словаря.  Наши 2.789 элементов будут включать в себя знаки пунктуации, так что мы обычно называем эти уникальные элементы <a name="types_index_term"></a> <span class="termdef">типами</span>, а не типов слов.</p>
+<p>Теперь давайте рассчитаем меру лексического богатства текста.  Следующий пример показывает нам, что число различных слов составляет всего 6% от общего количества слов, или - что эквивалентно - что каждое слово используется 16 раз в среднем (помните, если вы используете Python 2, то нужно начать с <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> __future__ <span class="pysrc-keyword">import </span>division</span></tt>).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; len(set(text3)) / len(text3)
+0.06230453042623537
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Далее, давайте сосредоточимся на конкретных словах.  Мы можем рассчитать, как часто слово встречается в тексте, и вычислить, какой процент текста занимает определенное слово:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text3.count("smote")
+5
+&gt;&gt;&gt; 100 * text4.count('a') / len(text4)
+1.4643016433938312
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> Сколько раз слово <span class="example">lol</span> появляется в <tt class="doctest"><span class="pre">text5</span></tt>
+Сколько это в процентах от общего количества слов в этом тексте?</p>
+</div>
+<p>Вы можете повторить такие расчеты по нескольким текстам, но постоянно перепечатывать формулу - утомительно.  Вместо этого вы можете придумать свое собственное имя для задачи, например "lexical_diversity" или "процент" и связать его с блоком кода.
+Теперь Вам надо только набрать короткое имя вместо одного или нескольких полных строк кода на Python и Вы можете повторно использовать его так часто, как Вы захотите. Блок кода, который выполняет для нас задачу, называется <a name="function_index_term"></a> <span class="termdef">функцией</span>, мы определяем короткое имя для нашей функции с помощью ключевого слова <tt class="doctest"><span class="pre">def</span></tt>. В следующем примере показано, как определить две новые функции, <tt class="doctest"><span class="pre">lexical_diversity()</span></tt> и <tt class="doctest"><span class="pre">percentage():</span></tt></p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def lexical_diversity(text): 
+...     return len(set(text)) / len(text) 
+...
+&gt;&gt;&gt; def percentage(count, total): 
+...     return 100 * count / total
+...</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="caution">
+<p class="first admonition-title">Внимание!</p>
+<p class="last">Интерпретатор Python изменяет приглашение с <tt class="doctest"><span class="pre"><span class="pysrc-prompt">&gt;&gt;&gt;</span></span></tt> на <tt class="doctest"><span class="pre"><span class="pysrc-more">...</span></span></tt> после встречи двоеточия в конце первой строки.  Приглашение <tt class="doctest"><span class="pre"><span class="pysrc-more">...</span></span></tt> означает, что Python ожидает, что далее последует <a name="indented_code_block_index_term"></a> <span class="termdef">блок кода с отступом</span>.
+Вы можете выбрать, как сделать отступ: набрав четыре пробела или нажав клавишу табуляции.  Чтобы закончить блок с отступом просто введите пустую строку.</p>
+</div>
+<p>В определении функции <tt class="doctest"><span class="pre">lexical_diversity()</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fun-parameter1"><span id="ref-fun-parameter1"><img src="http://www.nltk.org/book/callouts/callout1.gif" alt="[1]" class="callout" /></span></a>, мы задаем <a name="parameter_index_term"></a> <span class="termdef">параметр</span> с именем <tt class="doctest"><span class="pre">text</span></tt>. Этот параметр является "заменой" фактического текста, лексическое разнообразие которого мы хотим вычислить, и он периодически встречается в блоке кода, который будет выполняться при вызове этой функции<a class="reference internal" href="http://www.nltk.org/book/ch01.html#locvar"><span id="ref-locvar"><img src="http://www.nltk.org/book/callouts/callout2.gif" alt="[2]" class="callout" /></span></a>. Аналогичным образом функция <tt class="doctest"><span class="pre">percentage()</span></tt> определена так, чтобы принимать два параметра с именами <tt class="doctest"><span class="pre">count</span></tt> и <tt class="doctest"><span class="pre">total</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fun-parameter2"><span id="ref-fun-parameter2"><img src="http://www.nltk.org/book/callouts/callout3.gif" alt="[3]" class="callout" /></span></a>.</p>
+<p>После того, как Python узнает, что функции <tt class="doctest"><span class="pre">lexical_diversity()</span></tt> и <tt class="doctest"><span class="pre">percentage()</span></tt> имена для отдельных блоков кода, мы можем идти вперед и использовать эти функции:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; lexical_diversity(text3)
+0.06230453042623537
+&gt;&gt;&gt; lexical_diversity(text5)
+0.13477005109975562
+&gt;&gt;&gt; percentage(4, 5)
+80.0
+&gt;&gt;&gt; percentage(text4.count('a'), len(text4))
+1.4643016433938312
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Напомним, мы используем, или <a name="call_index_term"></a> <span class="termdef">вызываем</span>, функцию, такую как <tt class="doctest"><span class="pre">lexical_diversity()</span></tt>, вводя ее имя, за которым следует открывающая скобка, название текста, а затем закрывающая скобка. Эти круглые скобки будут появляться часто; их роль заключается в отделении имени задачи - такого, как <tt class="doctest"><span class="pre">lexical_diversity()</span></tt> - от данных, с которыми должна быть выполнена эта задача - таких, как <tt class="doctest"><span class="pre">text3</span></tt>
+Значение, которое мы помещаем в скобках, когда вызываем функцию - это <a name="argument_index_term"></a><span class="termdef">аргумент</span> функции.</p>
+<p>Вы уже встречали несколько функций в этой главе, таких как <tt class="doctest"><span class="pre">len()</span></tt>, <tt class="doctest"><span class="pre">set()</span></tt> и <tt class="doctest"><span class="pre">sorted()</span></tt>. По соглашению, мы всегда будем добавлять пустую пару скобок после имени функции, как в <tt class="doctest"><span class="pre">len()</span></tt>, просто чтобы дать понять, что то, о чем мы говорим, - это функция, а не какой-либо другой вид выражения Python.
+Функции являются важным понятием в программировании, и мы упоминаем их только в самом начале, чтобы дать новичкам ощущение мощи и креативности программирования.  Не волнуйтесь, если прямо сейчас для Вас это выглядит немного запутанно.</p>
+<p>Позже мы увидим, как использовать функции для представления данных в табличной форме, как в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#tab-brown-types">1.1</a>.
+Каждая строка таблицы будет требовать одни и те же вычисления, но с разными данными, и мы сделаем эту монотонную работу, используя функцию.</p>
+<span class="target" id="tab-brown-types"></span><table border="1" class="docutils" id="tab-brown-types">
+<colgroup>
+<col width="39%">
+<col width="13%">
+<col width="11%">
+<col width="37%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Жанр</th>
+<th class="head">Ток</th>
+<th class="head">Типы</th>
+<th class="head">Лексическое разнообразие</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>умения и хобби</td>
+<td>82345</td>
+<td>11935</td>
+<td>0,145</td>
+</tr>
+<tr><td>юмор</td>
+<td>21695</td>
+<td>5017</td>
+<td>0,231</td>
+</tr>
+<tr><td>фантастика: наука</td>
+<td>14470</td>
+<td>3233</td>
+<td>0,223</td>
+</tr>
+<tr><td>пресса: репортаж</td>
+<td>100554</td>
+<td>14394</td>
+<td>0,143</td>
+</tr>
+<tr><td>фантастика: романтика</td>
+<td>70022</td>
+<td>8452</td>
+<td>0,121</td>
+</tr>
+<tr><td>религия</td>
+<td>39399</td>
+<td>6373</td>
+<td>0.162</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 1.1:</span> <p>Лексическое разнообразие различных жанров в <em>Brown Corpus</em></p>
+</p>
+</td></table>
+</div>
+</div>
+<div class="section" id="a-closer-look-at-python-texts-as-lists-of-words">
+<span id="sec-a-closer-look-at-python-texts-as-lists-of-words"></span><h1>2 Более пристальный взгляд на Python: тексты как списки слов</h1>
+<!-- reimport
+
+>>> from nltk.book import *
+>>> def lexical_diversity(text):
+...     return len(text) / len(set(text)) -->
+<p>Вы уже увидели некоторые важные элементы языка программирования Python.
+Давайте потратим несколько минут, чтобы рассмотреть их систематически.</p>
+<div class="section" id="lists">
+<h2>2.1 Списки</h2>
+<!-- XXX it&#39;s a little confusing that we assign a value to sent1 here,
+when it&#39;s already received on from the "from nltk.book import *"
+statement.  Granted it&#39;s the same value, but still... -->
+<p>Что такое текст?  На одном уровне, это последовательность символов на странице, такой как эта.  На другом уровне, он представляет собой последовательность глав, состоящих из последовательности отделов, где каждый отдел представляет собой последовательность параграфов и так далее.  Однако для наших целей, мы будем думать, что текст - это не более, чем последовательность слов и знаков препинания.  Вот как мы представляем текст в Python, в данном случае первое предложение из <em>Моби Дика</em>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent1 = ['Call', 'me', 'Ishmael', '.']
+&gt;&gt;&gt;
+<span class="pysrc-prompt">&gt;&gt;&gt;</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>После приглашения мы ввели имя, которое придумали, <tt class="doctest"><span class="pre">sent1</span></tt>, а затем знак равенства, а затем несколько слов в кавычках, разделенных запятыми и окруженных квадратными скобками.  Этот материал в квадратных скобках известен как <a name="list_index_term"></a> <span class="termdef">список</span> в Python: так мы храним текст.
+Мы можем просмотреть его, введя имя <a class="reference internal" href="http://www.nltk.org/book/ch01.html#inspect-var"><span id="ref-inspect-var"><img src="http://www.nltk.org/book/callouts/callout1.gif" alt="[1]" class="callout" /></span></a>. Мы можем узнать его длину <a class="reference internal" href="http://www.nltk.org/book/ch01.html#len-sent"><span id="ref-len-sent"><img src="http://www.nltk.org/book/callouts/callout2.gif" alt="[2]" class="callout" /></span></a>.
+Мы даже можем применить к нему нашу собственную функцию <tt class="doctest"><span class="pre">lexical_diversity()</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch01.html#apply-function"><span id="ref-apply-function"><img src="http://www.nltk.org/book/callouts/callout3.gif" alt="[3]" class="callout" /></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent1 
+['Call', 'me', 'Ishmael', '.']
+&gt;&gt;&gt; len(sent1) 
+4
+&gt;&gt;&gt; lexical_diversity(sent1) 
+1.0
+&gt;&gt;&gt;
+</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Еще немного списков были определены для вас, по одному для первого предложения из каждого нашего текста, <tt class="doctest"><span class="pre">sent2</span></tt> ... <tt class="doctest"><span class="pre">sent9</span></tt>.  Мы просматриваем два из них здесь; вы можете для себя просмотреть остальные, используя интерпретатор Python (если вы получаете сообщение об ошибке, которая говорит, что <tt class="doctest"><span class="pre">sent2</span></tt> не определено, то вам необходимо сначала набрать <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> <span class="pysrc-keyword">nltk.book</span> import *</span></tt>).</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent2
+['The', 'family', 'of', 'Dashwood', 'had', 'long',
+'been', 'settled', 'in', 'Sussex', '.']
+&gt;&gt;&gt; sent3
+['In', 'the', 'beginning', 'God', 'created', 'the',
+'heaven', 'and', 'the', 'earth', '.']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Составьте несколько своих предложений, введя имя, знак равенства и список слов, как это: <tt class="doctest"><span class="pre">ex1 = [<span class="pysrc-string">'Monty'</span>, <span class="pysrc-string">'Python'</span>, <span class="pysrc-string">'and'</span>, <span class="pysrc-string">'the'</span>, <span class="pysrc-string">'Holy'</span>, <span class="pysrc-string">'Grail'</span>]</span></tt>.
+Повторите некоторые из других операций Python, которые мы видели ранее в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a>, например, <tt class="doctest"><span class="pre">sorted(ex1)</span></tt>, <tt class="doctest"><span class="pre">len(set(ex1))</span></tt>, <tt class="doctest"><span class="pre">ex1.count(<span class="pysrc-string">'the'</span>)</span></tt>.</p>
+</div>
+<p>Приятный сюрприз заключается в том, что мы можем использовать оператор сложения Python для списков.
+Сложение двух списков <a class="reference internal" href="http://www.nltk.org/book/ch01.html#list-plus-list"><span id="ref-list-plus-list"><img src="http://www.nltk.org/book/callouts/callout1.gif" alt="[1]" class="callout" /></span></a> создает новый список, состоящий из всех элементов первого списка, за которыми идут все элементы второго списка:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; ['Monty', 'Python'] + ['and', 'the', 'Holy', 'Grail'] 
+['Monty', 'Python', 'and', 'the', 'Holy', 'Grail']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Это применение операции сложения называется <a name="concatenation_index_term"></a><span class="termdef">конкатенацией</span>; она объединяет несколько списков в один список.  Мы можем объединить предложения, чтобы создать текст.</p>
+</div>
+<p>Мы также не должны вручную вводить списки; мы можем использовать короткие имена, которые ссылаются на предопределенные списки.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent4 + sent1
+['Fellow', '-', 'Citizens', 'of', 'the', 'Senate', 'and', 'of', 'the',
+'House', 'of', 'Representatives', ':', 'Call', 'me', 'Ishmael', '.']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Что если мы хотим добавить отдельный элемент в список? Эта операция известна как <a name="appending_index_term"></a><span class="termdef">присоединение</span>.
+Когда мы делаем <tt class="doctest"><span class="pre">append()</span></tt> к некоторому списку, этот список обновляется в результате этой операции.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent1.append("Some")
+&gt;&gt;&gt; sent1
+['Call', 'me', 'Ishmael', '.', 'Some']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="indexing-lists">
+<h2>2.2 Индексирование списков</h2>
+<!-- XXX I think a picture would be very helpful for this section, namely
+one showing something like:
+    | Call   | me     | Ishmael | .     |
+    0        1        2         3       4
+This might obviate the need to use a contrived sentence "word1
+word2 etc".  I find this picture especially useful for understanding
+slicing, but it also gives a reasonable motivation for zero-indexing. -->
+<!-- XXX If we end up doing this, can we offset the integers slightly so
+that they (just) fall inside the corresponding cell?
+
+    +- - - - - - - -+- - - - - - - -+- - - - - - - -+- - - - - - - -+
+    | Call   | me     | Ishmael| .      |
+    |0       |1       |2       |3       |4
+    +- - - - - - - -+- - - - - - - -+- - - - - - - -+- - - - - - - -+ -->
+<p>Как мы уже увидели, текст в Python - это список слов, представленных с использованием комбинации скобок и кавычек.  Как и с обычной страницей текста, мы можем подсчитать общее количество слов в <tt class="doctest"><span class="pre">text1</span></tt> с помощью <tt class="doctest"><span class="pre">len(text1)</span></tt>, а также подсчитать вхождения в текст конкретного слова - скажем, <tt class="doctest"><span class="pre"><span class="pysrc-string">'heaven'</span></span></tt> - с помощью <tt class="doctest"><span class="pre">text1.count(<span class="pysrc-string">'heaven'</span>)</span></tt>.</p>
+<p>Обладая некоторым терпением, мы можем выбрать 1-е, 173-е или даже 14.278-е слово в печатном тексте. Аналогично, мы можем идентифицировать элементы списка Python по порядку их появления в списке. Цифра, которая представляет эту позицию, является <a name="index_index_term"></a><span class="termdef">индексом</span> элемента.  Мы сообщаем Python, что необходимо показать элемент, который появляется в тексте на месте с индексом, например <tt class="doctest"><span class="pre">173</span></tt>, написав название текста, за которым следует индекс в квадратных скобках:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text4[173]
+'awaken'
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем сделать обратное: имея слово, найти индекс места, на котором он впервые возникает:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text4.index('awaken')
+173
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Индексы - это распространенный способ доступа к словам текста, или, в более общем плане, к элементам любого списка.
+Python также позволяет нам получить доступ к подспискам, посредством извлечения управляемых частей языка из больших текстов - техники, известной как <a name="slicing_index_term"></a><span class="termdef">слайсинг</span>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+
+&gt;&gt;&gt; text5[16715:16735]
+['U86', 'thats', 'why', 'something', 'like', 'gamefly', 'is', 'so', 'good',
+'because', 'you', 'can', 'actually', 'play', 'a', 'full', 'game', 'without',
+'buying', 'it']
+&gt;&gt;&gt; text6[1600:1625]
+['We', "'", 're', 'an', 'anarcho', '-', 'syndicalist', 'commune', '.', 'We',
+'take', 'it', 'in', 'turns', 'to', 'act', 'as', 'a', 'sort', 'of', 'executive',
+'officer', 'for', 'the', 'week']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Индексы имеют некоторые нюансы, и мы рассмотрим их с помощью искусственного предложения:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent = ['word1', 'word2', 'word3', 'word4', 'word5',
+...         'word6', 'word7', 'word8', 'word9', 'word10']
+&gt;&gt;&gt; sent[0]
+'word1'
+&gt;&gt;&gt; sent[9]
+'word10'
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание, что наши индексы начинаются с нуля: элемент ноль списка <tt class="doctest"><span class="pre">sent</span></tt>, записываемый как <tt class="doctest"><span class="pre">sent[0]</span></tt>, это первое слово, <tt class="doctest"><span class="pre"><span class="pysrc-string">'word1'</span></span></tt>, в то время как элемент 9 списка <tt class="doctest"><span class="pre">sent</span></tt> - это <tt class="doctest"><span class="pre"><span class="pysrc-string">'word10'</span></span></tt>.
+Причина проста: в тот момент, когда Python обращается к содержанию списка в памяти компьютера, он уже стоит на первом элементе; и мы должны сказать ему, сколько элементов вперед необходимо пройти.
+Таким образом, ноль шагов вперед оставляет его на первом элементе.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Эта практика индексирования начиная с нуля изначально сбивает с толку, но типична для современных языков программирования.
+Вы быстро поймете ее смысл, если вы освоили систему подсчета веков, где 19XY год был в 20-м веке, или если вы живете в стране, где этажи здания пронумерованы от 1, и поэтому, проходя <span class="math">n-1</span> пролетов, вы попадаете на уровень <span class="math">n</span>.</p>
+</div>
+<p>Теперь, если мы случайно использовали индекс, который слишком велик, мы получаем ошибку:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent[10]
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in ?
+IndexError: list index out of range
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>На этот раз это не ошибка синтаксиса, поскольку фрагмент программы синтаксически правильный.
+Напротив, это <a name="runtime_error_index_term"></a><span class="termdef">ошибка во время выполнения</span>, и она производит <tt class="doctest"><span class="pre">Traceback</span></tt> сообщение, которое показывает контекст ошибки, за которым следует имя ошибки, <tt class="doctest"><span class="pre">IndexError</span></tt>, и краткое объяснение.</p>
+<p>Давайте подробнее рассмотрим слайсинг, используя наше искусственное предложение еще раз.
+Здесь мы проверим, что срез <tt class="doctest"><span class="pre">5:8</span></tt> включает в себя элементы <tt class="doctest"><span class="pre">sent</span></tt> на позициях 5, 6 и 7:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent[5:8]
+['word6', 'word7', 'word8']
+&gt;&gt;&gt; sent[5]
+'word6'
+&gt;&gt;&gt; sent[6]
+'word7'
+&gt;&gt;&gt; sent[7]
+'word8'
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>По соглашению <tt class="doctest"><span class="pre">m:n</span></tt> означает элементы <span class="mathit">m</span>... <span class="mathit">n-1</span>.
+Как показывает следующий пример, мы можем опустить первое число, если срез начинается в начале списка <a class="reference internal" href="http://www.nltk.org/book/ch01.html#slice2"><span id="ref-slice2"><img src="http://www.nltk.org/book/callouts/callout1.gif" alt="[1]" class="callout" /></span></a> и мы можем опустить второй номер, если срез оканчивается на его конце<a class="reference internal" href="http://www.nltk.org/book/ch01.html#slice3"><span id="ref-slice3"><img src="http://www.nltk.org/book/callouts/callout2.gif" alt="[2]" class="callout" /></span></a>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent[:3] 
+['word1', 'word2', 'word3']
+&gt;&gt;&gt; text2[141525:] 
+['among', 'the', 'merits', 'and', 'the', 'happiness', 'of', 'Elinor', 'and', 'Marianne',
+',', 'let', 'it', 'not', 'be', 'ranked', 'as', 'the', 'least', 'considerable', ',',
+'that', 'though', 'sisters', ',', 'and', 'living', 'almost', 'within', 'sight', 'of',
+'each', 'other', ',', 'they', 'could', 'live', 'without', 'disagreement', 'between',
+'themselves', ',', 'or', 'producing', 'coolness', 'between', 'their', 'husbands', '.',
+'THE', 'END']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем изменить элемент списка путем присвоения значений одному из его индексов.
+В следующем примере, мы помещаем <tt class="doctest"><span class="pre">sent[0]</span></tt> слева от знака равенства <a class="reference internal" href="http://www.nltk.org/book/ch01.html#list-assignment"><span id="ref-list-assignment"><img src="http://www.nltk.org/book/callouts/callout1.gif" alt="[1]" class="callout" /></span></a>.  Мы также можем заменить весь срез новым материалом<a class="reference internal" href="http://www.nltk.org/book/ch01.html#slice-assignment"><span id="ref-slice-assignment"><img src="http://www.nltk.org/book/callouts/callout2.gif" alt="[2]" class="callout" /></span></a>.  Следствием этого последнего изменения является то, что список имеет только четыре элемента, а доступ к следующему значению генерирует ошибку <a class="reference internal" href="http://www.nltk.org/book/ch01.html#list-error"><span id="ref-list-error"><img src="http://www.nltk.org/book/callouts/callout3.gif" alt="[3]" class="callout" /></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+
+&gt;&gt;&gt; sent[0] = 'First' 
+&gt;&gt;&gt; sent[9] = 'Last'
+&gt;&gt;&gt; len(sent)
+10
+&gt;&gt;&gt; sent[1:9] = ['Second', 'Third'] 
+&gt;&gt;&gt; sent
+['First', 'Second', 'Third', 'Last']
+&gt;&gt;&gt; sent[9] 
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in ?
+IndexError: list index out of range
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> Потратьте несколько минут, чтобы определить собственное предложение, а затем изменить в нем отдельные слова и группы слов (срезы), используя рассмотренные методы.  Проверьте ваше понимание, выполнив упражнения на списки в конце этой главы.</p>
+</div>
+</div>
+<div class="section" id="variables">
+<h2>2.3 Переменные</h2>
+<p>С начала <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a>, вы имели доступ к текстам, называемым <tt class="doctest"><span class="pre">text1</span></tt>, <tt class="doctest"><span class="pre">text2</span></tt> и так далее.  Возможность с помощью таких кратких имен, как эти, ссылаться на книгу, содержащую 250.000 слов, избавило нас от необходимости набирать ее вручную!  В принципе мы можем давать имена всему, с чем производим вычисления.  Мы делали это уже в предыдущих разделах, например, определяя <a name="variable_index_term"></a> <span class="termdef">переменную</span> <tt class="doctest"><span class="pre">sent1</span></tt>, следующим образом :</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent1 = ['Call', 'me', 'Ishmael', '.']
+&gt;&gt;&gt;
+<span class="pysrc-prompt"></span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Такие строки имеют вид: <em>переменная = выражение.</em>  Python определит значение выражения и сохранит результат в переменной.  Этот процесс называется <a name="assignment_index_term"></a><span class="termdef">присвоением</span>.  Он не формирует никаких выходных данных; вы должны набрать переменную в отдельной строке, чтобы проверить ее содержимое.  Знак равенства немного сбивает с толку, так как информация движется справа налево. Возможно, понимание знака равенства как стрелки влево поможет избежать ошибки.
+Имя переменной может быть каким угодно, например, <tt class="doctest"><span class="pre">my_sent</span></tt>, <tt class="doctest"><span class="pre">sentence</span></tt>, <tt class="doctest"><span class="pre">xyzzy</span></tt>.
+Оно должно начинаться с буквы и может содержать цифры и символы подчеркивания.
+Вот некоторые примеры переменных и присвоений:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; my_sent = ['Bravely', 'bold', 'Sir', 'Robin', ',', 'rode',
+... 'forth', 'from', 'Camelot', '.']
+&gt;&gt;&gt; noun_phrase = my_sent[1:4]
+&gt;&gt;&gt; noun_phrase
+['bold', 'Sir', 'Robin']
+&gt;&gt;&gt; wOrDs = sorted(noun_phrase)
+&gt;&gt;&gt; wOrDs
+['Robin', 'Sir', 'bold']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Помните, что в отсортированных списках слова с заглавной буквы появляются перед словами со строчной буквы.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Обратите внимание, что в предыдущем примере мы разделили определение <tt class="doctest"><span class="pre">my_sent</span></tt> на две строки.  Выражения Python может быть разбито на несколько строк, пока это происходит внутри любого вида скобок.
+Python использует <tt class="doctest"><span class="pre"><span class="pysrc-more">"..."</span></span></tt> приглашение, чтобы указать, что ожидается еще ввод.  Не имеет значения, сколько отступов используются в этих строках продолжения, но некоторый отступ обычно делает их более удобными для чтения.</p>
+</div>
+<p>Хорошо выбирать значимые имена переменных, чтобы напомнить вам - и помочь кому-либо еще, кто читает ваш код Python - что ваш код должен делать.
+Python не пытается понять смысл имен; он слепо следует за вашими инструкциями и не возражает, если вы делаете что-то, что сбивает с толку, например, как такие присвоения: <tt class="doctest"><span class="pre">one = <span class="pysrc-string">'two'</span></span></tt> или <tt class="doctest"><span class="pre">two = 3</span></tt>.
+Единственное ограничение состоит в том, что имя переменной не может быть каким-либо из зарезервированных слов языка Python, таких как <tt class="doctest"><span class="pre">def</span></tt>, <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt>, <tt class="doctest"><span class="pre"><span class="pysrc-keyword">not</span></span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-keyword">import</span></span></tt>.  Если вы используете зарезервированное слово, Python вызовет ошибку синтаксиса:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; not = 'Camelot'           
+File "&lt;stdin&gt;", line 1
+    not = 'Camelot'
+        ^
+SyntaxError: invalid syntax
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы будем часто использовать переменные для хранения промежуточных результатов вычислений, особенно, когда это делает код проще для понимания.  Таким образом, <tt class="doctest"><span class="pre">len(set(text1))</span></tt> можно также записать:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; vocab = set(text1)
+&gt;&gt;&gt; vocab_size = len(vocab)
+&gt;&gt;&gt; vocab_size
+19317
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="caution">
+<p class="first admonition-title">Внимание!</p>
+<p class="last">Будьте осторожны с выбором имен (или <a name="identifiers_index_term"></a><span class="termdef">идентификаторов</span>) для переменных Python.  Во-первых, имя должно начинаться с буквы, далее могут следовать цифры (от <tt class="doctest"><span class="pre">0</span></tt> до <tt class="doctest"><span class="pre">9</span></tt>) или буквы. Таким образом, имя <tt class="doctest"><span class="pre">abc23</span></tt> подойдет, а <tt class="doctest"><span class="pre">23abc</span></tt> вызовет синтаксическую ошибку.
+Имена чувствительны к регистру, что означает, что <tt class="doctest"><span class="pre">MyVar</span></tt> и <tt class="doctest"><span class="pre">Myvar</span></tt> являются различными переменными.  Имена переменных не могут содержать пробелы, но вы можете отделить слова, используя подчеркивания, например, <tt class="doctest"><span class="pre">my_var</span></tt>. Будьте осторожны, чтобы не вставить дефис вместо подчеркивания: <tt class="doctest"><span class="pre">my-var</span></tt> это неправильно, так как Python интерпретирует <tt class="doctest"><span class="pre">"-"</span></tt> как знак минус.</p>
+</div>
+</div>
+<div class="section" id="strings">
+<h2>2.4 Строки</h2>
+<p>Некоторые из методов, которые мы использовали для доступа к элементам списка, также работают с отдельными словами, или <a name="strings_index_term"></a><span class="termdef">строками</span>.  Например, мы можем присвоить строку переменной<a class="reference internal" href="http://www.nltk.org/book/ch01.html#assign-string"><span id="ref-assign-string"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, получить символ строки с определенным индексом<a class="reference internal" href="http://www.nltk.org/book/ch01.html#index-string"><span id="ref-index-string"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, и сделать срез строки <a class="reference internal" href="http://www.nltk.org/book/ch01.html#slice-string"><span id="ref-slice-string"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; name = 'Monty' 
+&gt;&gt;&gt; name[0] 
+'M'
+&gt;&gt;&gt; name[:4] 
+'Mont'
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы также можем выполнить умножение и сложение со строками:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; name * 2
+'MontyMonty'
+&gt;&gt;&gt; name + '!'
+<span class="pysrc-output">'Monty!'</span>
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы можем объединить слова списка, чтобы сделать одну строку, или разделить строку, сделав из нее список, следующим образом:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; ' '.join(['Monty', 'Python'])
+'Monty Python'
+&gt;&gt;&gt; 'Monty Python'.split()
+['Monty', 'Python']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы вернемся к теме строк в <a class="reference external" href="http://www.nltk.org/book/ch03.html#chap-words">3</a>.
+На данный момент у нас есть два важных строительных блока - списки и строки - и мы готовы вернуться к анализу языка.</p>
+</div>
+</div>
+<div class="section" id="computing-with-language-simple-statistics">
+<span id="sec-computing-with-language-simple-statistics"></span><h1>3 Языковые вычисления: простая статистика</h1>
+<!-- reimport
+
+>>> from nltk.book import * -->
+<p>Давайте вернемся к нашему исследованию того, как мы можем применить наши вычислительные ресурсы к большому количеству текста.  Мы начали эту дискуссию в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a>, и ужу видели, как искать слова в контексте, как собрать словарь текста, как генерировать случайный текст в том же стиле и так далее.</p>
+<p>В этом разделе мы поднимаем вопрос о том, что делает текст отличным от других, и используем автоматические методы, чтобы найти характерные слова и выражения текста.  Как и в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a>, вы можете попробовать новые возможности языка Python, скопировав их в интерпретатор, вы узнаете об этих функциях систематически в следующем разделе.</p>
+<p>Перед тем как продолжить, вы возможно хотели бы проверить ваше понимание последнего раздела, спрогнозировав результат следующего кода.  Вы можете использовать интерпретатор, чтобы проверить правильно ли вы поняли.  Если вы не знаете, как выполнить эту задачу, было бы неплохо повторить предыдущий раздел, прежде чем продолжить дальше.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; saying = ['After', 'all', 'is', 'said', 'and', 'done',
+...           'more', 'is', 'said', 'than', 'done']
+&gt;&gt;&gt; tokens = set(saying)
+&gt;&gt;&gt; tokens = sorted(tokens)
+&gt;&gt;&gt; tokens[-2:]
+what output do you expect here?
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="section" id="frequency-distributions">
+<h2>3.1 Распределения частот</h2>
+<p>Как мы можем автоматически определить слова, которые лучше всего характеризуют тему и жанр текста?  Представьте, как бы вы поступили с задачей поиска 50 наиболее часто встречающихся слов книги.  Один из возможных методов состоит в том, чтобы вести учет повторений для каждого элемента словаря, как это показано в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fig-tally">3.1</a>.
+Подсчет потребовал бы тысячи строк, и это было бы чрезвычайно трудоемко - настолько трудоемко, что мы предпочли бы дать это задание машине.</p>
+<span class="target" id="fig-tally"></span><div class="figure" id="fig-tally">
+<img alt="../images/tally.png" src="http://www.nltk.org/images/tally.png" style="width:231.8px;height:155.0px">
+<p class="caption"><span class="caption-label">Рисунок 3.1:</span> Подсчет появлений слов в текстовом (распределение частот)</p>
+</div>
+<p>Таблица <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fig-tally">3.1</a> известна как <a name="frequency_distribution_index_term"></a><span class="termdef">распределение частот</span>, она сообщает нам частоту появления каждого элемента словаря в тексте.
+(В общем, может быть подсчитан любой вид наблюдаемых событий).
+Это "распределение", потому что оно говорит нам, как общее количество словарных токенов в тексте распределено по элементам словаря.
+Так как в обработке языка нам часто надо знать распределение частот, NLTK предоставляет встроенную поддержку этой задачи.  Давайте воспользуемся <tt class="doctest"><span class="pre">FreqDist</span></tt>, чтобы найти 50 наиболее частых слов <em>Moby Dick</em>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fdist1 = FreqDist(text1) 
+&gt;&gt;&gt; print(fdist1) 
+&lt;FreqDist with 19317 samples and 260819 outcomes&gt;
+&gt;&gt;&gt; fdist1.most_common(50) 
+[(',', 18713), ('the', 13721), ('.', 6862), ('of', 6536), ('and', 6024),
+('a', 4569), ('to', 4542), (';', 4072), ('in', 3916), ('that', 2982),
+("'", 2684), ('-', 2552), ('his', 2459), ('it', 2209), ('I', 2124),
+('s', 1739), ('is', 1695), ('he', 1661), ('with', 1659), ('was', 1632),
+('as', 1620), ('"', 1478), ('all', 1462), ('for', 1414), ('this', 1280),
+('!', 1269), ('at', 1231), ('by', 1137), ('but', 1113), ('not', 1103),
+('--', 1070), ('him', 1058), ('from', 1052), ('be', 1030), ('on', 1005),
+('so', 918), ('whale', 906), ('one', 889), ('you', 841), ('had', 767),
+('have', 760), ('there', 715), ('But', 705), ('or', 697), ('were', 680),
+('now', 646), ('which', 640), ('?', 637), ('me', 627), ('like', 624)]
+&gt;&gt;&gt; fdist1['whale']
+906
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Когда мы впервые вызываем <tt class="doctest"><span class="pre">FreqDist</span></tt>, мы передаем имя текста в качестве аргумента <a class="reference internal" href="http://www.nltk.org/book/ch01.html#freq-dist-call"><span id="ref-freq-dist-call"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>. Мы можем проверить общее количество слов ("outcomes"), которые были подсчитаны <a class="reference internal" href="http://www.nltk.org/book/ch01.html#freq-dist-inspect"><span id="ref-freq-dist-inspect"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a> - 260.819 в случае <em>Moby Dick</em>. Выражение <tt class="doctest"><span class="pre">most_common(50)</span></tt> дает нам список 50 наиболее часто встречающихся типов текста<a class="reference internal" href="http://www.nltk.org/book/ch01.html#freq-dist-most-common"><span id="ref-freq-dist-most-common"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a>.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong>
+Попробуйте выполнить предыдущий пример распределения частот самостоятельно с <tt class="doctest"><span class="pre">text2</span></tt>.  Будьте внимательны - используйте правильные круглые скобки и заглавные буквы.
+Если вы получите сообщение об ошибке <tt class="doctest"><span class="pre">NameError: name <span class="pysrc-string">'FreqDist'</span> <span class="pysrc-keyword">is not defined</span></span></tt>, вам нужно начать работу с <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> <span class="pysrc-keyword">nltk.book</span> import *</span></tt></p>
+</div>
+<!-- SB: no period after the above import statement -->
+<p>Помогают ли нам какие-либо слова, полученные в последнем примере, понять тему или жанр этого текста?
+Только одно слово, <span class="example">кит</span>, немного информативно!  Оно появляется более 900 раз.
+Остальные слова ничего не говорят нам о тексте; они являются просто английской "сантехникой". Какая часть текста занята такими словами?
+Мы можем получить кумулятивный график частоты этих слов, используя <tt class="doctest"><span class="pre">fdist1.plot (50, cumulative = True)</span></tt>, для получения графа в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fig-fdist-moby">3.2</a>.
+Эти 50 слов составляют почти половину книги!</p>
+<span class="target" id="fig-fdist-moby"></span><div class="figure" id="fig-fdist-moby">
+<img alt="../images/fdist-moby.png" src="http://www.nltk.org/images/fdist-moby.png" style="width:207.20000000000002px;height:116.2px">
+<p class="caption"><span class="caption-label">Рисунок 3.2:</span> Кумулятивный график частоты 50 наиболее часто встречаемых слов в <em>Моби Дике</em>: на них приходится почти половина токенов.</p>
+</div>
+<p>Если частотные слова не помогают нам, как насчет слов, которые появляются только один раз, так называемых <a name="hapaxes_index_term"></a><span class="termdef">гапаксов</span>?  Просмотрите их, набрав <tt class="doctest"><span class="pre">fdist1.hapaxes()</span></tt>.
+Этот список содержит <span class="example">лексикограф</span>, <span class="example">cetological</span>, <span class="example">контрабанда</span>, <span class="example">увещевания</span> и около 9.000 других.
+Кажется, что редких слов слишком много, и, не видя контекст, мы, вероятно, никак не можем угадать, что половина гапаксов означает!
+Поскольку ни частотные, ни редкие слова не помогают, нам нужно попробовать что-то другое.</p>
+</div>
+<div class="section" id="fine-grained-selection-of-words">
+<h2>3.2 "Тонкозернистый" выбор слов</h2>
+<p>Далее давайте посмотрим на <em>длинные</em> слова текста; возможно, они будут более характерны и информативны.  Для этого мы применим некоторые обозначения из теории множеств.  Мы хотели бы найти слова из словаря текста, которые имеют длину более 15 символов.  Давайте назовем это свойство <span class="math">Р</span>, так что <span class="math">Р(w)</span> истинно тогда и только тогда, когда <span class="math">w</span> имеет длину более 15 символов.
+Теперь мы можем выразить интересующие нас слова, используя математическое обозначение множеств, как показано в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#ex-set-comprehension-math">(1а)</a>.
+Это означает "множество всех <span class="math">w</span> таких, что <span class="math">w</span> является элементом <span class="math">V</span> (словаря) и <span class="math">w</span> имеет свойство <span class="math">Р</span>".</p>
+<span class="target" id="ex-set-comprehension"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(1)</td><td width="15"></td><td><span class="target" id="ex-set-comprehension-math"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">а.</td><td width="15"></td><td><span class="math">{w</span> | <span class="math">w</span> ∈ <span class="math">V</span> &amp; <span class="math">P(w)}</span></td></tr></table></p>
+<span class="target" id="ex-set-comprehension-python"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">б.</td><td width="15"></td><td><tt class="doctest"><span class="pre">[w <span class="pysrc-keyword">for</span> w <span class="pysrc-keyword">in</span> V <span class="pysrc-keyword">if</span> p(w)]</span></tt></td></tr></table></p>
+</td></tr></table></p>
+<p>Соответствующее выражение Python, приведено в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#ex-set-comprehension-python">(1b)</a>.
+(Обратите внимание, что оно возвращает список, а не набор, что значит дубликаты возможны.)
+Посмотрите, насколько похожи две записи.  Давайте сделаем еще один шаг и напишем исполняемый код Python:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; V = set(text1)
+&gt;&gt;&gt; long_words = [w for w in V if len(w) &gt; 15]
+&gt;&gt;&gt; sorted(long_words)
+['CIRCUMNAVIGATION', 'Physiognomically', 'apprehensiveness', 'cannibalistically',
+'characteristically', 'circumnavigating', 'circumnavigation', 'circumnavigations',
+'comprehensiveness', 'hermaphroditical', 'indiscriminately', 'indispensableness',
+'irresistibleness', 'physiognomically', 'preternaturalness', 'responsibilities',
+'simultaneousness', 'subterraneousness', 'supernaturalness', 'superstitiousness',
+'uncomfortableness', 'uncompromisedness', 'undiscriminating', 'uninterpenetratingly']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Для каждого слова <tt class="doctest"><span class="pre">w</span></tt> в словаре <tt class="doctest"><span class="pre">v</span></tt> мы проверяем, является ли <tt class="doctest"><span class="pre">len(w)</span></tt> больше, чем 15; все остальные слова будут проигнорированы.  Мы обсудим этот синтаксис более тщательно позже.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>: 
+Попробуйте предыдущие выражения в интерпретаторе Python, поэкспериментируйте, изменяя текст и условие длины слов.
+Есть ли различие в ваших результатах, если вы измените имена переменных, например, используя <tt class="doctest"><span class="pre">[word <span class="pysrc-keyword">for</span> word in vocab <span class="pysrc-keyword">if</span> ...]?</span></tt></p>
+</div>
+<p>Давайте вернемся к нашей задаче поиска слов, которые характеризуют текст.
+Обратите внимание на то, что длинные слова в <tt class="doctest"><span class="pre">text4</span></tt> отражают его государственный фокус - <span class="example">constitutuinally</span>, <span class="example">transcontinental</span> - в то время как слова из <tt class="doctest"><span class="pre">text5</span></tt> отражают его неофициальное содержание: <span class="example">boooooooooooglyyyyyy</span> и <span class="example">yuuuuuuuuuuuummmmmmmmmmmm</span>.
+Удалось ли нам автоматически извлечь слова, которые типизируют текст?  Что ж, эти очень длинные слова часто являются гапаксами (то есть, уникальными) и, возможно, было бы лучше найти <em>часто встречающиеся</em> длинные слова.  Это кажется перспективным, так как устраняет часто встречающиеся короткие слова (например, the) и нечастые длинные слова (например, antiphilosophists).
+Вот все слова из корпуса записей чатов, которые длиннее, чем семь символов, которые встречаются более чем семь раз:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fdist5 = FreqDist(text5)
+&gt;&gt;&gt; sorted(w for w in set(text5) if len(w) &gt; 7 and fdist5[w] &gt; 7)
+['#14-19teens', '#talkcity_adults', '((((((((((', '........', 'Question',
+'actually', 'anything', 'computer', 'cute.-ass', 'everyone', 'football',
+'innocent', 'listening', 'remember', 'seriously', 'something', 'together',
+'tomorrow', 'watching']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Обратите внимание на то, как мы использовали два условия: <tt class="doctest"><span class="pre">len(w) &gt; 7</span></tt> гарантирует, что слова содержат более семи букв, а <tt class="doctest"><span class="pre">fdist5[w] &gt; 7</span></tt> гарантирует, что эти слова встречаются более семи раз.  В конце концов нам удалось автоматически определить часто встречающиеся  отражающие содержание текста слова.  Это скромный, но важный этап: скромный кусочек кода, обрабатывающий десятки тысяч слов, дает некоторый информативный вывод.</p>
+</div>
+<div class="section" id="collocations-and-bigrams">
+<h2>3.3 Словосочетания и биграммы</h2>
+<p><a name="collocation_index_term"></a> <span class="termdef">Словосочетание</span> представляет собой последовательность слов, которые встречаются вместе необычно часто. Таким образом, <span class="example">красное вино</span> является словосочетанием, в то время как <span class="example">вино</span> нет. Особенностью словосочетаний является то, что они сопротивляются замещению входящих в них слов другими словами, которые имеют похожее значение; например, <span class="example">темно-бордовое вино</span> звучит определенно странно.</p>
+<p>Для того, чтобы набить руку на словосочетаниях, мы начинаем с извлечения из текста списка пар слов, которые также известны как <a name="bigrams_index_term"></a><span class="termdef">биграммы</span>. Это легко осуществляется с помощью функции <tt class="doctest"><span class="pre">bigrams()</span></tt>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; list(bigrams(['more', 'is', 'said', 'than', 'done']))
+[('more', 'is'), ('is', 'said'), ('said', 'than'), ('than', 'done')]
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Если бы вы опустили <tt class="doctest"><span class="pre">list()</span></tt> в приведенном выше выражении и просто набрали <tt class="doctest"><span class="pre">bigrams([<span class="pysrc-string">'more',</span> ...])</span></tt>, вы бы увидели вывод следующей формы <tt class="doctest"><span class="pre">&lt;generator object bigrams at 0x10fb8b3a8&gt;</span></tt>.
+Так Python говорит, что он готов вычислить последовательность элементов, в данном случае - биграммов. На данный момент Вам просто нужно знать, что вы должны сообщить Python, что необходимо преобразовать генератор в список, используя <tt class="doctest"><span class="pre">list()</span></tt>.</p>
+</div>
+<p>Здесь мы видим, что пара слов <span class="example">than-done</span> это биграмм, и мы запишем ее в Python как <tt class="doctest"><span class="pre">(<span class="pysrc-string"><span class="pysrc-string">'than', 'done'</span>)</span></span></tt>.  Теперь словосочетания по сути просто частотные биграммы, за исключением того, что мы хотим обратить больше внимания на случаи, которые включают редкие слова.  В частности, мы хотим найти биграммы, которые появляются чаще, чем можно было бы ожидать на основании частоты появления отдельных слов.  Функция <tt class="doctest"><span class="pre">collocations()</span></tt> делает это для нас. Мы увидим, как она работает позже.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; text4.collocations()
+United States; fellow citizens; four years; years ago; Federal
+Government; General Government; American people; Vice President; Old
+World; Almighty God; Fellow citizens; Chief Magistrate; Chief Justice;
+God bless; every citizen; Indian tribes; public debt; one another;
+foreign nations; political parties
+&gt;&gt;&gt; text8.collocations()
+would like; medium build; social drinker; quiet nights; non smoker;
+long term; age open; Would like; easy going; financially secure; fun
+times; similar interests; Age open; weekends away; poss rship; well
+presented; never married; single mum; permanent relationship; slim
+build
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Словосочетания, которые возникают, очень специфичны для жанра текста. Для того, чтобы найти <span class="example">красное вино</span> как словосочетание, нам нужно было бы обработать корпус текста намного больше.</p>
+</div>
+<div class="section" id="counting-other-things">
+<h2>3.4 Подсчет других вещей</h2>
+<p>Подсчет слов полезен, но мы можем считать и другие вещи тоже.  Например, мы можем взглянуть на распределение длин слов в тексте, создавая <tt class="doctest"><span class="pre">FreqDist</span></tt> из длинного списка чисел, где каждое число является длиной соответствующего слова в тексте:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; [len(w) for w in text1] 
+[1, 4, 4, 2, 6, 8, 4, 1, 9, 1, 1, 8, 2, 1, 4, 11, 5, 2, 1, 7, 6, 1, 3, 4, 5, 2, ...]
+&gt;&gt;&gt; fdist = FreqDist(len(w) for w in text1)  
+&gt;&gt;&gt; print(fdist)  
+&lt;FreqDist with 19 samples and 260819 outcomes&gt;
+&gt;&gt;&gt; fdist
+FreqDist({3: 50223, 1: 47933, 4: 42345, 2: 38513, 5: 26597, 6: 17111, 7: 14399,
+  8: 9966, 9: 6428, 10: 3528, ...})
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы начинаем с вывода списка длин слов из <tt class="doctest"><span class="pre">text1</span></tt> <a class="reference internal" href="http://www.nltk.org/book/ch01.html#word-lengths"><span id="ref-word-lengths"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, а <tt class="doctest"><span class="pre">FreqDist</span></tt> затем подсчитывает, сколько каждая из них появляется раз<a class="reference internal" href="http://www.nltk.org/book/ch01.html#freq-word-lengths"><span id="ref-freq-word-lengths"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>. Результат <a class="reference internal" href="http://www.nltk.org/book/ch01.html#freq-word-lengths-size"><span id="ref-freq-word-lengths-size"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a> это распределение, содержащее четверть миллиона элементов, каждый из которых представляет собой число, соответствующее словарному токену в тексте.  При это подсчитывается не более 20 различных элементов, числа от 1 до 20, потому что в тексте только 20 различных длин слов.  Т.е., есть слова, состоящие только из одного символа, двух символов, ..., двадцати символов, но ни одного с количеством символов двадцать один или более.  Можно задаться вопросом, как часто различные длины слов встречаются (например, сколько слов длинною в четыре символа появляется в тексте, каких слов больше: длинною в пять или длинною в четыре символа, и т.д.). Мы можем сделать это следующим образом:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; fdist.most_common()
+[(3, 50223), (1, 47933), (4, 42345), (2, 38513), (5, 26597), (6, 17111), (7, 14399),
+(8, 9966), (9, 6428), (10, 3528), (11, 1873), (12, 1053), (13, 567), (14, 177),
+(15, 70), (16, 22), (17, 12), (18, 1), (20, 1)]
+&gt;&gt;&gt; fdist.max()
+3
+&gt;&gt;&gt; fdist[3]
+50223
+&gt;&gt;&gt; fdist.freq(3)
+0.19255882431878046
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Из этого мы видим, что наиболее частотна длина слова 3, и что слова длинною 3 составляют примерно 50.000 (или 20%) слов, составляющих книгу.  Несмотря на то, что мы не будем проводить его здесь, дальнейший анализ длины слова может помочь нам понять различия между авторами, жанрами или языками.</p>
+<p><a class="reference internal" href="http://www.nltk.org/book/ch01.html#tab-freqdist">3.1</a> суммирует функции, которые были определены в распределении частот.</p>
+<span class="target" id="tab-freqdist"></span><table border="1" class="docutils" id="tab-freqdist">
+<colgroup>
+<col width="31%">
+<col width="69%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">пример</th>
+<th class="head">Описание</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">fdist = FreqDist(samples)</span></tt></td>
+<td>создать распределение частот, содержащее данные образцы (samples)</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist[sample] += 1</span></tt></td>
+<td>увеличить счетчик для sample</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist[<span class="pysrc-string">'monstrous'</span>]</span></tt></td>
+<td>подсчитать сколько раз встретился данный образец</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist.freq(<span class="pysrc-string">'monstrous'</span>)</span></tt></td>
+<td>частота данного образца</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist.N()</span></tt></td>
+<td>общее количество образцов</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist.most_common(n)</span></tt></td>
+<td><tt class="doctest"><span class="pre">n</span></tt> наиболее распространенных образцов и их частота</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span> sample <span class="pysrc-keyword">in</span> fdist:</span></tt></td>
+<td>перебрать образцы (итератор образцов)</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist.max()</span></tt></td>
+<td>образец с наибольшим счетом</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist.tabulate()</span></tt></td>
+<td>табулировать распределение частот</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist.plot()</span></tt></td>
+<td>графическая диаграмма распределения частот</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist.plot(cumulative=True)</span></tt></td>
+<td>кумулятивный график распределения частот</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist1 |= fdist2</span></tt></td>
+<td>обновить <tt class="doctest"><span class="pre">fdist1</span></tt> счетом из <tt class="doctest"><span class="pre">fdist2</span></tt></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">fdist1 &lt; fdist2</span></tt></td>
+<td>проверить встречаются ли образцы <tt class="doctest"><span class="pre">fdist1</span></tt> реже, чем образцы <tt class="doctest"><span class="pre">fdist2</span></tt></td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 3.1:</span> <p>Функции, определенные в разделе NLTK Распределение частот</p>
+</p>
+</td></table>
+<p>Наше обсуждение распределения частот потребовало ввести некоторые важные понятия Python, которые мы рассмотрим систематически в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-making-decisions">4</a>.</p>
+<!-- We&#39;ve also touched on the topic of normalization, and we&#39;ll explore this in
+depth in chap-words_. -->
+</div>
+</div>
+<div class="section" id="back-to-python-making-decisions-and-taking-control">
+<span id="sec-making-decisions"></span><h1>4 Назад к Python: Принятие решений и контроль</h1>
+<!-- reimport
+
+>>> from nltk.book import * -->
+<p>До сих пор наши маленькие программы обладали некоторыми интересными качествами: умением работать с языком и способность сохранить человеческий труд через автоматизацию.
+Ключевой особенностью программирования является способность машин принимать решения от нашего имени, выполняя инструкции при выполнении определенных условий, или многократно проходя текстовые данные, пока некоторое условие не будет выполнено.  Эта особенность известна как <a name="control_index_term"></a><span class="termdef">контроль</span> и она находится в центре внимания данного раздела.</p>
+<div class="section" id="conditionals">
+<h2>4.1 Условные предложения</h2>
+<p>Python поддерживает широкий спектр операторов, таких как <tt class="doctest"><span class="pre"><tt class="doctest"><span class="pre">&lt; и </span></tt>&gt;=</span></tt>, для проверки отношения между значениями. Полный набор этих <a name="relational_operators_index_term"></a><span class="termdef">относительных операторов</span> показан в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#tab-inequalities">4.1</a>.</p>
+<span class="target" id="tab-inequalities"></span><table border="1" class="docutils" id="tab-inequalities">
+<colgroup>
+<col width="14%">
+<col width="86%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">оператор</th>
+<th class="head">отношения</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">&lt;</span></tt></td>
+<td>меньше, чем</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">&lt;=</span></tt></td>
+<td>меньше или равно</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">==</span></tt></td>
+<td>равно (заметим, что это два знака <tt class="doctest"><span class="pre">"="</span></tt>, а не один)</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">!=</span></tt></td>
+<td>не равно</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">&gt;</span></tt></td>
+<td>больше чем</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">&gt;=</span></tt></td>
+<td>больше или равно</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.1:</span> <p>Операторы сравнения чисел</p>
+</p>
+</td></table>
+<p>Мы можем использовать их, чтобы выбрать различные слова из предложения новостного текста.
+Вот некоторые примеры - от строки к строке меняется только оператор.  Все они используют <tt class="doctest"><span class="pre">sent7</span></tt>, первое предложение из <tt class="doctest"><span class="pre">text7</span></tt> (<em>Wall Street Journal</em>).  Как и раньше, если вы получите сообщение об ошибке, говорящее, что <tt class="doctest"><span class="pre">sent7</span></tt> не определен, вам необходимо сначала набрать: <tt class="doctest"><span class="pre"><span class="pysrc-keyword">from</span> <span class="pysrc-keyword">nltk.book</span> import *</span></tt></p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent7
+['Pierre', 'Vinken', ',', '61', 'years', 'old', ',', 'will', 'join', 'the',
+'board', 'as', 'a', 'nonexecutive', 'director', 'Nov.', '29', '.']
+&gt;&gt;&gt; [w for w in sent7 if len(w) &lt; 4]
+[',', '61', 'old', ',', 'the', 'as', 'a', '29', '.']
+&gt;&gt;&gt; [w for w in sent7 if len(w) &lt;= 4]
+[',', '61', 'old', ',', 'will', 'join', 'the', 'as', 'a', 'Nov.', '29', '.']
+&gt;&gt;&gt; [w for w in sent7 if len(w) == 4]
+['will', 'join', 'Nov.']
+&gt;&gt;&gt; [w for w in sent7 if len(w) != 4]
+['Pierre', 'Vinken', ',', '61', 'years', 'old', ',', 'the', 'board',
+'as', 'a', 'nonexecutive', 'director', '29', '.']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Все эти примеры построены по одному образцу: <tt class="doctest"><span class="pre">[w <span class="pysrc-keyword">for</span> w <span class="pysrc-keyword">in</span> text</span></tt> <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> <em><tt class="doctest"><span class="pre">condition</span></tt></em>], где <em>condition</em> является проверкой Python, которая возвращает истину или ложь.
+В примерах кода, приведенных выше, условие всегда является сравнением чисел.
+Тем не менее, мы также можем проверить различные свойства слов, используя функции, перечисленные в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#tab-word-tests">4.2</a>.</p>
+<span class="target" id="tab-word-tests"></span><table border="1" class="docutils" id="tab-word-tests">
+<colgroup>
+<col width="21%">
+<col width="79%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Функция</th>
+<th class="head">Значение</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="doctest"><span class="pre">s.startswith(t)</span></tt></td>
+<td>проверяет, начинается ли <tt class="doctest"><span class="pre">s</span></tt> с <tt class="doctest"><span class="pre">t</span></tt></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">s.endswith(t)</span></tt></td>
+<td>проверяет, заканчивается ли <tt class="doctest"><span class="pre">s</span></tt> на <tt class="doctest"><span class="pre">t</span></tt></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">t in s</span></tt></td>
+<td>проверяет, входит ли <tt class="doctest"><span class="pre">t</span></tt> в <tt class="doctest"><span class="pre">s</span></tt></td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">s.islower()</span></tt></td>
+<td>проверяет, содержит ли <tt class="doctest"><span class="pre">s</span></tt> регистровые символы, и что все они в нижнем регистре</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">s.isupper()</span></tt></td>
+<td>проверяет, содержит ли <tt class="doctest"><span class="pre">s</span></tt> регистровые символы, и что все они в верхнем регистре</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">s.isalpha()</span></tt></td>
+<td>проверяет, является ли <tt class="doctest"><span class="pre">s</span></tt> непустым, и что все символы в нем буквенные</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">s.isalnum()</span></tt></td>
+<td>проверяет, является ли <tt class="doctest"><span class="pre">s</span></tt> непустым, и что все символы в нем буквенно-цифровые</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">s.isdigit()</span></tt></td>
+<td>проверяет, является ли <tt class="doctest"><span class="pre">s</span></tt> непустым, и что все символы в нем цифровые</td>
+</tr>
+<tr><td><tt class="doctest"><span class="pre">s.istitle()</span></tt></td>
+<td>проверяет, содержит ли <tt class="doctest"><span class="pre">s</span></tt> регистровые символов, и что все слова начинаются с заглавной буквы</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 4.2:</span> <p>Некоторые операторы сравнения слов</p>
+</p>
+</td></table>
+<p>Вот некоторые примеры использования этих операторов для выбора слов из наших текстов: 
+слов, оканчивающихся на <span class="example">-ableness</span>;
+слов, содержащих <span class="example">gnt</span>;
+cлов, имеющих начальную заглавную букву;
+и слов, состоящих только из цифр.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sorted(w for w in set(text1) if w.endswith('ableness'))
+['comfortableness', 'honourableness', 'immutableness', 'indispensableness', ...]
+&gt;&gt;&gt; sorted(term for term in set(text4) if 'gnt' in term)
+['Sovereignty', 'sovereignties', 'sovereignty']
+&gt;&gt;&gt; sorted(item for item in set(text6) if item.istitle())
+['A', 'Aaaaaaaaah', 'Aaaaaaaah', 'Aaaaaah', 'Aaaah', 'Aaaaugh', 'Aaagh', ...]
+&gt;&gt;&gt; sorted(item for item in set(sent7) if item.isdigit())
+['29', '61']
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы также можем создавать более сложные условия.  Если <span class="math">c</span> - это условие, то <tt class="doctest"><span class="pre"><span class="pysrc-keyword">not</span></span></tt> <span class="math">c</span> также является условием.
+Если у нас есть два условия <span class="math">c</span><sub>1</sub> и <span class="math">c</span><sub>2</sub>, то мы можем объединить их, чтобы сформировать новое условие с помощью конъюнкции или дизъюнкции: 
+<span class="math">c</span><sub>1</sub> <tt class="doctest"><span class="pre"><span class="pysrc-keyword">и</span></span></tt> <span class="math">c</span><sub>2</sub>, 
+<span class="math">c</span><sub>1</sub> <tt class="doctest"><span class="pre"><span class="pysrc-keyword">или</span></span></tt> <span class="math">с</span><sub>2</sub>.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Выполните следующие примеры и попытайтесь объяснить, что происходит в каждом из них.
+Далее, попробуйте составить собственных условий.</p>
+</div>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sorted(w for w in set(text7) if '-' in w and 'index' in w)
+&gt;&gt;&gt; sorted(wd for wd in set(text3) if wd.istitle() and len(wd) &gt; 10)
+&gt;&gt;&gt; sorted(w for w in set(sent7) if not w.islower())
+&gt;&gt;&gt; sorted(t for t in set(text2) if 'cie' in t or 'cei' in t)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="operating-on-every-element">
+<h2>4.2 Работа с каждым элементом</h2>
+<p>В <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-simple-statistics">3</a>, мы видели несколько примеров подсчета элементов отличных от слов.  Давайте подробнее рассмотрим обозначения, которые мы использовали:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; [len(w) for w in text1]
+[1, 4, 4, 2, 6, 8, 4, 1, 9, 1, 1, 8, 2, 1, 4, 11, 5, 2, 1, 7, 6, 1, 3, 4, 5, 2, ...]
+&gt;&gt;&gt; [w.upper() for w in text1]
+['[', 'MOBY', 'DICK', 'BY', 'HERMAN', 'MELVILLE', '1851', ']', 'ETYMOLOGY', '.', ...]
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Эти выражения имеют вид <tt class="doctest"><span class="pre">[f(w) <span class="pysrc-keyword">for</span> ...]</span></tt> или <tt class="doctest"><span class="pre">[w.f() <span class="pysrc-keyword">for</span> ...]</span></tt>, где <tt class="doctest"><span class="pre">f</span></tt> является функцией, которая работает со словом, чтобы вычислить его длину или перевести его буквы в верхний регистр.
+На данный момент, вы не должны понимать разницу между обозначениями <tt class="doctest"><span class="pre">f(w)</span></tt> и <tt class="doctest"><span class="pre">w.f()</span></tt>.  Вместо этого, просто выучите эту идиому Python, которая выполняет одну и ту же операцию над каждым элементом списка.  В предыдущих примерах, он проходит через каждое слово в <tt class="doctest"><span class="pre">text1</span></tt>, назначая каждое из них по очереди переменной <tt class="doctest"><span class="pre">w</span></tt> и выполняя указканную операцию над этой переменной.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Обозначение, которое только что было описано, называется "охват списка". Это наш первый пример идиомы Python - фиксированного обозначения, которое мы используем обыкновенно, не пытаясь всякий раз проанализировать его.  Освоение таких идиом важно для того, чтобы стать хорошим Python программистом.</p>
+</div>
+<p>Вернемся к вопросу о размере словаря и применим ту же идиому здесь:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; len(text1)
+260819
+&gt;&gt;&gt; len(set(text1))
+19317
+&gt;&gt;&gt; len(set(word.lower() for word in text1))
+17231
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Теперь, когда мы не считаем дважды такие слова, как <span class="example">This</span> и <span class="example">this</span>, различающиеся только в капитализации, мы уменьшили счета словаря на 2,000!  Мы можем сделать еще один шаг и исключить цифры и знаки препинания из подсчета, отфильтровывая все небуквенные элементы:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; len(set(word.lower() for word in text1 if word.isalpha()))
+16948
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Этот пример немного сложнее: в нем переводятся в нижний регистр все истинно буквенные элементы.
+Возможно, было бы легче просто посчитать элементы, которые содержат только символы в нижнем регистре, но это дает неправильный ответ (почему?).</p>
+<p>Не волнуйтесь, если вы еще не чувствуете себя уверенно с охватами списков, так как вы увидите еще много примеров с разъяснениями в следующих главах.</p>
+</div>
+<div class="section" id="nested-code-blocks">
+<h2>4.3 Вложенные блоки кода</h2>
+<p>Большинство языков программирования позволяют выполнить блок кода, когда <a name="conditional_expression_index_term"></a><span class="termdef">условное выражение,</span> или <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> предложение, выполнено.  Мы уже видели примеры условных тестов в коде, как например <tt class="doctest"><span class="pre">[w <span class="pysrc-keyword">for</span> w <span class="pysrc-keyword">in</span> sent7 <span class="pysrc-keyword">if</span> len(w) &lt; 4]</span></tt>. В следующей программе мы создали переменную с именем <tt class="doctest"><span class="pre">word</span></tt>, содержащую строковое значение <tt class="doctest"><span class="pre"><span class="pysrc-string">'cat'</span></span></tt>. <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> предложение проверяет, является ли тест <tt class="doctest"><span class="pre">len(word) &lt; 5</span></tt> истинным.
+Если это так, то вызывается тело <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> предложения и выполняется предложение <tt class="doctest"><span class="pre"><span class="pysrc-keyword">print</span></span></tt>, выводящее на дисплей сообщение пользователю.
+Не забудьте сделать отступ перед <tt class="doctest"><span class="pre"><span class="pysrc-keyword">print</span></span></tt> предложением, набрав четыре пробела.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; word = 'cat'
+&gt;&gt;&gt; if len(word) &lt; 5:
+...     print('word length is less than 5')
+...  
+word length is less than 5
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Когда мы используем интерпретатор Python мы должны добавить дополнительную пустую строку <a class="reference internal" href="http://www.nltk.org/book/ch01.html#blank-line"><span id="ref-blank-line"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a> для того, чтобы он обнаружил, что вложенный блок завершен.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p>Если вы используете Python 2.6 или 2.7, вам необходимо включить следующую строку для того, чтобы приведенная выше функция <tt class="doctest"><span class="pre"><span class="pysrc-keyword">print</span></span></tt> была распознана:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from __future__ import print_function</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<p>Если изменить условный тест на <tt class="doctest"><span class="pre">len(word) &gt;= 5</span></tt>, чтобы проверить, что длина <tt class="doctest"><span class="pre">word</span></tt> больше или равна <tt class="doctest"><span class="pre">5</span></tt>, то тест больше не будет истинным.
+На этот раз, тело <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> предложения не будет выполнено и никакое сообщение не показывается пользователю:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; if len(word) &gt;= 5:
+...   print('word length is greater than or equal to 5')
+...
+<span class="pysrc-prompt">&gt;&gt;&gt;</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p><tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> предложение известно как <a name="control_structure_index_term"></a> <span class="termdef">структура управления</span>, поскольку она контролирует, будет ли выполняться код в блоке с отступом.
+Еще одной структурой управления является <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt> цикл.
+Попробуйте следующее и не забудьте поставить двоеточие и четыре пробела:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for word in ['Call', 'me', 'Ishmael', '.']:
+...     print(word)
+...
+Call
+me
+Ishmael
+.
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Это называется цикл, поскольку Python выполняет код в кольцевом режиме.  Она начинается с выполнения присвоения <tt class="doctest"><span class="pre">word</span></tt> = <span class="pysrc-string">'Call'</span>, на самом деле используя переменную <tt class="doctest"><span class="pre">word</span></tt>, чтобы назвать первый элемент списка.  Затем он отображает значение переменной <tt class="doctest"><span class="pre">word</span></tt> пользователю.  Далее, он идет обратно к <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt> предложению, и перед выводом на экран переменной выполняет присвоение <tt class="doctest"><span class="pre">word</span></tt> = <span class="pysrc-string">'me'</span>, и так далее.  Он продолжает таким образом до тех пор, пока каждый элемент списка не будет обработан.</p>
+</div>
+<div class="section" id="looping-with-conditions">
+<h2>4.4 Циклическая обработка с условиями</h2>
+<p>Теперь мы можем объединить <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt> предложения.
+Мы переберем все элементы списка и напечатаем элемент, только если он заканчивается на букву <em>l</em>.  Мы выберем другое имя для переменной, чтобы продемонстрировать, что Python не пытается понять смысл имен переменных.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sent1 = ['Call', 'me', 'Ishmael', '.']
+&gt;&gt;&gt; for xyzzy in sent1:
+...     if xyzzy.endswith('l'):
+...         print(xyzzy)
+...
+Call
+Ishmael
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Вы заметите, что <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt> предложения имеют двоеточие в конце строки, перед тем, как начинается отступ. На самом деле, все управляющие структуры Python заканчиваются двоеточием.  Двоеточие указывает на то, что текущее утверждение относится к блоку с отступом, который следует за ним.</p>
+<p>Мы также можем указать действие, которое должно быть выполнено, если условие <tt class="doctest"><span class="pre"><span class="pysrc-keyword"></span></span></tt>if/0} утверждения не выполнено.
+Здесь мы видим <tt class="doctest"><span class="pre"><span class="pysrc-keyword">elif</span></span></tt> (else if) предложение и <tt class="doctest"><span class="pre"><span class="pysrc-keyword">else</span></span></tt> предложение.  Обратите внимание на то, что они также имеют двоеточие перед кодом с отступом.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for token in sent1:
+...     if token.islower():
+...         print(token, 'is a lowercase word')
+...     elif token.istitle():
+...         print(token, 'is a titlecase word')
+...     else:
+...         print(token, 'is punctuation')
+...
+Call is a titlecase word
+me is a lowercase word
+Ishmael is a titlecase word
+. is punctuation
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Как вы можете видеть, даже с этим небольшим количеством знания Python, вы можете начать создавать многострочные программы на Python.
+Важно разрабатывать такие программы по частям, проверяя, что каждая часть делает то, что вы ожидаете, прежде чем объединять их в программу.  Поэтому интерактивный интерпретатор Python настолько бесценен, и поэтому его использование должно стать для вас комфортным.</p>
+<p>И, наконец, давайте объединим идиомы, которые мы исследовали.
+Во-первых, мы создаем список <span class="example">cie</span> и <span class="example">cei</span> слов, затем мы перебераем все элементы и выводим их на экран.  Обратите внимание на дополнительную информацию, содержащуюся в предложении печати: <cite>end=' '</cite>.
+Это говорит Python, чтобы он напечатал пробел (не новую строку по умолчанию) после каждого слова.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tricky = sorted(w for w in set(text2) if 'cie' in w or 'cei' in w)
+&gt;&gt;&gt; for word in tricky:
+...     print(word, end=' ')
+ancient ceiling conceit conceited conceive conscience
+conscientious conscientiously deceitful deceive ...
+&gt;&gt;&gt;</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+</div>
+<div class="section" id="automatic-natural-language-understanding">
+<span id="sec-automatic-natural-language-understanding"></span><h1>5 Автоматическое понимание естественного языка</h1>
+<!-- >>> from nltk.misc import babelize_shell -->
+<p>Мы изучали язык снизу вверх с помощью текстов и языка программирования Python.  Однако мы также заинтересованы в эксплуатации наших знаний о языке и вычислении путем создания полезных языковых технологий. Сейчас мы воспользуемся возможностью сделать шаг назад от пристального рассмотрения кода для того, чтобы нарисовать более широкую картину обработки естественного языка.</p>
+<p>На чисто практическом уровне, все мы нуждаемся в помощи, чтобы ориентироваться во информационной вселенной, заключенной в тексте всемирной паутины.  Поисковые системы сыграли решающую роль в росте и популяризации интернета, но имеют некоторые недостатки.
+Требуется умение, знания и немного удачи, чтобы извлечь ответы на такие вопросы, как: <span class="example">Какие туристические объекты можно посетить между Филадельфией и Питсбургом при ограниченном бюджете?</span>
+<span class="example">Что эксперты говорят о цифровых зеркальных камерах?</span> <span class="example">Какие прогнозы о рынке стали были сделаны авторитетными комментаторами на прошлой неделе?</span> Чтобы научить компьютер отвечать на них автоматически необходимо решить ряд задач по обработке языка, в том числе задачи извлечения информации, логического умозаключения и обобщения, которые должны были бы выполняться в масштабе и с уровнем надежности, которые до сих пор за пределами наших нынешних возможностей.</p>
+<p>На более философском уровне, давняя проблема в области искусственного интеллекта заключалась в том, чтобы построить интеллектуальные машины, а большая часть интеллектуального поведения - это понимание языка.  В течение многих лет эта цель рассматривалась как слишком сложная.
+Однако, по мере того, как технологии NLP становятся более зрелыми, и надежные методы анализа неструктурированного текста получают все более широкое распространение, перспектива понимания естественного языка вновь появилась в качестве реальной цели.</p>
+<p>В этом разделе мы опишем некоторые технологии понимания языка, чтобы дать вам ощущение интересных проблем, которые ждут вас.</p>
+<div class="section" id="word-sense-disambiguation">
+<h2>5.1 Разрешение лексической многозначности</h2>
+<p>В <a name="word_sense_disambiguation_index_term"></a> <span class="termdef">разрешении лексической неоднозначности</span> мы хотим понять, какой смысл слова подразумевался в данном контексте.  Рассмотрите многозначные слова <span class="example">serve</span> и <span class="example">dish</span>:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(2)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">а.</td><td width="15"></td><td><span class="example">serve:</span> помогать с едой или напитком; занимать должность; ввести мяч в игру</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">б.</td><td width="15"></td><td><span class="example">dish:</span> тарелка; блюдо; устройство связи</td></tr></table></p>
+</td></tr></table></p>
+<p>В предложении, содержащем фразу: <span class="example">he served</span> <span class="example">the dish</span>, вы можете обнаружить, что оба <span class="example">serve</span> и <span class="example">dish</span> употребляются в значении, связанном с едой.  Маловероятно, что предмет дискуссии поменялся от спорта к посуде в пространстве трех слов.
+В противном случае это бы заставило вас придумывать странные образы, как теннисный про вымещает свою фрустрацию на фарфоровом чайном сервизе, разложенном рядом с кортом.
+Другими словами, мы автоматически разрешаем неоднозначность слова используя контекст, опираясь на простой факт, что соседние слова имеют тесно связанные значения.
+В качестве другого примера этого контекстуального эффекта, рассмотрим слово <span class="example">by</span>, которое имеет несколько значений, например: <span class="example">книга Честертона</span> (агентивное - Честертон был автором книги); <span class="example">чашка у печки</span> (локативное - печь там, где чашка); и <span class="example">представить к пятнице</span> (временное - пятница - это время представления).
+Обратите внимание в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#ex-lost-children">(3c)</a>, что значение слова, выделенного курсивом, помогает нам интерпретировать значение <span class="example">by</span>.</p>
+<span class="target" id="ex-lost-children"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(3)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Потерянные дети были найдены <span class="emphasis">спасателями</span> (агентив)</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Потерянные дети были найдены <span class="emphasis">у горы</span> (локатив)</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>Потерянные дети были найдены <span class="emphasis">ко второй половине дня</span> (темпорал)</td></tr></table></p>
+</td></tr></table></p>
+</div>
+<div class="section" id="pronoun-resolution">
+<h2>5.2 Отнесение местоимения к имени </h2>
+<p>Более глубокий вид понимания языка должен определять "кто что сделал кому", то есть находить субъекты и объекты глаголов.  Вы научились делать это в начальной школе, но это сложнее, чем вы могли бы подумать.
+В предложении <span class="example">воры украли картины</span> легко сказать , кто выполнил действие воровства.
+Рассмотрим три возможных следующих предложения в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#ex-thieves">(4с)</a> и попытаемся определить, что было продано, поймано и найдено (один случай неоднозначен).</p>
+<span class="target" id="ex-thieves"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(4)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Воры украли картины.  Впоследствии они были <span class="emphasis">проданы</span>.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Воры украли картины.  Впоследствии они были <span class="emphasis">пойманы</span>.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>Воры украли картины.  Впоследствии они были <span class="emphasis">найдены</span>.</td></tr></table></p>
+</td></tr></table></p>
+<p>Ответ на этот вопрос влечет выбор в качестве <a name="antecedent_index_term"></a> <span class="termdef">антецедента</span> местоимения <span class="example">"они"</span> - либо воров, либо картин.  Вычислительные методы для решения этой проблемы включают в себя <a name="anaphora_resolution_index_term"></a><span class="termdef">разрешение анафоры</span> - определение того, к чему относится фраза, содержащая местоимение или существительное - и <a name="semantic_role_labeling_index_term"></a><span class="termdef">маркировку семантической роли</span> - определение того, как фраза, содержащая существительное, относится к глаголу (в качестве агента, терпящего, инструмента и т.п.).</p>
+</div>
+<div class="section" id="generating-language-output">
+<h2>5.3 Генерирование речи</h2>
+<p>Если мы сможем автоматически решать такие проблемы понимания языка, мы сможем перейти к задачам, которые требуют генерирования речи, например, <a name="question_answering_index_term"></a> <span class="termdef">подготовка ответов на вопросы</span> и <a name="machine_translation_index_term"></a><span class="termdef">машинный перевод</span>.  В первом случае машина должна быть в состоянии отвечать на вопросы пользователя, относящиеся к совокупности текстов:</p>
+<span class="target" id="ex-qa-application"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(5)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td><em>Текст:</em> ... Воры украли картины.  Впоследствии они были проданы. ...</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td><em>Человек:</em> Кто или что было продано?</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td><em>Машина:</em> Картины.</td></tr></table></p>
+</td></tr></table></p>
+<p>Ответ машины показывает, что она правильно решила, что <span class="example">они</span> относится к картинам, а не ворам.  Во втором случае, машина должна быть в состоянии перевести текст на другой язык, точно передавая смысл исходного текста.  При переводе пример текста на французский язык, мы вынуждены выбрать пол местоимения во втором предложении: <span class="example">ils</span> (мужской), если воры будут найдены, и <span class="example">elles</span> (женский), если картины найдены.  Правильный перевод на самом деле зависит от правильного понимания местоимения.</p>
+<span class="target" id="ex-mt-application"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(6)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Воры украли картины.  Впоследствии они были найдены.</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Les voleurs ont volé les peintures. Ils ont été trouvés plus tard. (воры)</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>Les voleurs ont volé les peintures. Elles ont été trouvées плюс tard. (картины)</td></tr></table></p>
+</td></tr></table></p>
+<p>Во всех этих примерах выработка смысла слова, субъекта глагола и антецедента местоимения являются шагами в установлении смысла предложения, которые мы ожидаем от системы понимания языка.</p>
+</div>
+<div class="section" id="machine-translation">
+<h2>5.4 Машинный перевод</h2>
+<p>В течение долгого времени, машинный перевод (МП) был Святым Граалем понимания языка, в конечном счете стремящимся обеспечить высоко качественный идиоматический перевод между любой парой языков.
+Его корни уходят в первые дни холодной войны, когда обещание автоматического перевода привело к существенной государственной поддержке, а вместе с ней и к рождению самого NLP.</p>
+<p>Сегодня практические системы перевода существуют для конкретных пар языков, а некоторые из них интегрированы в системы веб-поиска.
+Тем не менее, эти системы имеют некоторые серьезные недостатки, которые резко проявляются при переводе одного и того же предложения между парой языков туда и обратно, пока не будет достигнуто равновесие, например:</p>
+<div class="line-block">
+<div class="line">0&gt; как долго до следующего рейса в Элис Спрингс?</div>
+<div class="line">1&gt; wie lang vor dem folgenden Flug zu Alice Springs?</div>
+<div class="line">2&gt; как долго до следующего рейса в Элис прыгать?</div>
+<div class="line">3&gt; wie lang vor dem folgenden Flug zu Alice springen Sie?</div>
+<div class="line">4&gt; как долго до следующего рейса в Элис вы прыгаете?</div>
+<div class="line">5&gt; wie lang, bevor der folgende Flug zu Alice tun, Sie springen?</div>
+<div class="line">6&gt; как долго, до следующего полета в Элис делает, вы прыгаете?</div>
+<div class="line">7&gt; wie lang bevor der folgende Flug zu Alice tut, tun Sie springen?</div>
+<div class="line">8&gt; как долго до следующего полета в Элис делает, вы прыгаете?</div>
+<div class="line">9&gt; wie lang, bevor der folgende Flug zu Alice tut, tun Sie springen?</div>
+<div class="line">10&gt; как долго, до следующий рейс делает в Элис, делать вы прыгаете?</div>
+<div class="line">11&gt; wie lang bevor der folgende Flug zu Alice tut, Sie tun Sprung?</div>
+<div class="line">12&gt; как долго до того, как следующий рейс делает прыжок в Элис, делает вы?</div>
+</div>
+<p>Заметим , что система правильно переводит <span class="example">Элис Спрингс</span> с английского на немецкий (в строке, начинающейся с <tt class="doctest"><span class="pre">1&gt;</span></tt>), но на обратном пути в английский язык это название превращается в <span class="example">Элис прыгать</span> (строка <tt class="doctest"><span class="pre">2</span></tt>).  Предлог <span class="example">до</span> первоначально переведен соответствующим немецким предлогом <span class="example">vor</span>, но позже союзом <span class="example">bevor</span> (строка 5).
+После строки <tt class="doctest"><span class="pre">5</span></tt> предложения становятся бессмысленными (но обратите внимание на различные формулировки, обозначенные запятыми, и переход от <span class="example">jump</span> к <span class="example">leap</span>).
+Система перевода не распознала, что слово было частью имени собственного, и неверно интерпретировала грамматическую структуру.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> Попробуйте сделать это самостоятельно, используя <tt class="doctest"><span class="pre">http://translationparty.com/</span></tt></p>
+</div>
+<p>Машинный перевод труден, потому что любое слово может иметь несколько возможных переводов (в зависимости от его значения) и потому что порядок слов должен быть изменен в соответствии с грамматической структурой целевого языка.
+Сегодня этим трудностям противостоят, собирая огромные количества параллельных текстов с новостных и правительственных веб-сайтов, которые публикуют документы на двух и более языках.  Получив документ на немецком и английском и, возможно, двуязычный словарь, мы можем автоматически сопоставить предложения на двух языках, то есть выполнить процесс, названный <a name="text_alignment_index_term"></a> <span class="termdef">выравниванием текста</span>.  После того, как у нас есть миллион или более пар предложений, мы можем обнаружить соответствующие слова и фразы и построить модель, которая может быть использована для перевода нового текста.</p>
+</div>
+<div class="section" id="spoken-dialog-systems">
+<h2>5.5 Диалоговые системы</h2>
+<p>В истории искусственного интеллекта, главный показатель интеллекта был лингвистический, а именно <a name="turing_test_index_term"></a><span class="termdef">Тест Тьюринга</span>: может ли система диалога, отвечая на ввод текста пользователя, выполнять свою роль так естественно, что мы не сможем отличить ее ответ от ответа данного человеком?  В противоположность этому, современные коммерческие системы диалога весьма ограничены, но все равно выполняют полезные функции в узко определенных областях, как мы видим здесь:</p>
+<div class="line-block">
+<div class="line">S: Как я могу вам помочь?</div>
+<div class="line">U: Когда идет Спасти рядового Райана?</div>
+<div class="line">S: Для какого театра?</div>
+<div class="line">U: Театр The Paramount.</div>
+<div class="line">S: Спасти рядового Райана не идет в театре The Paramount, но</div>
+<div class="line">он идет в театре Мэдисон в 3:00, 5:30, 8:00 и 10:30.</div>
+</div>
+<p>Вы не смогли бы спросить эту систему, как проехать в то или иное место или подробности о близлежащих ресторанах, если бы требуемая информация не была уже сохранена, и подходящие пары вопросов и ответов не были включены в систему обработки языка.</p>
+<p>Заметим, что эта система, кажется, понимает цели пользователя: пользователь спрашивает, когда показывают фильм и система правильно определяет из этого, что пользователь хочет посмотреть фильм. Этот вывод кажется настолько очевидным, что вы, вероятно, не заметили, что это было сделано, однако система естественного языка должна быть наделена этой возможностью для того, чтобы взаимодействовать естественным образом.  Без этого, когда бы ее спросили: <span class="example">"Вы знаете, когда идет Спасти рядового Райана?"</span>, система могла бы бесполезно ответить холодным <span class="example">"Да"</span>.
+Тем не менее, разработчики коммерческих систем диалога используют контекстные предположения и бизнес-логику, чтобы гарантировать, что различные способы, с помощью которых пользователь может выражать запросы или предоставлять информацию, обрабатываются таким образом, который имеет смысл для конкретного применения.  Таким образом, если вы наберете: <span class="example">"Когда..."</span>, или <span class="example">"Я хочу знать, когда..."</span>, или <span class="example">"Можете ли Вы сказать мне, когда..."</span>, простые правила всегда потребуют время на отображение.  Этого достаточно для системы, чтобы предоставить полезную услугу.</p>
+<span class="target" id="fig-sds"></span><div class="figure" id="fig-sds">
+<img alt="../images/dialogue.png" src="http://www.nltk.org/images/dialogue.png" style="width:600.0px;height:324.0px">
+<p class="caption"><span class="caption-label">Рисунок 5.1</span>: простая последовательная схема архитектуры для системы разговорного диалога: разговорный вход (слева вверху) анализируется, слова распознаются, предложения разбираются и интерпретируются в контексте, конкретные для данного приложения действия происходят (справа вверху); ответ планируется, реализуется как синтаксическая структура, затем преобразуется в правильно связанные слова и, наконец, в разговорный выход (разговорную речь); различные типы лингвистических знаний информирует каждую стадию процесса.</p>
+</div>
+<p>Системы диалога дают нам возможность упомянуть обще признанную последовательную схему для NLP. <a class="reference internal" href="http://www.nltk.org/book/ch01.html#fig-sds">5.1</a> показывает архитектуру простой системы диалога.
+Вдоль верхней части диаграммы, слева направо, изображена последовательная схема ("трубопровод") компонентов понимания некоторого языка.
+Они объединяют речевой ввод через синтаксический разбор с некоторым видом представления смысла.  По середине, справа налево, показана обратная последовательная схема компонентов для преобразования концепций в речь.  Эти компоненты составляют динамические аспекты системы.
+В нижней части диаграммы представлены характерные структуры статической информации: хранилища зависящих от языка данных, которые используются компонентами обработки для выполнения своей работы.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь</strong>: 
+В качестве примера примитивной системы диалога, попытайтесь поговорить с чатботом NLTK.  Чтобы увидеть доступные чатботы, запустите <tt class="doctest"><span class="pre">nltk.chat.chatbots ()</span></tt>.
+(Не забудьте <tt class="doctest"><span class="pre"><span class="pysrc-keyword">import nltk</span></span></tt> сначала.)</p>
+</div>
+</div>
+<div class="section" id="textual-entailment">
+<h2>5.6 Содержание текста</h2>
+<p>Проблема понимания языка привлекла к себе внимание в последние годы благодаря общественной "общей задаче" названной Распознавание содержания текста (RTE). Базовый сценарий прост.  Предположим, вы хотите найти доказательство гипотезы: <span class="example">"Сандра Гуди был побежден Максом Пурнелл"</span> и что у вас есть один короткий текст, который, кажется, относится к делу, например: <span class="example">"Сандра Гуди впервые был избран в парламент на выборах 2002 года, с трудом завоевывая место от Коромандела, победив лейбористского кандидата Макса Пурнела и отодвигая действующего представителя кандидата от Зеленых МП Жанетт Фицимонс на третье место</span>.  Предоставляет ли этот текст для вас достаточно доказательств, чтобы принять гипотезу?  В данном конкретном случае, ответ будет: "Нет". Вы можете сделать этот вывод легко, но с помощью автоматизированных методов принять правильное решение очень трудно. RTE проблемы предоставляют данные, которые позволяют конкурентам разрабатывать свои системы, но не достаточно данных для методов машинного обучения «brute force» (тему, которую мы рассмотрим в <a class="reference external" href="http://www.nltk.org/book/ch06.html#chap-data-intensive">chap-data-intensive</a>).  Следовательно, некоторый лингвистический анализ имеет решающее значение. В предыдущем примере, для системы важно заметить, что в гипотезе <span class="example">Сандра Гуди</span> называет человека, который был побежден, а не человека, который победил, как в тексте. В качестве еще одной иллюстрации сложности задачи, рассмотрим следующую пару текста и гипотезы:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(7)</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>Текст: Дэвид Голинкин является редактором или автором восемнадцати книг, а также более 150 ответов, статьей, проповедей и книг</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>Гипотеза: Голинкин написал восемнадцать книг</td></tr></table></p>
+</td></tr></table></p>
+<p>Для того, чтобы определить, подтверждается ли гипотеза текстом, система нуждается в следующем фоновом знании: (i) если кто-то является автором книги, то он/она написала эту книгу; (ii) если кто-то является редактором книги, то он/она не написала (все) эти книги; (iii) если кто-то редактор или автор восемнадцати книг, то нельзя сделать вывод, что он/она является автором восемнадцати книг.</p>
+</div>
+<div class="section" id="limitations-of-nlp">
+<h2>5.7 Ограничения NLP</h2>
+<p>Несмотря на ведомые исследованиями успехи в задачах, таких как RTE, системы естественного языка, которые были внедрены для реальных приложений до сих пор не могут выполнять рассуждения основанные на здравом смысле или делать выводы из мировых знаний надежно и без исключений.  Мы можем подождать, пока эти трудные проблемы искусственного интеллекта будут решены, но тем временем необходимо жить с некоторыми серьезными ограничениями умозаключений и знаний систем естественного языка. Поэтому с самого начала важной целью NLP исследований состояла в том, чтобы добиться прогресса в трудной задаче построения технологий, которые "понимают язык", используя формальные, но мощные методы вместо неограниченного знания и способностей к рассуждению.
+На самом деле, это одна из целей этой книги и мы надеемся вооружить вас знаниями и навыками для создания полезных систем NLP, и внести свой вклад в долгосрочное стремление к построению интеллектуальных машин.</p>
+</div>
+</div>
+<div class="section" id="summary">
+<h1>6 Резюме</h1>
+<ul class="simple">
+<li>Тексты представлены в Python с помощью списков: <tt class="doctest"><span class="pre">[<span class="pysrc-string">'Monty'</span>, <span class="pysrc-string">'Python'</span>]</span></tt>.  Мы можем использовать индексацию, слайсинг и функцию <tt class="doctest"><span class="pre">len()</span></tt> для списков.</li>
+<li>Слово "токен" является конкретным появление данного слова в тексте; слово "тип" является уникальной формой слова как определенной последовательности букв.  Мы считаем токены слов, используя <tt class="doctest"><span class="pre">len(text)</span></tt>, а типы слов с помощью <tt class="doctest"><span class="pre">len(set(text))</span></tt>.</li>
+<li>Мы получаем словарь текста <tt class="doctest"><span class="pre">t</span></tt> с помощью <tt class="doctest"><span class="pre">sorted(set(t))</span></tt>.</li>
+<li>Мы оперируем с каждым элементом текста с помощью <tt class="doctest"><span class="pre">[f(х) <span class="pysrc-keyword">for</span> x <span class="pysrc-keyword">in</span> text]</span></tt>.</li>
+<li>Чтобы получить словарь, игнорирующий регистровые различия и знаки препинания, мы можем записать <tt class="doctest"><span class="pre">set(w.lower() <span class="pysrc-keyword">for</span> w <span class="pysrc-keyword">in</span> text <span class="pysrc-keyword">if</span> w.isalpha())</span></tt>.</li>
+<li>Мы обрабатываем каждое слово в тексте, используя предложение <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span></span></tt>, например, <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span> w <span class="pysrc-keyword">in</span> t:</span></tt> или <tt class="doctest"><span class="pre"><span class="pysrc-keyword">for</span> word <span class="pysrc-keyword">in</span> text:</span></tt>.  Это предложение должно сопровождаться двоеточием и отступом блок кода, который будет выполняться каждый раз при переходе от слова к слову.</li>
+<li>Мы проверяем условие, используя предложение <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span></span></tt>: <tt class="doctest"><span class="pre"><span class="pysrc-keyword">if</span> len(word) &lt; 5:</span></tt>.
+Это предложение должно сопровождаться двоеточием и отступом блок кода, который будет выполняться только если условие истинно.</li>
+<li>Распределение частоты представляет собой совокупность элементов вместе с подсчетом их частоты (например, слова текста и частоты их появления).</li>
+<li>Функция представляет собой блок кода, который был назначен имени и может быть использован повторно. Функции определяются с помощью ключевого слова <tt class="doctest"><span class="pre">def</span></tt>, как в выражении <tt class="doctest"><span class="pre"><span class="pysrc-keyword">def</span> <span class="pysrc-defname">mult(х, у)</span></span></tt>; <tt class="doctest"><span class="pre">х</span></tt> и <tt class="doctest"><span class="pre">у</span></tt> являются параметрами функции и  заменяют фактические значения данных.</li>
+<li>Функция вызывается путем указания ее имени, за которым следует ни одного или несколько аргументов внутри круглых скобок, например: <tt class="doctest"><span class="pre">texts()</span></tt>, <tt class="doctest"><span class="pre">mult(3, 4)</span></tt>, <tt class="doctest"><span class="pre">len(text1)</span></tt>.</li>
+</ul>
+</div>
+<div class="section" id="further-reading">
+<h1>7 Дальнейшее чтение</h1>
+<p>В этой главе введены новые понятия программирования, обработки естественного языка и лингвистики вперемешку.
+Многие из них консолидированы в следующих главах.  Тем не менее, вы можете также обратиться к онлайн-материалам, предоставляемые с этой главой (по адресу <tt class="doctest"><span class="pre">http://nltk.org/</span></tt>), в том числе ссылки на дополнительные справочные материалы и ссылки на онлайн NLP системы.
+Вы можете также хотеть прочитать о некоторых лингвистических и связанных с НЛП понятиях в Википедии (например, о словосочетаниях, тесте Тьюринга, отличии типа от токена).</p>
+<p>Вам следует ознакомиться с имеющейся документацией Python по адресу  <tt class="doctest"><span class="pre">http://docs.python.org/</span></tt>, включая множество руководств и всеобъемлющих справочных материалов, на которые там есть ссылки.
+<span class="emphasis">Руководство для начинающих по Python</span> доступно на <tt class="doctest"><span class="pre">http://wiki.python.org/moin/BeginnersGuide</span></tt>. Ответы на разные вопросы о Python могут быть найдены в разделе "Часто задаваемые вопросы" по адресу <tt class="doctest"><span class="pre">http://python.org/doc/faq/general/</span></tt>.</p>
+<p>Постольку поскольку вы копаетесь в NLTK, вы возможно захотите подписаться на почтовую рассылку, в которой сообщается о выпуске различных новых инструментов.  Существует также почтовая рассылка пользователей NLTK, в которой пользователи помогают друг другу в процессе изучения того, как использовать Python и NLTK для анализа языка.  Подробности об этих рассылках доступны на <tt class="doctest"><span class="pre">http://nltk.org/</span></tt>.</p>
+<p>Для получения дополнительной информации о темах, затронутых в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-automatic-natural-language-understanding">5</a>, а также об NLP в целом, вам возможно захотите проконсультироваться с одной из следующих замечательных книг:</p>
+<ul class="simple">
+<li>Indurkhya, Nitin and Fred Damerau (eds, 2010) Handbook of Natural Language Processing (Second Edition) Chapman &amp; Hall/CRC. 2010.   <a class="reference external" href="http://www.nltk.org/book/bibliography.html#indurkhyadamerau2010" id="id1">(Indurkhya &amp; Damerau, 2010)</a> <a class="reference external" href="http://www.nltk.org/book/bibliography.html#dale00handbook" id="id2">(Dale, Moisl, и Somers, 2000)</a></li>
+<li>Jurafsky, Daniel and James Martin (2008) Speech and Language Processing (Second Edition).  Prentice Hall.
+<a class="reference external" href="http://www.nltk.org/book/bibliography.html#jurafskymartin2008" id="id3">(Jurafsky &amp; Martin, 2008)</a></li>
+<li>Mitkov, Ruslan (ed, 2003) The Oxford Handbook of Computational Linguistics.   Oxford University Press.
+(second edition expected in 2010).  <a class="reference external" href="http://www.nltk.org/book/bibliography.html#mitkov02handbook" id="id4">(Mitkov, 2002)</a></li>
+</ul>
+<p>Ассоциация вычислительной лингвистики (ACL) является международной организацией, которая представляет поле NLP.  Веб-сайт ACL <tt class="doctest"><span class="pre">(http://www.aclweb.org/)</span></tt> содержит множество полезных ресурсов, в том числе: информация о международных и региональных конференциях и семинарах; <span class="emphasis">ACL Wiki</span> со ссылками на сотни полезных ресурсов; и <span class="emphasis">ACL Антология</span>, которая содержит большую часть литературы, посвященной исследованию NLP за последние 50 с лишним лет, полностью индексированную и доступную для свободного скачивания.</p>
+<p>Отличными вводными учебниками по лингвистики являются: <a href="http://www.nltk.org/book/ch01.html#id8"><span class="problematic" id="id9"><span id="id5"></span>[Finegan2007]<span id="id5"></span>, </span></a><a class="reference external" href="http://www.nltk.org/book/bibliography.html#ogrady2004" id="id6">(O'Grady et al, 2004)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#osu2007" id="id7">(OSU, 2007)</a>.  Вы возможно захотите проконсультироваться с <span class="emphasis">LanguageLog</span> - популярным лингвистическим блогом, в котором время от времени появляются сообщения,  использующие методы, описанные в этой книге.</p>
+</div>
+<div class="section" id="exercises">
+<h1>8 Упражнения</h1>
+<!-- TODO: add lots more exercises on lists! -->
+<ol class="arabic">
+<li><p class="first">☼ Попробуйте использовать интерпретатор Python в качестве калькулятора, и ввести такие выражения , как <tt class="doctest"><span class="pre">12 / (4 + 1).</span></tt></p>
+</li>
+<li><p class="first">☼ Учитывая алфавит из 26 букв, есть 26 к власти 10 или <tt class="doctest"><span class="pre">26 ** 10,</span></tt> десять букв строк мы можем сформировать.  Это вырабатывает <tt class="doctest"><span class="pre">141167095653376.</span></tt>  Сколько сотен буквенные строки возможны?</p>
+</li>
+<li><p class="first">☼ операция умножения на Python может быть применен к спискам.
+Что происходит , когда вы вводите <tt class="doctest"><span class="pre">[ <span class="pysrc-string">'Monty',</span> <span class="pysrc-string">'Python']</span> * 20,</span></tt> или <tt class="doctest"><span class="pre">3 * sent1?</span></tt></p>
+</li>
+<li><p class="first">☼ Обзор <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-computing-with-language-texts-and-words">1</a> на вычислении с языком.  Сколько слов там в <tt class="doctest"><span class="pre">text2?</span></tt>
+Сколько различных слов?</p>
+</li>
+<li><p class="first">☼ Сравните лексические оценки разнообразия для юмора и романтики в художественной литературе <a class="reference internal" href="http://www.nltk.org/book/ch01.html#tab-brown-types">1.1</a> .  Какой жанр более лексически разнообразны?</p>
+</li>
+<li><p class="first">☼ получения дисперсии сюжет из четырех главных героев в <em>Разум и чувства:</em> Elinor, Марианне, Эдвард, и Уиллоуби.
+Что вы можете наблюдать о различных роли, которую играют мужчины и женщины в этом романе?  Можете ли вы определить пары?</p>
+</li>
+<li><p class="first">☼ Найти коллокаций в <tt class="doctest"><span class="pre">text5.</span></tt></p>
+</li>
+<li><p class="first">☼ Рассмотрим следующее выражение Python: <tt class="doctest"><span class="pre">Len (набор (text4)).</span></tt>
+Указать цель этого выражения.  Опишите два шага, участвующих в выполнении этого вычисления.</p>
+</li>
+<li><p class="first">☼ Обзор <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-a-closer-look-at-python-texts-as-lists-of-words">2</a> по спискам и строк.</p>
+<ol class="loweralpha simple">
+<li>Определить строку и присвоить его переменной, например, <tt class="doctest"><span class="pre">my_string = <span class="pysrc-string">'My String'</span></span></tt> (но положить что - то более интересное в строке).
+Вывести содержимое этой переменной в двух направлениях, во- первых, просто введя имя переменной и нажмите клавишу ВВОД, а затем с помощью оператора <tt class="doctest"><span class="pre"><span class="pysrc-keyword">печати.</span></span></tt></li>
+<li>Попробуйте добавить строку в себе с помощью <tt class="doctest"><span class="pre">my_string + my_string</span></tt> или умножив его на число, например, <tt class="doctest"><span class="pre">my_string * 3.</span></tt>  Обратите внимание на то, что строки соединяются между собой без каких-либо пробелов.  Как вы могли бы это исправить?</li>
+</ol>
+</li>
+<li><p class="first">☼ Определить переменную <tt class="doctest"><span class="pre">my_sent</span></tt> быть список слов, используя синтаксис <tt class="doctest"><span class="pre">my_sent = [ <span class="pysrc-string">"My",</span> <span class="pysrc-string">"послал"]</span></span></tt> (но с вашими собственными словами, или любимая поговорка).</p>
+<ol class="loweralpha simple">
+<li>Используйте <tt class="doctest"><span class="pre"><span class="pysrc-string">''</span> .join (my_sent)</span></tt> , чтобы преобразовать это в строку.</li>
+<li>Используйте <tt class="doctest"><span class="pre">раскол ()</span></tt> , чтобы разбить строку обратно в список формы , которую вы должны были начать с.</li>
+</ol>
+</li>
+<li><p class="first">☼ Определение нескольких переменных , содержащих списки слов, например, <tt class="doctest"><span class="pre">phrase1,</span></tt> <tt class="doctest"><span class="pre">phrase2,</span></tt> и так далее.  Присоединяйтесь к ним вместе в различных комбинациях (с помощью оператора плюс), чтобы сформировать целые предложения.  Какова взаимосвязь между <tt class="doctest"><span class="pre">LEN (phrase1 + phrase2)</span></tt> и <tt class="doctest"><span class="pre">LEN (phrase1) + LEN (phrase2)?</span></tt></p>
+</li>
+<li><p class="first">☼ Рассмотрим следующие два выражения, которые имеют одинаковое значение.  Какой из них обычно будет более актуальным в НЛП?  Зачем?</p>
+<ol class="loweralpha simple">
+<li><tt class="doctest"><span class="pre"><span class="pysrc-string">"Monty Python"</span> [6:12]</span></tt></li>
+<li><tt class="doctest"><span class="pre">[ <span class="pysrc-string">"Рокфор",</span> <span class="pysrc-string">"Питон"]</span> [1]</span></tt></li>
+</ol>
+</li>
+<li><p class="first">☼ Мы видели, как представить предложение в виде списка слов, где каждое слово представляет собой последовательность символов.  Что <tt class="doctest"><span class="pre">sent1 [2] [2]</span></tt> делать?
+Зачем?  Эксперимент с другими значениями индекса.</p>
+</li>
+<li><p class="first">☼ Первое предложение <tt class="doctest"><span class="pre">Text3</span></tt> предоставляется вам в переменной <tt class="doctest"><span class="pre">sent3.</span></tt>  Индекс в <tt class="doctest"><span class="pre">sent3</span></tt> равен 1, так как <tt class="doctest"><span class="pre">sent3 [1]</span></tt> дает нам <tt class="doctest"><span class="pre"><span class="pysrc-string">''.</span></span></tt>  Каковы показатели двух других вхождений этого слова в <tt class="doctest"><span class="pre">sent3?</span></tt></p>
+</li>
+<li><p class="first">☼ Обзор обсуждение условными в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-making-decisions">4</a> .
+Найти все слова в чат Корпус <tt class="doctest"><span class="pre">(text5)</span></tt> , начиная с буквы <span class="example">б.</span>  Показать их в алфавитном порядке.</p>
+</li>
+<li><p class="first">☼ Введите <tt class="doctest"><span class="pre">список</span></tt> выражений <tt class="doctest"><span class="pre">(диапазон (10))</span></tt> в интерпретатор командной строке.
+Теперь попробуйте <tt class="doctest"><span class="pre">список (диапазон (10, 20)),</span></tt> <tt class="doctest"><span class="pre">список (диапазон (10, 20, 2)),</span></tt> и <tt class="doctest"><span class="pre">список (диапазон (20, 10, -2)).</span></tt>
+Мы увидим множество применений для этой встроенной функции в последующих главах.</p>
+</li>
+<li><p class="first">◑ Используйте <tt class="doctest"><span class="pre">text9.index ()</span></tt> , чтобы найти индекс слова <span class="example">заката.</span>
+Вам нужно вставить это слово в качестве аргумента в круглых скобках.
+Способом проб и ошибок, найти кусок для полного предложения, содержащего это слово.</p>
+</li>
+<li><p class="first">◑ Использование списка добавления, а также <tt class="doctest"><span class="pre">набор</span></tt> и <tt class="doctest"><span class="pre">отсортированные</span></tt> операций, вычислить словарный запас предложений <tt class="doctest"><span class="pre">sent1</span></tt> ... <tt class="doctest"><span class="pre">sent8.</span></tt></p>
+</li>
+<li><p class="first">◑ В чем разница между следующими двумя линиями?
+Какой из них будет давать большее значение?  Будет ли это иметь место для других текстов?</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> Сортируется (набор (w.lower () <span class="pysrc-keyword">для</span> ш <span class="pysrc-keyword">в</span> text1)) <span class="pysrc-prompt">&gt;&gt;&gt;</span> сортируется (w.lower () <span class="pysrc-keyword">для</span> W <span class="pysrc-keyword">в</span> комплекте (текст1))</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</li>
+<li><p class="first">◑ В чем разница между следующими двумя тестами: <tt class="doctest"><span class="pre">w.isupper ()</span></tt> , а <tt class="doctest"><span class="pre"><span class="pysrc-keyword">не</span> w.islower ()?</span></tt></p>
+</li>
+<li><p class="first">◑ Написать выражение ломтик , который извлекает два последних слова <tt class="doctest"><span class="pre">text2.</span></tt></p>
+</li>
+<li><p class="first">◑ Найти все четыре буквы слова в чате корпус <tt class="doctest"><span class="pre">(text5).</span></tt>
+С помощью частотного распределения <tt class="doctest"><span class="pre">(FreqDist),</span></tt> показывают эти слова в порядке убывания частоты.</p>
+</li>
+<li><p class="first">◑ Обзор обсуждение зацикливание с условиями в <a class="reference internal" href="http://www.nltk.org/book/ch01.html#sec-making-decisions">4</a> .
+Используйте комбинацию <tt class="doctest"><span class="pre"><span class="pysrc-keyword">для</span></span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-keyword">если</span></span></tt> оператор в цикле над словами сценария фильма для <em>Монти Пайтон и Священный Грааль</em> <tt class="doctest"><span class="pre">(text6)</span></tt> и <tt class="doctest"><span class="pre"><span class="pysrc-keyword">напечатать</span></span></tt> все слова из прописных букв, по одному в каждой строке.</p>
+</li>
+<li><p class="first">◑ Написать выражения для нахождения всех слов в <tt class="doctest"><span class="pre">text6</span></tt> , которые удовлетворяют условиям , перечисленным ниже.  Результат должен быть в виде списка слов: <tt class="doctest"><span class="pre">[ <span class="pysrc-string">'слово1',</span> <span class="pysrc-string">'слово2',</span> ...].</span></tt></p>
+<ol class="loweralpha simple">
+<li>Окончание в <span class="example">Изе</span></li>
+<li>Содержащие букву <span class="example">г</span></li>
+<li>Содержит последовательность букв <span class="example">пт</span></li>
+<li>Имея все буквы в нижнем регистре для первоначального капитала , за исключением (например, <tt class="doctest"><span class="pre">titlecase)</span></tt></li>
+</ol>
+</li>
+<li><p class="first">◑ Define , <tt class="doctest"><span class="pre">послал</span></tt> список слов <tt class="doctest"><span class="pre">[ <span class="pysrc-string">'она',</span> <span class="pysrc-string">'продает',</span> <span class="pysrc-string">'море',</span> <span class="pysrc-string">'снаряды',</span> <span class="pysrc-string">'на',</span> <span class="pysrc-string">'в',</span> <span class="pysrc-string">'море',</span> <span class="pysrc-string">'берег'].</span></span></tt>
+Теперь написать код для выполнения следующих задач:</p>
+<ol class="loweralpha simple">
+<li>Печатать все слова , начинающиеся с <span class="example">ш</span></li>
+<li>Печать всех слов, больше, чем четыре символа</li>
+</ol>
+</li>
+<li><p class="first">◑ Что делает следующий код Python делать?  <tt class="doctest"><span class="pre">сумма (Len (ш) <span class="pysrc-keyword">для</span> ш <span class="pysrc-keyword">в</span> text1)</span></tt> Можете ли вы использовать его , чтобы отработать среднюю длину слова в тексте?</p>
+</li>
+<li><p class="first">◑ Определить функцию , называемую <tt class="doctest"><span class="pre">vocab_size (текст)</span></tt> , который имеет один параметр для текста, и который возвращает размер словаря текста.</p>
+</li>
+<li><p class="first">◑ Определим функцию <tt class="doctest"><span class="pre">процента (слово, текст)</span></tt> , который вычисляет , как часто данное слово встречается в тексте, и выражает результат в процентах.</p>
+</li>
+<li><p class="first">◑ Мы использовали наборы для хранения словарей.  Попробуйте следующее выражение Python: <tt class="doctest"><span class="pre">набор (sent3) &lt;Set (text1).</span></tt>  Эксперимент с этим , используя разные аргументы , чтобы <tt class="doctest"><span class="pre">установить ().</span></tt>  Что оно делает?
+Можете ли вы думать о практическом применении для этого?</p>
+</li>
+</ol>
+<!-- Footer to be used in all chapters -->
+<div class="admonition-about-this-document admonition">
+<p class="first admonition-title">Об этом документе ...</p>
+<p>Обновлялся для NLTK 3.0.
+Это глава из книги <em>Обработка естественного языка с помощью Python</em> написанной <a class="reference external" href="http://estive.net/">Стивеном Бердом</a> , <a class="reference external" href="http://homepages.inf.ed.ac.uk/ewan/">Эваном Клайном</a> и <a class="reference external" href="http://ed.loper.org/">Эдвардом Лопером</a> , Copyright © 2014 авторов.
+Он распространяется с <em>Набором инструментов для естественного языка</em> <tt class="doctest"><span class="pre">[http://nltk.org/],</span></tt> версия 3.0 в соответствии с условиями <em>Creative Commons Attribution-Noncommercial-No Derivative Works 3.0 Лицензии Соединенных Штатов</em> [ <a class="reference external" href="http://creativecommons.org/licenses/by-nc-nd/3.0/us/">http://creativecommons.org/licenses/by-nc-nd/3.0/us/</a>].</p>
+<p class="last">Этот документ был построен на ср 1 июля 2015 12:30:05 AEST</p>
+</div>
+</div>
+<div class="system-messages section">
+<h1>Docutils Системные сообщения</h1>
+<div class="system-message" id="id8">
+<p class="system-message-title">Системное сообщение: ОШИБКА / 3 <tt class="docutils">(ch01.rst2,</tt> линия 1889 г.); <em><a href="http://www.nltk.org/book/ch01.html#id9">обратной</a></em></p>
+Неизвестно имя цели: "finegan2007".</div>
+</div>
+</div>
+</body>
+</html>

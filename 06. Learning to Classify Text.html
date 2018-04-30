@@ -1,0 +1,1710 @@
+﻿<html lang="ru" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ascii"></meta>
+<meta name="generator" content="Docutils 0.12: http://docutils.sourceforge.net/"></meta>
+<title>6.6 Изучение классификации текста</title>
+<style type="text/css">/* :Author: Edward Loper, James Curran:Copyright: This stylesheet has been placed in the public domain.Stylesheet for use with Docutils.This stylesheet defines new css classes used by NLTK.It uses a Python syntax highlighting scheme that matchesthe colour scheme used by IDLE, which makes it easier forbeginners to check they are typing things in correctly. */
+/* Include the standard docutils stylesheet. */
+</style>
+</head>
+<body dir="ltr">
+<div class="document" id="learning-to-classify-text">
+<h1 class="title">6. Как классифицировать текст</h1>
+
+<!-- -*- mode: rst -*- -->
+<!-- -*- mode: rst -*- -->
+<!-- CAP abbreviations (map to small caps in LaTeX) -->
+<!-- Other candidates for global consistency -->
+<!-- PTB removed since it must be indexed -->
+<!-- WN removed since it must be indexed -->
+<!-- misc & punctuation -->
+<!-- cdots was unicode U+22EF but not working -->
+<!-- exercise meta-tags -->
+<!-- Unicode tests -->
+<!-- phonetic -->
+<!-- misc -->
+<!-- used in Unicode section -->
+<!-- arrows -->
+<!-- unification stuff -->
+<!-- Math & Logic -->
+<!-- sets -->
+<!-- Greek -->
+<!-- Chinese -->
+<!-- URLs -->
+<!-- Python example - a snippet of code in running text -->
+<!-- PlaceHolder example -  something that should be replaced by actual code -->
+<!-- Linguistic eXample - cited form in running text -->
+<!-- Emphasized (more declarative than just using *) -->
+<!-- Grammatical Category - e.g. NP and verb as technical terms
+.. role:: gc
+   :class: category -->
+<!-- Math expression - e.g. especially for variables -->
+<!-- Textual Math expression - for words &#39;inside&#39; a math environment -->
+<!-- Feature (or attribute) -->
+<!-- Raw LaTeX -->
+<!-- Raw HTML -->
+<!-- Feature-value -->
+<!-- Lexemes -->
+<!-- Replacements that rely on previous definitions :-) -->
+<!-- standard global imports
+
+>>> from __future__ import division
+>>> import nltk, re, pprint -->
+<!-- Organization:
+- Supervised Classification - - this introduces basic concepts, and
+  runs through lots of interesting examples
+- Evaluation - - talks about evaluation :)
+- Classification Methods (x3)
+- Generative vs Conditional
+- Joint Classification
+- Data modeling - - this talks about abstractly what we can learn
+  about language as linguists
+- ML in Python -->
+<span class="target" id="chap-data-intensive"></span><!-- XXX "test set" or "evaluation set"- - and what about "gold standard"? -->
+<!-- XXX globally, "<word>"(ie word enclosed by double quotes) needs to be replaced by -->
+<!-- `<word>`:lx: -->
+<!-- nomenclature note: training corpus/test corpus or training set/test set?? -->
+<!-- discuss qc corpus -->
+<!-- explain that segmentation (e.g. tokenization, sentence segmentation) can
+be viewed as a classification task -->
+<!-- Determinize, for the sake of doctest:
+
+>>> import random; random.seed(12345) -->
+<p>Обнаружение моделей является центральной частью обработки естественного языка.  Слова, оканчивающиеся на <span class="example">-ed</span>, как правило, глаголы прошедшего времени (<a class="reference external" href="http://www.nltk.org/book/ch05.html#chap-tag">5.</a>).  Частое использование <span class="example">will</span> свидетельствует о новостном тексте (<a class="reference external" href="http://www.nltk.org/book/ch03.html#chap-words">3</a>).  Эти наблюдаемые паттерны - структура слова и частота слово - случается коррелируют с конкретными аспектами смысла, такими как время и тема.
+Но как мы узнали, где начать искать, какие аспекты формы связать с какими аспектами смысла?</p>
+<p>Цель этой главы - ответить на следующие вопросы:</p>
+<ol class="arabic simple">
+<li>Как мы можем идентифицировать специфические особенности языковых данных, которые являются характерными для их классификации?</li>
+<li>Как мы можем строить модели языка, которые могут быть использованы для автоматического выполнения задач по обработке языка?</li>
+<li>Что мы можем узнать о языке из этих моделей?</li>
+</ol>
+<p>Параллельно мы рассмотрим некоторые важные методы машинного обучения, в том числе деревья решений, наивные классификаторы Байеса, и классификаторы максимальной энтропии.  Мы будем не будем разбирать математические и статистические основы этих методов, а сосредоточимся на том, как и когда использовать их (см. раздел Дополнительные материалы для получения дополнительной технической информации).  Прежде чем рассматривать эти методы, мы в первую очередь должны оценить масштаб этой темы.</p>
+<div class="section" id="supervised-classification">
+<span id="sec-supervised-classification"></span><h1>1 Контролируемая классификация</h1>
+<p><a name="classification_index_term"></a><span class="termdef">Классификация</span> является задачей выбора правильной <a name="class_label_index_term"></a><span class="termdef">метки класса</span> для данного входа.  В основных задачах классификации каждый вход рассматривается в отрыве от всех остальных входов, а множество меток определяется заранее.  Некоторые примеры задач классификации:</p>
+<ul class="simple">
+<li>Принятие решения, является ли письмо спамом или нет.</li>
+<li>Выбор темы новостной статьи из фиксированного списка тематических областей, таких как "спорт", "технологии" и "политика".</li>
+<li>Выбор референта для данного вхождение слова <span class="example">bank</span> из возможных: берег реки, финансовое учреждение, акт наклона в сторону или акт размещения чего-либо в финансовом учреждении.</li>
+</ul>
+<p>Основная задача классификации имеет ряд интересных вариантов.
+Например, в мультиклассификации каждому экземпляру может быть назначено множество меток; в классификации с открытыми классами набор меток не определен заранее; а в классификации последовательности список входов классифицируется совместно.</p>
+<p>Классификатор называется <a name="supervised_index_term"></a><span class="termdef">контролируемым</span>, если он построен на основе тренировочного корпуса, содержащего правильную метку для каждого входа.  Схема контролируемой классификации показана на <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-supervised-classification">1.1</a>.</p>
+<span class="target" id="fig-supervised-classification"></span><div class="figure" id="fig-supervised-classification">
+<img alt="../images/supervised-classification.png" src="http://www.nltk.org/images/supervised-classification.png" style="width:456.5px;height:235.5px">
+<p class="caption"><span class="caption-label">Рисунок 1.1</span>: Контролируемая классификация. (a) Во время тренировки, экстрактор свойств используется для преобразования каждого значения входного сигнала в набор свойств.
+Эти наборы свойств, которые схватывают основную информацию о каждом входе, которая должны быть использована для его классификации, обсуждаются в следующем разделе.
+Пары наборов свойств и меток подаются в алгоритм машинного обучения, чтобы создать модель. (b) Во время предсказания, тот же экстрактор свойств используется для преобразования невидимых входов в наборы свойств.
+Эти наборы свойств затем подаются в модель, которая генерирует предсказанные метки.</p>
+</div>
+<p>В оставшейся части этого раздела мы рассмотрим, как классификаторы могут быть использованы для решения широкого спектра задач.  Наше обсуждение не претендует на полноту, но стремится дать показательную выборку задач, которые могут быть выполнены с помощью текстовых классификаторов.</p>
+<div class="section" id="gender-identification">
+<h2>1.1 Половая идентификация</h2>
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch02.html#sec-lexical-resources">4</a> мы увидели, что мужские и женские имена имеют некоторые отличительные особенности.  Имена, оканчивающиеся на <span class="example">a</span>, <span class="example">e</span> и <span class="example">i</span>, вероятно, будут женскими, в то время как имена, заканчивающиеся на <span class="example">k</span>, <span class="example">o</span>, <span class="example">r</span>, <span class="example">s</span> и <span class="example">t</span>, вероятно, будут мужскими.
+Давайте построим классификатор, чтобы смоделировать эти различия более точно.</p>
+<p>Первым шагом в создании классификатор является решение о том, какие <a name="features_index_term"></a><span class="termdef">свойства</span> входа релевантны и как <a name="encode_index_term"></a><span class="termdef">кодировать</span> эти свойства.  Для этого примера мы начнем с заключительной буквы имени.  Следующая <a name="feature_extractor_index_term"></a>функция <span class="termdef">извлечения свойств</span> создает словарь, содержащий соответствующую информацию о данном имени:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def gender_features(word):
+...     return {'last_letter': word[-1]}
+&gt;&gt;&gt; gender_features('Shrek')
+{'last_letter': 'k'}</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Возвращенный словарь, известный как <a name="feature_set_index_term"></a><span class="termdef">набор свойств</span> ставит в соответствие имена свойств и их значения.  Названия свойств - это чувствительные к регистру строки, которые обычно предоставляют короткое легко читаемое описание свойства, как в нашем примере <tt class="doctest"><span class="pre"><span class="pysrc-string">'last_letter'</span></span></tt>.  Значения свойств - это значения с простыми типами, такими как логические значения, числа и строки.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Большинство методов классификации требуют, чтобы свойства были закодированы с помощью простых типов значений, таких как логические значения, числа и строки.  Но обратите внимание: только то, что свойство имеет простой тип, не обязательно означает, что значение свойства просто выразить или вычислить. На самом деле, в качестве свойств можно даже использовать очень сложные и содержательные значения, такие как выход второго контролируемого классификатора.</p>
+</div>
+<p>Теперь, когда мы определили экстрактор свойств, нам необходимо подготовить перечень примеров и соответствующие метки классов.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import names
+&gt;&gt;&gt; labeled_names = ([(name, 'male') for name in names.words('male.txt')] +
+... [(name, 'female') for name in names.words('female.txt')])
+&gt;&gt;&gt; import random
+&gt;&gt;&gt; random.shuffle(labeled_names)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- XXX say something about what featuresets are -->
+<p>Далее мы используем экстрактор свойств для обработки данных <tt class="doctest"><span class="pre">names</span></tt> и разделить полученный список наборов свойств на <a name="training_set_index_term"></a><span class="termdef">тренировочный набор</span> и <a name="test_set_index_term"></a><span class="termdef">тестовый набор</span>.  Тренировочный набор используется для подготовки нового «наивного классификатора Байеса".</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; featuresets = [(gender_features(n), gender) for (n, gender) in labeled_names]
+&gt;&gt;&gt; train_set, test_set = featuresets[500:], featuresets[:500]
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Мы узнаем больше о наимвном классификаторе Байеса позже в этой главе.  На данный момент давайте просто проверим его на несколько именах, которых не было в обучающих данных:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; classifier.classify(gender_features('Neo'))
+'male'
+&gt;&gt;&gt; classifier.classify(gender_features('Trinity'))
+'female'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Заметим, что эти имена персонажей из <em>Матрицы</em> классифицированы правильно.  Хотя этот научно-фантастический фильм рассказывает о событиях 2199 года, он все же соответствует нашим ожиданиям об именах и полах.  Мы можем систематически оценивать классификатор на гораздо большем количестве невидимых данных:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(nltk.classify.accuracy(classifier, test_set))
+0.77</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>И, наконец, мы можем исследовать классификатор, чтобы определить, какие из свойств, которые он нашел, наиболее эффективны для различения имен по гендерному признаку:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; classifier.show_most_informative_features(5)
+Most Informative Features
+             last_letter = 'a'            female : male   =     33.2 : 1.0
+             last_letter = 'k'              male : female =     32.6 : 1.0
+             last_letter = 'p'              male : female =     19.7 : 1.0
+             last_letter = 'v'              male : female =     18.6 : 1.0
+             last_letter = 'f'              male : female =     17.3 : 1.0</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Этот список показывает, что имена в обучающем наборе, которые заканчиваются на "a" являются женскими в 33 раза чаще, чем мужскими, а имена, которые заканчиваются на "k" являются мужскими в 32 раза чаще, чем женскими.  Эти соотношения известны как <a name="likelihood_ratios_index_term"></a> <span class="termdef">доли вероятности</span> и могут быть полезны для сравнения различных отношений свойство-результат.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last"><strong>Ваша очередь:</strong> 
+Измените функцию <tt class="doctest"><span class="pre">gender_features()</span></tt>, чтобы предоставить классификатору свойства, кодирующие длину имени, его первую букву, а также любые другие свойства, которые вам покажутся информативными.  Повторите тренировку классификатора с этими новыми свойствами и проверьте его точность.</p>
+</div>
+<p>При работе с большими корпусами построения единого списка, который содержит в себе свойства всех экземпляров может занимать большой объем памяти.  В этих случаях используйте функцию <tt class="doctest"><span class="pre">nltk.classify.apply_features</span></tt>, которая возвращает объект, который действует как список, но не хранит все наборы свойств в памяти:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.classify import apply_features
+&gt;&gt;&gt; train_set = apply_features(gender_features, labeled_names[500:])
+&gt;&gt;&gt; test_set = apply_features(gender_features, labeled_names[:500])</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+</div>
+<div class="section" id="choosing-the-right-features">
+<h2>1.2 Выбор правильных свойств</h2>
+<p>Выбор релевантных свойств и принятие решения, как кодировать их для метода обучения, может иметь огромное влияние на способность метода обучения извлекать хорошую модель.  Большая часть интересной работы при построении классификатора - это выбор свойств, которые могут быть релевантными, и решение вопроса о том, как мы можем их представить.  Несмотря на то, что часто можно получить приличную производительность, используя довольно простой и очевидный набор свойств, обычно есть значительные выгоды от использования тщательно выстроенных свойств на основе глубокого понимания задачи.</p>
+<p>Как правило, экстракторы свойств строятся методом проб и ошибок под руководством интуиций о том, какая информация имеет отношение к этой проблеме.  Общераспространенным является начало с подхода "кухонная раковина", когда в дело идут все свойства, которые вы можете придумать, а затем выполняется проверка того, какие свойства, на самом деле, являются полезными.  Мы принимаем этот подход гендерных свойств имени в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-gender-features-overfitting">1.2</a>.</p>
+<!-- XXX is it worth telling readers not to confuse feature names like "count(j)"
+with functions? -->
+<!-- XXX how about mentioning the term "presence feature" as the name
+for boolean-valued features? -->
+<!-- XXX briefly explain what&#39;s being done in
+features["count(%s)" % letter] = name.lower().count(letter) -->
+<span class="target" id="code-gender-features-overfitting"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def gender_features2(name):
+    features = {}
+    features["first_letter"] = name[0].lower()
+    features["last_letter"] = name[-1].lower()
+    for letter in 'abcdefghijklmnopqrstuvwxyz':
+        features["count({})".format(letter)] = name.lower().count(letter)
+        features["has({})".format(letter)] = (letter in name.lower())
+    return features</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; gender_features2('John') 
+{'count(j)': 1, 'has(d)': False, 'count(b)': 0, ...}</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_gender_features_overfitting.py" type="text/x-python"><span class="caption-label">Пример 1.2 (code_gender_features_overfitting.py)</span></a>: <span class="caption-label">Листинг 1.2</span>: Экстрактор свойств, который не соответствует гендерным свойствам.
+Набор свойств, возвращаемый этим экстрактором свойств содержат большое количество специфических свойств, ведущих к "переобученности" для относительно небольшого корпуса имен.</p></td></tr>
+</table></div>
+<p>Однако обычно есть ограничения на количество свойств, которые вы должны использовать с заданным алгоритмом обучения - если вы предоставляете слишком много свойств, то алгоритм будет иметь более высокий шанс полагаться на стилистические особенности ваших тренировочных данных, которые плохо обобщают новые примеры.  Эта проблема известна как <a name="overfitting_index_term"></a> <span class="termdef">переобученность</span> и может быть особенно проблематичной при работе с небольшими наборами тренировочных данных.  Например, если мы тренируем наивный байесовский классификатор, используя экстрактор свойств, показанный в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-gender-features-overfitting">1.2</a>, он будет переобучен относительно небольшого тренировочного набора, в результате чего будет создана модель, в которой точность составляет около 1% ниже, чем точность классификатора, который только обращает внимание на последнюю букву каждого имени:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; featuresets = [(gender_features2(n), gender) for (n, gender) in labeled_names]
+&gt;&gt;&gt; train_set, test_set = featuresets[500:], featuresets[:500]
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set)
+&gt;&gt;&gt; print(nltk.classify.accuracy(classifier, test_set))
+0.768</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- XXX How common is it to call the training + dev-test data a &#39;development set&#39;? -->
+<!-- I&#39;ve not come across it. In -->
+<!-- any case, the extra label seems unnecessary. J&M seem to be more standard; they -->
+<!-- call partition into "training", "dev-test" and "test" (p187) -->
+<p>После того, как первоначальный набор свойств был выбран, очень продуктивным методом для уточнения набора свойств является <a name="error_analysis_index_term"></a><span class="termdef">анализ ошибок</span>.  Сначала мы выбираем <a name="development_set_index_term"></a> <span class="termdef">набор для разработки</span>, содержащий данные для создания модели.  Этот набор разработки затем делится на <a name="training_set_index_term_2"></a><span class="termdef">тренировочный набор</span> и <a name="dev_test_index_term"></a><span class="termdef">тестовый (dev-test)</span> набор.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; train_names = labeled_names[1500:]
+&gt;&gt;&gt; devtest_names = labeled_names[500:1500]
+&gt;&gt;&gt; test_names = labeled_names[:500]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Тренировочный набор разработки используется для обучения модели, а тестовый набор разработки (dev-test) используется для выполнения анализа ошибок.  Тестовый (test) набор используется в нашей окончательной оценке системы.  По причинам, изложенным ниже, важно, чтобы мы использовали отдельный набор для анализа ошибок (dev-test ), а не просто тестовый набор (test set).  Разделение данных корпуса на различные наборы показано в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-corpus-org">1.3</a>.</p>
+<span class="target" id="fig-corpus-org"></span><div class="figure" id="fig-corpus-org">
+<img alt="../images/corpus-org.png" src="http://www.nltk.org/images/corpus-org.png" style="width:319.0px;height:166.0px">
+<p class="caption"><span class="caption-label">Рисунок 1.3:</span> Организация данных корпуса для обучения контролируемых классификаторов.
+Данные корпуса делятся на две группы: набор разработки и тестовый набор.  Набор разработки часто подразделяется на тренировочный набор и тестовый набор разработки.</p>
+</div>
+<p>Разделив корпус на соответствующие наборы данных, мы готовим модель, используя тренировочный набор <a class="reference internal" href="http://www.nltk.org/book/ch06.html#err-analysis-train"><span id="ref-err-analysis-train"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>, а затем прогоняем ее на тестовом наборе разработки<a class="reference internal" href="http://www.nltk.org/book/ch06.html#err-analysis-run"><span id="ref-err-analysis-run"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; train_set = [(gender_features(n), gender) for (n, gender) in train_names]
+&gt;&gt;&gt; devtest_set = [(gender_features(n), gender) for (n, gender) in devtest_names]
+&gt;&gt;&gt; test_set = [(gender_features(n), gender) for (n, gender) in test_names]
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set) 
+&gt;&gt;&gt; print(nltk.classify.accuracy(classifier, devtest_set)) 
+0.75</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Используя тестовый набор разработки, мы можем сгенерировать список ошибок, которые классификатор делает при прогнозировании пола имени:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; errors = []
+&gt;&gt;&gt; for (name, tag) in devtest_names:
+...     guess = classifier.classify(gender_features(name))
+...     if guess != tag:
+...         errors.append( (tag, guess, name) )</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Затем мы можем исследовать отдельные случаи ошибок, когда модель предсказала неправильную метку, и попытаться определить, какие дополнительные элементы информации позволили бы ей принять правильное решение (или какие существующие фрагменты информации заставляют ее принять неправильное решение).  Набор свойств может быть соответствующим образом скорректирован.  Классификатор имен, который мы построили, генерирует около 100 ошибок на на тестовом наборе разработки:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; for (tag, guess, name) in sorted(errors):
+...     print('correct={:&lt;8} guess={:&lt;8s} name={:&lt;30}'.format(tag, guess, name))
+correct=female   guess=male     name=Abigail
+  ...
+correct=female   guess=male     name=Cindelyn
+  ...
+correct=female   guess=male     name=Katheryn
+correct=female   guess=male     name=Kathryn
+  ...
+correct=male     guess=female   name=Aldrich
+  ...
+correct=male     guess=female   name=Mitch
+  ...
+correct=male     guess=female   name=Rich
+  ...</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Просматривая этот список ошибок становится ясно, что некоторые суффиксы, состоящие из двух и более букв, могут указывать на мужское или женское имя.  Например, имена, заканчивающиеся на <span class="example">yn</span> оказываются преимущественно женскими, несмотря на то, что имена, оканчивающиеся на <span class="example">n</span> имеют тенденцию быть мужскими; а имена, заканчивающиеся на <span class="example">ch</span> обычно мужские, несмотря на то, что имена, которые заканчиваются на <span class="example">h</span>, как правило, женские.  Поэтому мы скорректируем наш экстрактор свойств и включим в него свойства для двухбуквенных суффиксов:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def gender_features(word):
+...     return {'suffix1': word[-1:],
+...             'suffix2': word[-2:]}</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Перестроив классификатор с новым экстрактором свойств, мы видим, что результативность на тестовом наборе разработки улучшается почти на 2 процентных пункта (с 76,5% до 78,2%):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; train_set = [(gender_features(n), gender) for (n, gender) in train_names]
+&gt;&gt;&gt; devtest_set = [(gender_features(n), gender) for (n, gender) in devtest_names]
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set)
+&gt;&gt;&gt; print(nltk.classify.accuracy(classifier, devtest_set))
+0.782</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Эта процедура анализа ошибок может быть затем повторена для проверки паттернов ошибок, которые были сделаны недавно улучшенным классификатором.
+Каждый раз, когда повторяется процедура анализа ошибок, мы должны по-другому поделить данные на тренировочный и тестовый набор разработки, чтобы гарантировать, что классификатор не начинает отражать особенности тестового набора разработки.</p>
+<p>Но как только мы использовали тестовый набор разработки для подготовки модели, мы больше не можем верить, что он даст нам точное представление о том, как хорошо модель будет работать на новых данных.  Поэтому важно держать тестовый набор отдельно и не использовать его, пока наша разработка модели не будет завершена.  Когда разработка будет завершена, мы можем использовать тестовый набор, чтобы оценить, насколько хорошо наша модель будет работать на новых входных данных.</p>
+</div>
+<div class="section" id="document-classification">
+<h2>1.3 Классификация документов</h2>
+<!-- Determinize, for the sake of doctest:
+
+>>> import random; random.seed(12345) -->
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch02.html#sec-extracting-text-from-corpora">1</a> мы видели несколько примеров корпусов, в которых документы были помечены категориями.  Используя эти корпусы, мы можем построить классификаторы, которые будут автоматически помечать новые документы соответствующими метками категорий.  Сначала мы строим перечень документов, помеченных соответствующими категориями.  Для этого примера мы выбрали корпус отзывов на фильмы, который классифицирует каждый обзор как положительный или отрицательный.</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import movie_reviews
+&gt;&gt;&gt; documents = [(list(movie_reviews.words(fileid)), category)
+...              for category in movie_reviews.categories()
+...              for fileid in movie_reviews.fileids(category)]
+&gt;&gt;&gt; random.shuffle(documents)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Далее мы определяем экстрактор свойств для документов, чтобы классификатор знал, на какие аспекты данных следует обратить внимание (<a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-document-classify-fd">1.4</a>).  Для идентификации темы документа, мы можем определить свойство для каждого слова, указывающее, содержит ли документ это слово.  Чтобы ограничить количество свойств, которые классификатор должен обрабатывать, мы начинаем с построения списка 2000 наиболее частых слов в общем корпусе <a class="reference internal" href="http://www.nltk.org/book/ch06.html#document-classify-all-words"><span id="ref-document-classify-all-words"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.  Затем мы можем определить экстрактор свойств <a class="reference internal" href="http://www.nltk.org/book/ch06.html#document-classify-extractor"><span id="ref-document-classify-extractor"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>, который просто проверяет, присутствует ли каждое из этих слов в данном документе.</p>
+<span class="target" id="code-document-classify-fd"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+all_words = nltk.FreqDist(w.lower() for w in movie_reviews.words())
+word_features = list(all_words)[:2000] 
+
+def document_features(document): 
+    document_words = set(document) 
+    features = {}
+    for word in word_features:
+        features['contains({})'.format(word)] = (word in document_words)
+    return features</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(document_features(movie_reviews.words('pos/cv957_8737.txt'))) 
+{'contains(waste)': False, 'contains(lot)': False, ...}</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_document_classify_fd.py" type="text/x-python"><span class="caption-label">Пример 1.4 (code_document_classify_fd.py)</span></a> : <span class="caption-label">Листинг 1.4</span>: Экстрактор свойств для классификации документов, чьи свойства указывают, присутствуют ли отдельные слова в данном документе.</p></td></tr>
+</table></div>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Причина, по которой мы вычисляем набор всех слов в документе в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#document-classify-set"><span id="ref-document-classify-set"><img class="callout" alt="[3]" src="http://www.nltk.org/book/callouts/callout3.gif"></span></a> иная, нежели просто проверка, присутствует ли <tt class="doctest"><span class="pre">слово <span class="pysrc-keyword">в</span> документе</span></tt>, дело в том, что проверка наличия слова в наборе гораздо быстрее, чем проверка наличия его в списке (<a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-algorithm-design">4.7</a>).</p>
+</div>
+<p>Теперь, когда мы определили наш экстрактор свойств, мы можем использовать его, чтобы обучить классификатор помечать новые обзоры фильмов (<a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-document-classify-use">1.5</a>).  Чтобы проверить, насколько надежен полученный классификатор, мы вычислим его точность на тестовом наборе <a class="reference internal" href="http://www.nltk.org/book/ch06.html#document-classify-test"><span id="ref-document-classify-test"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.  И снова мы можем использовать <tt class="doctest"><span class="pre">show_most_informative_features()</span></tt>, чтобы выяснить, какие из найденных классификатором свойств оказались наиболее информативными <a class="reference internal" href="http://www.nltk.org/book/ch06.html#document-classify-smif"><span id="ref-document-classify-smif"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.</p>
+<span class="target" id="code-document-classify-use"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+featuresets = [(document_features(d), c) for (d,c) in documents]
+train_set, test_set = featuresets[100:], featuresets[:100]
+classifier = nltk.NaiveBayesClassifier.train(train_set)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(nltk.classify.accuracy(classifier, test_set)) 
+0.81
+&gt;&gt;&gt; classifier.show_most_informative_features(5) 
+Most Informative Features
+   contains(outstanding) = True              pos : neg    =     11.1 : 1.0
+        contains(seagal) = True              neg : pos    =      7.7 : 1.0
+   contains(wonderfully) = True              pos : neg    =      6.8 : 1.0
+         contains(damon) = True              pos : neg    =      5.9 : 1.0
+        contains(wasted) = True              neg : pos    =      5.8 : 1.0</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_document_classify_use.py" type="text/x-python"><span class="caption-label">Пример 1.5 (code_document_classify_use.py)</span></a>: <span class="caption-label">Листинг 1.5:</span> Обучение и тестирование классификатора для классификации документов.</p></td></tr>
+</table></div>
+<p>По-видимому в этом корпусе отзыв, в котором упоминается "Сигал", имеет почти в 8 раз больше шансов быть отрицательным, чем положительным, в то время как отзыв, который упоминает "Дэймона", примерно в 6 раз более вероятно, что будет положительным.</p>
+<!-- I tried adding simple frequencies w/ binning, but it didn&#39;t improve
+performance.  Using something more advanced like tf-idf probably
+would, but I don&#39;t want to take up the space here to explain all
+that. -->
+<!-- This classifier gives different results for most_informative_features on
+successive runs. [EK] -->
+</div>
+<div class="section" id="part-of-speech-tagging">
+<h2>Разметка частей речи</h2>
+<!-- The decision tree classifier is currently RIDICULOUSLY SLOW. :-/ -->
+<p>В <a class="reference external" href="http://www.nltk.org/book/ch05.html#chap-tag">5.</a> мы построили разметчик, использующий регулярное выражение, который выбирает метку части речи для слова, глядя на внутреннюю структуру слова.  Однако мы должны были сконструировать этот разметчик вручную.  Вместо этого мы можем обучить классификатор определять, какие суффиксы являются наиболее информативными.  Давайте начнем с выяснения того, какие суффиксы наиболее распространенные:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; suffix_fdist = nltk.FreqDist()
+&gt;&gt;&gt; for word in brown.words():
+...     word = word.lower()
+...     suffix_fdist[word[-1:]] += 1
+...     suffix_fdist[word[-2:]] += 1
+...     suffix_fdist[word[-3:]] += 1</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; common_suffixes = [suffix for (suffix, count) in suffix_fdist.most_common(100)]
+&gt;&gt;&gt; print(common_suffixes)
+['e', ',', '.', 's', 'd', 't', 'he', 'n', 'a', 'of', 'the',
+ 'y', 'r', 'to', 'in', 'f', 'o', 'ed', 'nd', 'is', 'on', 'l',
+ 'g', 'and', 'ng', 'er', 'as', 'ing', 'h', 'at', 'es', 'or',
+ 're', 'it', '``', 'an', "''", 'm', ';', 'i', 'ly', 'ion', ...]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- To make the emacs mode less confused: `` -->
+<p>Далее мы определим функцию извлечения свойств, которая проверяет данное слово на эти суффиксы:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def pos_features(word):
+...     features = {}
+...     for suffix in common_suffixes:
+...         features['endswith({})'.format(suffix)] = word.lower().endswith(suffix)
+...     return features</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Функции извлечения свойств ведут себя как тонированные стекла, выделяя некоторые из свойств (цветов) в наших данных и делая невозможным увидеть другие свойства.  Классификатор будет опираться исключительно на эти подчеркнутые свойства при определении того, как пометить входы.  В этом случае классификатор будет принимать свои решения только на основе информации о том, какие из общих суффиксов (если таковые имеются) имеет данное слово.</p>
+<!-- XXX I like the use of spaces in the doctest block, but I think this the only time -->
+<!-- they are used. -->
+<p>Теперь, когда мы определили нашу функцию-экстрактор, мы можем использовать ее для подготовки нового классификатора на основе "дерева решений" (будет обсуждаться в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#sec-decision-trees">4</a>):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tagged_words = brown.tagged_words(categories='news')
+&gt;&gt;&gt; featuresets = [(pos_features(n), g) for (n,g) in tagged_words]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; size = int(len(featuresets) * 0.1)
+&gt;&gt;&gt; train_set, test_set = featuresets[size:], featuresets[:size]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; classifier = nltk.DecisionTreeClassifier.train(train_set)
+&gt;&gt;&gt; nltk.classify.accuracy(classifier, test_set)
+0.62705121829935351</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; classifier.classify(pos_features('cats'))
+'NNS'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- XXX raise the issue of interpretability of models earlier?
+(E.g. deliberately use the word "interpret" in the opening of the chapter?) -->
+<p>Одна хорошая особенность моделей на основе дерева решений состоит в том, что их часто довольно легко интерпретировать - мы можем даже поручить NLTK печатать их как псевдокод:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; print(classifier.pseudocode(depth=4))
+if endswith(,) == True: return ','
+if endswith(,) == False:
+  if endswith(the) == True: return 'AT'
+  if endswith(the) == False:
+    if endswith(s) == True:
+      if endswith(is) == True: return 'BEZ'
+      if endswith(is) == False: return 'VBZ'
+    if endswith(s) == False:
+      if endswith(.) == True: return '.'
+      if endswith(.) == False: return 'NN'</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- XXX NOTE: Last time I ran the doctests, I got a slightly different
+decision tree.  Is this nondeterministic?  It appeared that the
+decision tree was making *mostly* the same decisions.  We can
+update this, but it will require updating the following text too.
+Here&#39;s the decision tree I got on the most recent run:
+
+ if endswith(the) == False:
+   if endswith(,) == False:
+     if endswith(s) == False:
+       if endswith(.) == False: return &#39;.&#39;
+       if endswith(.) == True: return &#39;.&#39;
+     if endswith(s) == True:
+       if endswith(is) == False: return &#39;PP$&#39;
+       if endswith(is) == True: return &#39;BEZ&#39;
+   if endswith(,) == True: return &#39;,&#39;
+ if endswith(the) == True: return &#39;AT&#39; -->
+<p>Здесь мы видим, что классификатор начинает с проверки, заканчивается ли слово запятой - если это так, то оно получит специальную метку <tt class="doctest"><span class="pre"><span class="pysrc-string">","</span></span></tt>.  Далее классификатор проверяет, заканчивается ли слово на <tt class="doctest"><span class="pre"><span class="pysrc-string">"the"</span></span></tt>, в этом случае оно почти наверняка определитель.  Этот "суффикс" используется в дереве решений, потому что слово "the" такое распространенное.
+Продолжая, классификатор проверяет, оканчивается ли слово на "s".  Если это так, то , скорее всего, оно получит метку глагола <tt class="doctest"><span class="pre">VBZ</span></tt> (если это не слово "is", которое имеет специальную метку <tt class="doctest"><span class="pre">BEZ</span></tt>), а если нет, то это, скорее всего, существительное (если только это не знак препинания ".").
+Реальный классификатор содержит дальнейшие вложенные если-то предложения ниже тех, которые показаны здесь, но аргумент <tt class="doctest"><span class="pre">depth=4</span></tt>просто отображает верхнюю часть дерева решений.</p>
+<!-- XXX How about some features that match word patterns more generally,
+linking back to the knowledge represented in a regular expression
+tagger, such as: (r&#39;^-?[0-9]+(.[0-9]+)?$&#39;, &#39;CD&#39;)
+-> response: this is a very large search space, though we could
+manually throw some of them in. -->
+</div>
+<div class="section" id="exploiting-context">
+<h2>1.5 Использование контекста</h2>
+<!-- Change this to use DecisionTree, to match prev section? -->
+<p>Путем добавления функции извлечения свойств мы могли бы изменить этот разметчик, чтобы он мог использовать множество других внутренних свойств слова, таких как длина слова, число слогов или его префикс.  Однако до тех пор, пока экстрактор свойств просто смотрит на целевое слово, у нас нет никакого способа добавлять новые свойства, которые зависят от <em>контекста</em>, в котором слово появляется.  Но контекстные возможности часто предоставляют мощные подсказки о правильной метке - например, при обработке слова "fly" знание о том, что предыдущее слово "a", позволит нам определить, что оно функционирует как существительное, а не глагол.</p>
+<p>Для того чтобы учесть свойства, которые зависят от контекста данного слова, мы должны пересмотреть шаблон, который мы использовали для определения нашего экстрактор свойств.
+Вместо того, чтобы просто передавать слово, мы будем передавать полное (не помеченное) предложение с индексом целевого слова.
+Такой подход демонстрируется в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-suffix-pos-tag">1.6</a>, который использует экстрактор контекстно-зависимых свойств, чтобы определить классификатор частей речи.</p>
+<span class="target" id="code-suffix-pos-tag"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def pos_features(sentence, i): 
+    features = {"suffix(1)": sentence[i][-1:],
+                "suffix(2)": sentence[i][-2:],
+                "suffix(3)": sentence[i][-3:]}
+    if i == 0:
+        features["prev-word"] = "&lt;START&gt;"
+    else:
+        features["prev-word"] = sentence[i-1]
+    return features</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; pos_features(brown.sents()[0], 8)
+{'suffix(3)': 'ion', 'prev-word': 'an', 'suffix(2)': 'on', 'suffix(1)': 'n'}
+
+&gt;&gt;&gt; tagged_sents = brown.tagged_sents(categories='news')
+&gt;&gt;&gt; featuresets = []
+&gt;&gt;&gt; for tagged_sent in tagged_sents:
+...     untagged_sent = nltk.tag.untag(tagged_sent)
+...     for i, (word, tag) in enumerate(tagged_sent):
+...         featuresets.append( (pos_features(untagged_sent, i), tag) )
+
+&gt;&gt;&gt; size = int(len(featuresets) * 0.1)
+&gt;&gt;&gt; train_set, test_set = featuresets[size:], featuresets[:size]
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set)
+
+&gt;&gt;&gt; nltk.classify.accuracy(classifier, test_set)
+0.78915962207856782</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_suffix_pos_tag.py" type="text/x-python"><span class="caption-label">Пример 1.6 (code_suffix_pos_tag.py)</span></a>: <span class="caption-label">Листинг 1.6</span>: Классификатор частей речи, чей детектор свойств анализирует контекст, в котором слово появляется для того, чтобы определить, какая метка части речи должна быть назначена.  В частности, индивидуальность предыдущего слова включена в качестве свойства.</p></td></tr>
+</table></div>
+<!-- This needs a comparison point from prev classifier!! -->
+<!-- It would be nice to actually show this (using
+show_most_informative_features or something): -->
+<p>Понятно, что использование контекстных свойств повышает результативность нашего разметчика частей речи.  Например, классификатор узнает о том, что слово скорее всего является существительным, если оно идет сразу после слова "большой" или слова "губернаторского".  Однако он не в состоянии выучить обобщение, что слово, вероятно, существительное, если оно следует за прилагательным, потому что он не имеет доступа к метке части речи предыдущего слова.  В целом простые классификаторы всегда рассматривают каждый вход как независимый от всех других входов.  Во многих случаях это имеет смысл.  Например, решения о том, имеют ли имена тенденцию быть мужскими или женскими, могут быть приняты на основе перебора случаев.  Однако часто бывают случаи, такие как разметка частей речи, где мы заинтересованы в решении проблем классификации, тесно связанных друг с другом.</p>
+</div>
+<div class="section" id="sequence-classification">
+<h2>1.6 Классификация последовательности</h2>
+<p>Для того, чтобы схватить зависимости между связанными задачами классификации, мы можем использовать модели <a name="joint_classifier_index_term"></a><span class="termdef">объединенного классификатора</span>, которые выбирают соответствующую маркировку для набора связанных входов.  В случае разметки частей речи разнообразие различных моделей <a name="sequence_classifier_index_term"></a><span class="termdef">классификатора последовательности</span> может быть использовано, для совместного выбора меток части речи для всех слов в данном предложении.</p>
+<!-- note that consecutive classification isn&#39;t a widely-used term,
+but it seems reasonably good to me. -->
+<p>Одна из стратегий классификации последовательности, известная как <a name="consecutive_classification_index_term"></a><span class="termdef">последовательная классификация</span> или <a name="greedy_sequence_classification_index_term"></a><span class="termdef">жадные классификация последовательности</span>, заключается в том, чтобы найти наиболее вероятную метку класса для первого входа, затем использовать этот ответ, чтобы найти лучшую метку для следующего входа.  Затем процесс может повторяться до тех пор, пока все входные данные не были помечены.  Это подход, который был принят биграмм-разметчиком из <a class="reference external" href="http://www.nltk.org/book/ch05.html#sec-n-gram-tagging">5</a>, который начал с выбора метки части речи для первого слова в предложении, а затем определял метку для каждого последующего слова на основе самого этого слова и предсказанной метки для предыдущего слова.</p>
+<p>Эта стратегия показана в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-consecutive-pos-tagger">1.7</a>.
+Сначала мы должны усилить нашу функцию извлечения свойств, чтобы она принимала аргумент <tt class="doctest"><span class="pre">history</span></tt>, который предоставляет список меток, которые мы уже предсказали для данного предложения<a class="reference internal" href="http://www.nltk.org/book/ch06.html#consec-pos-tag-features"><span id="ref-consec-pos-tag-features"><img class="callout" alt="[1]" src="http://www.nltk.org/book/callouts/callout1.gif"></span></a>.
+Каждая метка в <tt class="doctest"><span class="pre">истории</span></tt> соответствует слову в <tt class="doctest"><span class="pre">предложении</span></tt>.  Но учтите, что <tt class="doctest"><span class="pre">history</span></tt> будет содержать только метки для слов, которые мы уже классифицировали, то есть расположенных слева от целевого слова.  Таким образом, в то время как можно посмотреть на некоторые особенности слов справа от целевого слова, не представляется возможным посмотреть на метки для этих слов (так как мы их еще не породили).</p>
+<p>Определив экстрактор свойств, мы можем приступить к созданию нашего классификатора последовательности <a class="reference internal" href="http://www.nltk.org/book/ch06.html#consec-pos-tagger"><span id="ref-consec-pos-tagger"><img class="callout" alt="[2]" src="http://www.nltk.org/book/callouts/callout2.gif"></span></a>.  Во время обучения мы используем аннотированные метки, чтобы предоставить экстрактору свойств соответствующую историю, но когда выполняется разметка новых предложений, мы формируем список истории на основе вывода самого разметчика.</p>
+<span class="target" id="code-consecutive-pos-tagger"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+ def pos_features(sentence, i, history): 
+     features = {"suffix(1)": sentence[i][-1:],
+                 "suffix(2)": sentence[i][-2:],
+                 "suffix(3)": sentence[i][-3:]}
+     if i == 0:
+         features["prev-word"] = "&lt;START&gt;"
+         features["prev-tag"] = "&lt;START&gt;"
+     else:
+         features["prev-word"] = sentence[i-1]
+         features["prev-tag"] = history[i-1]
+     return features
+
+class ConsecutivePosTagger(nltk.TaggerI): 
+
+    def __init__(self, train_sents):
+        train_set = []
+        for tagged_sent in train_sents:
+            untagged_sent = nltk.tag.untag(tagged_sent)
+            history = []
+            for i, (word, tag) in enumerate(tagged_sent):
+                featureset = pos_features(untagged_sent, i, history)
+                train_set.append( (featureset, tag) )
+                history.append(tag)
+        self.classifier = nltk.NaiveBayesClassifier.train(train_set)
+
+    def tag(self, sentence):
+        history = []
+        for i, word in enumerate(sentence):
+            featureset = pos_features(sentence, i, history)
+            tag = self.classifier.classify(featureset)
+            history.append(tag)
+        return zip(sentence, history)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; tagged_sents = brown.tagged_sents(categories='news')
+&gt;&gt;&gt; size = int(len(tagged_sents) * 0.1)
+&gt;&gt;&gt; train_sents, test_sents = tagged_sents[size:], tagged_sents[:size]
+&gt;&gt;&gt; tagger = ConsecutivePosTagger(train_sents)
+&gt;&gt;&gt; print(tagger.evaluate(test_sents))
+0.79796012981</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_consecutive_pos_tagger.py" type="text/x-python"><span class="caption-label">Пример 1.7 (code_consecutive_pos_tagger.py)</span></a> : <span class="caption-label">Листинг 1.7:</span> Разметка частей речи с помощью классификатора последовательности</p></td></tr>
+</table></div>
+</div>
+<div class="section" id="other-methods-for-sequence-classification">
+<h2>1.7 Другие методы классификации последовательности</h2>
+<p>Один из недостатков этого подхода заключается в том, что мы придерживаемся каждого решения, которое мы приняли.  Например, если мы решим пометить слово как существительное, но позже найдем доказательство того, что оно должно было быть глаголом, нет никакого способа вернуться и исправить свою ошибку.  Одним из путей решения этой проблемы является принятие трансформационной стратегии.  Трансформационные объединенные классификаторы работают путем создания первоначального присвоения меток для входов и последующего итеративного уточнения этого присвоения в попытке исправить несоответствия между связанными входами.  Разметчик Брилля, описанный в <a class="reference external" href="http://www.nltk.org/book/ch05.html#sec-transformation-based-tagging">(1)</a>, является хорошим примером этой стратегии.</p>
+<p>Другим решением является назначение оценки для всех возможных последовательностей теги частей речи и выбор последовательности, общая оценка которой является самой высокой. Это подход, принятый <a name="hidden_markov_models_index_term"></a><span class="termdef">Скрытыми моделями Маркова</span>.
+Скрытые модели Маркова аналогичны последовательным классификаторам тем, что смотрят и на входы и на историю предсказанных меток. Однако они не просто находят единственную лучшую метку для данного слова, они генерируют распределение вероятностей по меткам. Эти вероятности затем объединяются для расчета оценки вероятности для последовательностей меток, и последовательность меток с наибольшей вероятностью выбирается. К сожалению, число возможных последовательностей меток достаточно велика. Для набор из 30 меток, есть около 600 триллион (30<sup>10</sup>) способов пометить предложение из 10 слов.  Для того, чтобы избежать рассмотрения всех этих возможных последовательностей по отдельности, скрытые марковские модели требуют, чтобы экстрактор свойств смотрел только на самую последнюю метку (или на <span class="math">n</span> самых последних меток, где <span class="math">n</span> достаточно мало). Учитывая это ограничение, можно использовать динамическое программирование (<a class="reference external" href="http://www.nltk.org/book/ch04.html#sec-algorithm-design">4.7</a>), чтобы эффективно найти наиболее вероятную последовательность меток. В частности, для каждого последовательного индекса слова <span class="math">i</span> оценка вычисляется для каждой возможной текущей и предыдущей метки.
+Этот же базовый подход применяется двумя другими продвинутыми моделями, которые называются <a name="maximum_entropy_markov_models_index_term"></a><span class="termdef">модели максимальной энтропии Маркова</span> и <a name="linear_chain_conditional_random_field_models_index_term"></a><span class="termdef">линейно-цепные условные модели случайного поля</span>; но другие алгоритмы используются для нахождения оценки последовательностей меток.</p>
+</div>
+</div>
+<div class="section" id="further-examples-of-supervised-classification">
+<span id="sec-further-examples-of-supervised-classification"></span><h1>2 Другие примеры контролируемой классификации</h1>
+<div class="section" id="sentence-segmentation">
+<h2>2.1 Выделение предложения</h2>
+<p>Выделение предложения можно рассматривать как задачу классификации для пунктуации: всякий раз, когда мы сталкиваемся с символом, который мог бы положить конец предложения, такие как период или знак вопроса, мы должны решить, прекращает ли предыдущее предложение.</p>
+<p>Первый шаг заключается в том, чтобы получить некоторые данные, которые уже были разделены на предложения и преобразовать их в форму, которая является подходящей для извлечения признаков:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; sents = nltk.corpus.treebank_raw.sents()
+&gt;&gt;&gt; tokens = []
+&gt;&gt;&gt; boundaries = set()
+&gt;&gt;&gt; offset = 0
+&gt;&gt;&gt; for sent in sents:
+...     tokens.extend(sent)
+...     offset += len(sent)
+...     boundaries.add(offset-1)</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Здесь <tt class="doctest"><span class="pre">tokens</span></tt> - это объединенный список токенов из отдельных предложений, а <tt class="doctest"><span class="pre">boundaries</span></tt> - набор, содержащий индексы всех токенов на границе предложений.  Далее нам необходимо указать свойства данных, которые будут использоваться для решения вопроса о том, указывает ли пунктуация на границу предложения:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def punct_features(tokens, i):
+...     return {'next-word-capitalized': tokens[i+1][0].isupper(),
+...             'prev-word': tokens[i-1].lower(),
+...             'punct': tokens[i],
+...             'prev-word-is-one-char': len(tokens[i-1]) == 1}</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>На основе этого экстрактора свойств, мы можем создать список помеченных наборов свойств, выбрав все токены пунктуации и пометив, являются ли они граничными токенами или нет:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; featuresets = [(punct_features(tokens, i), (i in boundaries))
+...                for i in range(1, len(tokens)-1)
+...                if tokens[i] in '.?!']</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>С помощью этих наборов свойств, мы можем обучить и оценить классификатор пунктуации:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; size = int(len(featuresets) * 0.1)
+&gt;&gt;&gt; train_set, test_set = featuresets[size:], featuresets[:size]
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set)
+&gt;&gt;&gt; nltk.classify.accuracy(classifier, test_set)
+0.936026936026936</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Чтобы использовать этот классификатор для выделения предложений, мы просто проверяем каждый знак препинания на предмет того, помечен ли он как граница; и разделяем список слов на знаках, являющихся границами предложений.  Листинг в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-classification-based-segmenter">2.1</a> показывает, как это можно сделать.</p>
+<span class="target" id="code-classification-based-segmenter"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def segment_sentences(words):
+    start = 0
+    sents = []
+    for i, word in enumerate(words):
+        if word in '.?!' and classifier.classify(punct_features(words, i)) == True:
+            sents.append(words[start:i+1])
+            start = i+1
+    if start &lt; len(words):
+        sents.append(words[start:])
+    return sents</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_classification_based_segmenter.py" type="text/x-python"><span class="caption-label">Пример 2.1 (code_classification_based_segmenter.py)</span></a>: <span class="caption-label">Листинг 2.1:</span> Выделитель предложений основанный на классификации</p></td></tr>
+</table></div>
+</div>
+<div class="section" id="identifying-dialogue-act-types">
+<h2>2.2 Определение типов акта диалога</h2>
+<p>При обработке диалога может быть полезно думать о высказываниях как о типе <em>действия</em>, выполняемого говорящим.  Эта интерпретация наиболее очевидна для перформативных высказываний, таких как "Я прощаю тебя" или "Держу пари, вы не сможете подняться на этот холм". Но приветствия, вопросы, ответы, утверждения и уточнения - все могут рассматриваться как типы основанных на речи действий.  Признание <a name="dialogue_acts_index_term"></a> <span class="termdef">актов диалога</span>, лежащих в основе высказываний в диалоге, может стать важным первым шагом в понимании беседы.</p>
+<p>NPS Chat Corpus, который был продемонстрирован в <a class="reference external" href="http://www.nltk.org/book/ch02.html#sec-extracting-text-from-corpora">1</a>, состоит из более чем 10.000 сообщений из сеансов обмена мгновенными сообщениями.  Все эти сообщения были помечены одним из 15 типов акта диалога, такими как "Заявление", "Эмоция", "Вопрос" и "Продолжение". Поэтому мы можем использовать эти данные, чтобы построить классификатор, который может идентифицировать типы акта диалога для новых мгновенных сообщений.  Первым шагом является извлечение основных данных сообщений.  Мы вызовем <tt class="doctest"><span class="pre">xml_posts()</span></tt>, чтобы получить структуру данных, представляющую XML аннотацию для каждой записи:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; posts = nltk.corpus.nps_chat.xml_posts()[:10000]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Далее мы определим простой экстрактор свойств, который проверяет, какие слова содержит сообщение:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def dialogue_act_features(post):
+...     features = {}
+...     for word in nltk.word_tokenize(post):
+...         features['contains({})'.format(word.lower())] = True
+...     return features</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Наконец, мы построим данные обучения и тестирования путем применения экстрактор свойств для каждого сообщения (используя <tt class="doctest"><span class="pre">post.get(<span class="pysrc-string">'class'</span>)</span></tt> для получения типа акта диалога) и создадим новый классификатор:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; featuresets = [(dialogue_act_features(post.text), post.get('class'))
+...                for post in posts]
+&gt;&gt;&gt; size = int(len(featuresets) * 0.1)
+&gt;&gt;&gt; train_set, test_set = featuresets[size:], featuresets[:size]
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set)
+&gt;&gt;&gt; print(nltk.classify.accuracy(classifier, test_set))
+0.67</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<!-- XXX delete note -->
+<!-- *We had planned to extend this example by showing how a sequence
+classifier can be used to take advantage of the fact that
+some sequences (eg ynquestion->yanswer) are more likely than
+others.* -->
+</div>
+<div class="section" id="recognizing-textual-entailment">
+<h2>2.3 Признание текстового воплощения</h2>
+<p>Признание текстового воплощения (ПТВ (RTE)) - это задача определения того, влечет ли за собой данный фрагмент текста <em>T</em> другой текст, который называется "гипотезой" (как уже обсуждалось в <a class="reference external" href="http://www.nltk.org/book/ch01.html#sec-automatic-natural-language-understanding">5</a>).
+До сегодняшнего дня было четыре RTE проблемы с доступными для конкурирующих команд данными для разработки и тестирования.
+Вот несколько примеров пар текст/гипотеза из набора данных разработки проблемы №3. Метка <em>Истина</em> указывает на то, что воплощение есть, а <em>Ложь</em> на то, что его нет.</p>
+<blockquote>
+<p>Задача 3, пара 34 (Истина)</p>
+<blockquote>
+<p><strong>Т</strong>: Парвиз Давуди представлял Иран на встрече Шанхайской организации сотрудничества (ШОС), формирующейся ассоциации, которая связывает вместе Россию, Китай и четыре бывших советских республик Средней Азии для борьбы с терроризмом.</p>
+<p><strong>Г</strong>: Китай является членом ШОС.</p>
+</blockquote>
+<p>Задача 3, пара 81 (Ложь)</p>
+<blockquote>
+<p><strong>Т</strong>: В соответствии с уставом организации NC членами ООО являются Г. Нэльсон Биверс, ИИИ, Г. Честер Биверс и Дженни Биверс Стюарт.</p>
+<p><strong>Г:</strong> Jennie Биверс Стюарт является акционером Аналитической лаборатории Королины.</p>
+</blockquote>
+</blockquote>
+<p>Следует подчеркнуть, что не предполагается, что связь между текстом и гипотезой должна быть логической реализацией, скорее речь идет о том, сделает ли человек вывод, что текст содержит разумные доказательства для принятия гипотезы в качестве истины.</p>
+<p>Мы можем относиться к RTE как классификационной задаче, в которой мы пытаемся предсказать <em>True</em>/<em>False</em> метку для каждой пары. Хотя вполне вероятно, что успешные подходы к решению этой задачи будут включать сочетание синтаксического разбора, семантики и знаний реального мира, многие ранние попытки RTE достигли достаточно хороших результатов с помощью неглубокого анализа на основе сходства текста и гипотезы на уровне слов. В идеальном случае мы бы ожидали, что если есть воплощение, то вся информация, выраженная гипотезой, должна также присутствовать в тексте. И наоборот, если есть информация, содержащаяся в гипотезе, которая отсутствует в тексте, то воплощения не будет.</p>
+<p>В нашем детекторе свойств RTE (<a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-rte-features">2.2</a>), мы позволили словам (т.е. типам слов) служить в качестве представителя информации, а наши свойства подсчитывают степень совпадения слов и степень, до которой слова есть в гипотезе, но не в тексте (схваченная методом <tt class="doctest"><span class="pre">hyp_extra()</span></tt>). Не все слова одинаково важны - упоминания именованных субстанций, таких как имена людей, организаций и мест, вероятно, будут более значительными, что побуждает нас извлечь четкую информацию для <tt class="doctest"><span class="pre">wordS</span></tt> и <tt class="doctest"><span class="pre">neS</span></tt> (именованных субстанций). Кроме того, некоторые высокочастотные функциональные слова отфильтровываются как "стоп-слова".</p>
+<!-- XXX following pylisting is not referenced from the text -->
+<table class="docutils citation" id="xx" frame="void" rules="none">
+<colgroup><col class="label"><col></colgroup>
+<tbody valign="top">
+<tr><td class="label">[xx]</td><td>дать некоторое вступление к RTEFeatureExtractor??</td></tr>
+</tbody>
+</table>
+<span class="target" id="code-rte-features"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+def rte_features(rtepair):
+    extractor = nltk.RTEFeatureExtractor(rtepair)
+    features = {}
+    features['word_overlap'] = len(extractor.overlap('word'))
+    features['word_hyp_extra'] = len(extractor.hyp_extra('word'))
+    features['ne_overlap'] = len(extractor.overlap('ne'))
+    features['ne_hyp_extra'] = len(extractor.hyp_extra('ne'))
+    return features</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_rte_features.py" type="text/x-python"><span class="caption-label">Пример 2.2 (code_rte_features.py)</span></a> : <span class="caption-label">Листинг 2.2:</span> Экстрактор свойств для "Признания текстового воплощения" .  Класс <tt class="doctest"><span class="pre">RTEFeatureExtractor</span></tt> создает мешок слов для текста и гипотезы после отбрасывания некоторых стоп-слов, затем вычисляет совпадения и различия.</p></td></tr>
+</table></div>
+<p>Чтобы проиллюстрировать содержание этих свойств, мы рассмотрим некоторые атрибуты Пары текста/гипотезы №34, показанной ранее:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; rtepair = nltk.corpus.rte.pairs(['rte3_dev.xml'])[33]
+&gt;&gt;&gt; extractor = nltk.RTEFeatureExtractor(rtepair)
+&gt;&gt;&gt; print(extractor.text_words)
+{'Russia', 'Organisation', 'Shanghai', 'Asia', 'four', 'at',
+'operation', 'SCO', ...}
+&gt;&gt;&gt; print(extractor.hyp_words)
+{'member', 'SCO', 'China'}
+&gt;&gt;&gt; print(extractor.overlap('word'))
+set()
+&gt;&gt;&gt; print(extractor.overlap('ne'))
+{'SCO', 'China'}
+&gt;&gt;&gt; print(extractor.hyp_extra('word'))
+{'member'}</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Эти свойства указывают, что все важные слова в гипотезе содержатся в тексте, и, таким образом, есть некоторое оправдание для маркировки этой пары как <em>Истины</em>.</p>
+<p>Модуль <tt class="doctest"><span class="pre">nltk.classify.rte_classify</span></tt> достигает точности чуть более 58% на комбинированных тестовых данных RTE с помощью таких методов. Хотя эта цифра не очень впечатляет, требуются значительные усилия и больше лингвистической обработки, чтобы значительно улучшить результаты.</p>
+</div>
+<div class="section" id="scaling-up-to-large-datasets">
+<h2>2.4 Увеличение масштаба до больших наборов данных</h2>
+<p>Python предоставляет отличную среду для выполнения базовых операций обработки текста и извлечения свойств.  Однако он не способен выполнить интенсивные численные вычисления, требуемые методами машинного обучения столь же быстро, как языки низкого уровня, как C.  Поэтому, если вы попытаетесь использовать чисто питоновские реализации машинного обучения (например, <tt class="doctest"><span class="pre">NLTK.NaiveBayesClassifier</span></tt>) на больших наборах данных, вы можете обнаружить, что алгоритму обучения требуется необоснованно большое количество времени и памяти для завершения.</p>
+<p>Если вы планируете обучать классификаторы с помощью большого количества обучающих данных или большому количеству свойств, мы рекомендуем вам изучить возможности NLTK для взаимодействия с внешними пакетами машинного обучения.  После того, как были установлены эти пакеты, NLTK может прозрачно вызывать их (с помощью системных вызовов) для обучения моделей классификаторов значительно быстрее, чем чисто питоновские реализации.  Посетите веб-страницу NLTK для получения списка рекомендуемых пакетов машинного обучения, которые поддерживаются NLTK.</p>
+<!-- SB: I think numpy and other numerical libraries do their work in C, and
+are probably quite efficient.  Not clear about support for sparse arrays. -->
+<!-- EL: Yes, but even with numpy etc, python is *slow* for this stuff.
+I speak from experience. :) -->
+<!-- XXX Note that the additive nature of a lot of training tasks mean
+that parallelization will work fine.  If those can be done using
+MapReduce we&#39;ll be able to use NLTK for some non-toy problems here. -->
+</div>
+</div>
+<div class="section" id="evaluation">
+<span id="sec-evaluation"></span><h1>3 Оценка</h1>
+<p>Для того, чтобы решить, точно ли классификационная модель схватывает паттерн, мы должны оценить эту модель.  Результат этой оценки важен для принятия решения о том, насколько модель заслуживает доверие, и для каких целей мы можем ее использовать.  Оценка также может быть эффективным инструментом для будущих усовершенствований модели.</p>
+<div class="section" id="the-test-set">
+<h2>3.1 Тестовый набор данных</h2>
+<p>Большинство методов оценки рассчитывают балл модели путем сравнения меток, которые она генерирует для входов в <a name="test_set_index_term_2"></a><span class="termdef">тестовом наборе</span> (или <a name="evaluation_set_index_term"></a><span class="termdef">оценочном наборе)</span> с правильными метками для этих входов.  Этот тестовый набор, как правило, имеет такой же формат, как и обучающий набор.  Однако очень важно, чтобы тестовый набор отличался от учебного корпуса: если бы мы просто повторно использовали учебный набор в качестве тестового набора, то модель, которая просто запомнили свой вход, без обучения тому, как обобщить учебный набор для новых примеров, мы бы получили обманчиво высокий балл.</p>
+<p>При построении тестового набора, зачастую существует компромисс между количеством данных доступных для тестирования и количеством данных доступных для обучения.  Для задач классификации, которые имеют небольшое количество хорошо сбалансированных меток и разнообразный тестовый набор, значимая оценка может быть выполнена с помощью всего лишь 100 экземпляров оценки.  Но если задача классификации имеет большое количество меток или включает в себя очень редкие метки, то размер тестового набора должен быть выбран таким образом, чтобы гарантировать, что наименее частая метка встречается по меньшей мере 50 раз.  Кроме того, если тестовый набор содержит множество тесно связанных экземпляров - таких, как экземпляры, выбираемые из одного документа - то размер тестового набора должен быть увеличен, чтобы гарантировать, что это отсутствие разнообразия не искажает результаты оценки.  Когда доступно большое количество аннотированных данных, обычное дело заблуждаться "на стороне безопасности" используя 10% от общего объема данных для оценки.</p>
+<p>Еще одно соображение при выборе тестового набора - это степень сходства между экземплярами в тестовом наборе и наборе разработки.  Чем более схожи эти два набора данных, тем менее уверенными мы можем быть, что результаты оценки будут обобщать результаты на других наборах данных.  Например, рассмотрим задачу частеречной разметки.  На одном полюсе мы могли бы создать обучающий набор и тестовый набор, назначая в случайном порядке предложения из источника данных, который отражает единственный жанр (новости):</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; import random
+&gt;&gt;&gt; from nltk.corpus import brown
+&gt;&gt;&gt; tagged_sents = list(brown.tagged_sents(categories='news'))
+&gt;&gt;&gt; random.shuffle(tagged_sents)
+&gt;&gt;&gt; size = int(len(tagged_sents) * 0.1)
+&gt;&gt;&gt; train_set, test_set = tagged_sents[size:], tagged_sents[:size]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>В этом случае наш тестовый набор будет <em>очень</em> похож на наш тренировочный набор.  Обучающий набор и набор для тестирования взяты из одного и того же жанра, поэтому мы не можем быть уверены в том, что результаты оценки будут обобщать результаты для других жанров.  Что еще хуже, из-за вызова <tt class="doctest"><span class="pre">random.shuffle()</span></tt>, тестовый набор содержит предложения, которые взяты из тех же документов, которые были использованы для обучения.  Если есть какая-либо закономерность в пределах документа - скажем, если данное слово появляется с определенной меткой части речи особенно часто - то эта особенность будет отражена как в наборе разработки, так и в тестовом наборе.  Несколько лучший подход состоит в том, чтобы тренировочный и тестовый набор были взяты из различных документов:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt; file_ids = brown.fileids(categories='news')
+&gt;&gt;&gt; size = int(len(file_ids) * 0.1)
+&gt;&gt;&gt; train_set = brown.tagged_sents(file_ids[size:])
+&gt;&gt;&gt; test_set = brown.tagged_sents(file_ids[:size])</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Если мы хотим выполнить более жесткие оценки, мы можем составить тестовый набор из документов, которые менее тесно связаны с документами в тренировочном наборе:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; train_set = brown.tagged_sents(categories='news')
+&gt;&gt;&gt; test_set = brown.tagged_sents(categories='fiction')</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Если мы построим классификатор, который хорошо работает на этом тестовом наборе, то мы можем быть уверены в том, что он имеет способность хорошо обобщать далеко за пределами данных, на которых он был обучен.</p>
+</div>
+<div class="section" id="accuracy">
+<h2>3.2 Точность</h2>
+<p>Наиболее простой показатель, который может быть использован для оценки классификатора, <a name="accuracy_index_term"></a><span class="termdef">точность,</span> измеряет процент входов в тестовом наборе, которые были правильно помечены классификатором.  Например, классификатор пола имени, который предсказывает правильное название 60 раз в тестовом наборе, содержащем 80 имен, будет иметь точность 60/80 = 75%.  Функция <tt class="doctest"><span class="pre">nltk.classify.accuracy()</span></tt> рассчитает точность модели классификатора на данном тестовом наборе:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; classifier = nltk.NaiveBayesClassifier.train(train_set) 
+&gt;&gt;&gt; print('Accuracy: {:4.2f}'.format(nltk.classify.accuracy(classifier, test_set))) 
+0.75</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>При интерпретации балла точности классификатора важно учитывать частоты меток отдельных классов в тестовом наборе.  Например, рассмотрим классификатор, который определяет правильно смысл слова для каждого вхождения слова <span class="example">bank</span>.  Если мы оцениваем этот классификатор по тексту финансовой ленте новостей, то мы можем обнаружить, что значение <tt class="doctest"><span class="pre">финансовое учреждение</span></tt> появляется 19 раз из 20.  В этом случае точность 95% вряд ли впечатляет, так как мы могли бы достичь такой точности с моделью, которая всегда возвращает значение <tt class="doctest"><span class="pre">финансовое учреждение</span></tt>.  Однако, если мы напротив оцениваем классификатор на более сбалансированном корпусе, где самое распространенное значение слова имеет частоту 40%, тогда 95% оценка точности будет гораздо более позитивный результат.  (Аналогичная проблема возникает при измерении согласия между аннотаторами в <a class="reference external" href="http://www.nltk.org/book/ch11.html#sec-life-cycle-of-a-corpus">2</a>.)</p>
+</div>
+<div class="section" id="precision-and-recall">
+<h2>3.3 Точность и охват</h2>
+<p>Другой случай, когда баллы точности могут ввести в заблуждение, - задачи "поиска", такие как поиск информации, где мы пытаемся найти документы, которые имеют отношение к конкретной задаче.  Поскольку число несоответствующих документов значительно превышает число соответствующих документов, оценка точности модели, которая маркирует каждый документ как несоответствующий была бы очень близка к 100%.</p>
+<span class="target" id="fig-precision-recall"></span><div class="figure" id="fig-precision-recall">
+<img alt="../images/precision-recall.png" src="http://www.nltk.org/images/precision-recall.png" style="width:523.0px;height:283.5px">
+<p class="caption"><span class="caption-label">Рисунок 3.1:</span> Истинные и ложные позитивы и негативы</p>
+</div>
+<p>Поэтому обычно используется другой набор мер для задач поиска, основанный на количестве элементов в каждой из четырех категорий, показанных на Рисунке <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-precision-recall">3.1</a>:</p>
+<ul class="simple">
+<li><a name="true_positives_index_term"></a><span class="termdef">Истинные позитивы</span> - это релевантные элементы, которые мы правильно определили как релевантные.</li>
+<li><a name="true_negatives_index_term"></a><span class="termdef">Истинные негативы</span> - это нерелевантные элементы, которые мы правильно определили как нерелевантные.</li>
+<li><a name="false_positives_index_term"></a><span class="termdef">Ложные позитивы</span> (или <a name="type_i_errors_index_term"></a><span class="termdef">Тип I ошибки</span>) - это нерелевантные элементы, которые мы неправильно идентифицировали как релевантные.</li>
+<li><a name="false_negatives_index_term"></a><span class="termdef">Ложные негативы</span> (или <a name="type_ii_errors_index_term"></a><span class="termdef">Тип II ошибки)</span> - это релевантные элементы, которые мы неправильно идентифицировали как нерелевантные.</li>
+</ul>
+<p>Учитывая эти четыре числа, мы можем определить следующие показатели:</p>
+<ul class="simple">
+<li><a name="precision_index_term"></a><span class="termdef">Точность</span>, которая указывает на то, сколько элементов, которые мы определили, были релевантны, <span class="math">TP/(TP + FP)</span>.</li>
+<li><a name="recall_index_term"></a><span class="termdef">Охват</span>, который указывает, сколько релевантных элементов мы идентифицировали <span class="math">TP/(TP+FN)</span>.</li>
+<li><a name="f_measure_index_term"></a><span class="termdef">F-Мера</span> (или <a name="f_score_index_term"></a><span class="termdef">F-балл)</span>, который сочетает в себе точность и охват, чтобы выразить единый балл, определяется как среднее гармоническое точности и охвата: (2×<em>Точность</em>×<em>Охват</em>)/(<em>Точность</em> + <em>Охват</em>).</li>
+</ul>
+<!-- alternative def for f-score: 2/(1/Precision+1/Recall) -->
+</div>
+<div class="section" id="confusion-matrices">
+<h2>3.4 Матрицы ошибок</h2>
+<!-- Repeat some code from chapter 5, which recreates the tagger t2.
+This tagger is used to illustrate the confusion matrix:
+
+ >>> from nltk.corpus import brown
+ >>> brown_tagged_sents = brown.tagged_sents(categories=&#39;news&#39;)
+ >>> size = int(len(brown_tagged_sents) * 0.9)
+ >>> train_sents = brown_tagged_sents[:size]
+ >>> test_sents = brown_tagged_sents[size:]
+ >>> t0 = nltk.DefaultTagger(&#39;NN&#39;)
+ >>> t1 = nltk.UnigramTagger(train_sents, backoff=t0)
+ >>> t2 = nltk.BigramTagger(train_sents, backoff=t1) -->
+<p>При выполнении задач классификации с более, чем тремя метками, может быть информативным подразделять ошибки, сделанные моделью, по типу ошибки.  <a name="confusion_matrix_index_term"></a><span class="termdef">Матрица ошибок</span> представляет собой таблицу, где каждая ячейка [<span class="math">i</span>, <span class="math">j</span>] указывает на то, как часто метка <span class="math">j</span> была предсказана, когда правильной был метка <span class="math">i</span>.  Таким образом, диагональные элементы (т.е. ячейки <a href="http://www.nltk.org/book/ch06.html#id17"><span class="problematic" id="id18">|ii|</span></a>) указывают на метки, которые были предсказаны правильно, а недиагональные элементы указывают на ошибки.  В следующем примере мы создаем матрицу ошибок для биграмм-разметчика, разработанного в <a class="reference external" href="http://www.nltk.org/book/ch05.html#sec-automatic-tagging">4</a>:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+&gt;&gt;&gt; def tag_list(tagged_sents):
+...     return [tag for sent in tagged_sents for (word, tag) in sent]
+&gt;&gt;&gt; def apply_tagger(tagger, corpus):
+...     return [tagger.tag(nltk.tag.untag(sent)) for sent in corpus]
+&gt;&gt;&gt; gold = tag_list(brown.tagged_sents(categories='editorial'))
+&gt;&gt;&gt; test = tag_list(apply_tagger(t2, brown.tagged_sents(categories='editorial')))
+&gt;&gt;&gt; cm = nltk.ConfusionMatrix(gold, test)
+&gt;&gt;&gt; print(cm.pretty_format(sort_by_count=True, show_percents=True, truncate=9))
+    |                                         N                      |
+    |      N      I      A      J             N             V      N |
+    |      N      N      T      J      .      S      ,      B      P |
+----+----------------------------------------------------------------+
+ NN | &lt;11.8%&gt;  0.0%      .   0.2%      .   0.0%      .   0.3%   0.0% |
+ IN |   0.0%  &lt;9.0%&gt;     .      .      .   0.0%      .      .      . |
+ AT |      .      .  &lt;8.6%&gt;     .      .      .      .      .      . |
+ JJ |   1.7%      .      .  &lt;3.9%&gt;     .      .      .   0.0%   0.0% |
+  . |      .      .      .      .  &lt;4.8%&gt;     .      .      .      . |
+NNS |   1.5%      .      .      .      .  &lt;3.2%&gt;     .      .   0.0% |
+  , |      .      .      .      .      .      .  &lt;4.4%&gt;     .      . |
+ VB |   0.9%      .      .   0.0%      .      .      .  &lt;2.4%&gt;     . |
+ NP |   1.0%      .      .   0.0%      .      .      .      .  &lt;1.8%&gt;|
+----+----------------------------------------------------------------+
+(row = reference; col = test)
+<span class="pysrc-output"></span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Матрица ошибок показывает, что наиболее часто встречающиеся ошибки включают замену <tt class="doctest"><span class="pre">NN</span></tt> на <tt class="doctest"><span class="pre">JJ</span></tt> (для 1,6% слов) и <tt class="doctest"><span class="pre">NN</span></tt> на <tt class="doctest"><span class="pre">NNS</span></tt> (для 1,5% слов).  Обратите внимание, что точки <tt class="doctest"><span class="pre">(.)</span></tt> указывают на ячейки, значение которых равно 0, а диагональные элементы - которые соответствуют правильным классификациям - отмечены угловыми скобками.
+.. XXX объясняет использование "референса" в приведенной выше легенде.</p>
+</div>
+<div class="section" id="cross-validation">
+<h2>3.5 Перекрестная проверка</h2>
+<p>Для того, чтобы оценить наши модели, мы должны зарезервировать часть аннотированных данных для тестового набора.  Как мы уже упоминали, если тестовый набор слишком мал, то наша оценка не может быть точной.  Однако обычно увеличение тестового набора означает уменьшение учебного набора, что может оказать существенное влияние на результативность, если ограниченное количество аннотированных данных доступно.</p>
+<p>Одним из решений этой проблемы является выполнение нескольких оценок на различных тестовых наборах и объединение баллов от этих оценок - метод, известный как <a name="cross_validation_index_term"></a><span class="termdef">перекрестная проверка</span>.  В частности, мы делим оригинальный корпус на <span class="math">N</span> наборов, называемых <a name="folds_index_term"></a><span class="termdef">складками</span>.  Для каждой из этих складок мы готовим модель, используя все данные <em>за исключением</em> данных в этой складке, а затем проверяем эту модель в этой складке.  Даже если отдельные складки возможно слишком маленькие, чтобы дать точные баллы оценки сами по себе, комбинированный балл оценки основан на большом количестве данных, поэтому вполне надежен.</p>
+<p>Второе и не менее важное преимущество использования кросс-проверки является то, что она позволяет нам исследовать, насколько широко результативность варьируется в зависимости от различных наборов обучения.  Если мы получим очень похожие оценки для всех обучающих наборов <span class="math">N</span>, то мы можем быть достаточно уверены в том, что оценка является точной.  С другой стороны, если баллы оценки для каждого из <span class="math">N</span> учебных наборов сильно отличаются, то нам, вероятно, следует скептически относиться к точности оценочного балла.</p>
+<!-- XXX give a code snippet for dividing corpus up for cross-validation -->
+<!-- mention statistical significance tests explicitly here? -->
+</div>
+</div>
+<div class="section" id="decision-trees">
+<span id="sec-decision-trees"></span><h1>4 Деревья решений</h1>
+<p>В следующих трех разделах мы подробнее рассмотрим три метода машинного обучения, которые могут быть использованы для автоматического построения классификационных моделей: деревьев решений, наивных классификаторов Байеса и классификаторов максимальной энтропии.  Как мы уже видели, можно рассматривать эти методы обучения, как черные ящики, просто модели обучения и использовать их для прогнозирования, не понимая, как они работают.  Но многое можно узнать из более пристального взгляда на то, как эти методы обучения выбирают модели на основе данных в тренировочном наборе.  Понимание этих методов может помочь нам выбрать соответствующие свойства, а особенно помочь нам решить, каким образом эти свойства должны быть закодированы.  А понимание созданных моделей может позволить нам извлечь информацию о том, какие свойства являются наиболее информативными, и как эти свойства связаны друг с другом.</p>
+<!-- Note that they haven&#39;t necessarily seen syntax trees before this, so
+it may seem odd to them (or at least not obvious) that these "trees"
+are upside down. -->
+<!-- XXX some people will know the concept of a "dichotomous key".
+("tree-structured flowchart" assumes domain knowledge so doesn&#39;t
+communicate as widely) -->
+<p><a name="decision_tree_index_term"></a><span class="termdef">Дерево решений</span> представляет собой простую блок-схему алгоритма, который выбирает метки для входных значений.  Эта блок-схема состоит из <a name="decision_nodes_index_term"></a><span class="termdef">узлов решений</span>, которые проверяют значения свойств, и <a name="leaf_nodes_index_term"></a><span class="termdef">листовых узлов</span>, которые присваивают метки.  Чтобы выбрать метку для значения ввода, мы начинаем с первого узла решения на блок-схеме, известного как ее <a name="root_node_index_term"></a><span class="termdef">корневой узел</span>.
+Этот узел содержит условие, которое проверяет одно из свойств входного значения и выбирает ветку на основе значения этого свойства.
+Следуя за веткой, которая описывает наше входное значение, мы прибываем к новому узлу решения с новым условием на свойство входного значения.
+Мы продолжаем следовать по ветвям, выбранным по условию каждого узла, пока мы не придем к листовому узлу, который предоставляет метку для входного значения.  <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-decision-tree">4.1</a> показывает пример модели дерева решений задачи определения половой принадлежности имени.</p>
+<span class="target" id="fig-decision-tree"></span><div class="figure" id="fig-decision-tree">
+<img alt="../images/decision-tree.png" src="http://www.nltk.org/images/decision-tree.png" style="width:197.5px;height:93.0px">
+<p class="caption"><span class="caption-label">Рисунок 4.1</span>: Модель дерева решений для задачи определения половой принадлежности имени.  Обратите внимание, что диаграммы деревьев обычно рисуются "вверх ногами" с корнем наверху, а листьями внизу.</p>
+</div>
+<!-- XXX show: train decision tree, then print it as pseudocode & as more
+compact tree. -->
+<!-- XXX seems odd to talk about a decision tree "modeling a training set" below. -->
+<p>После того, как у нас есть дерево решений, несложно использовать ее для присвоения меток новым значениям ввода.  Менее очевидно то, как мы можем построить дерево решений, которое моделирует данный обучающий набор.  Но прежде чем мы рассмотрим алгоритм обучения для построения деревьев решений, мы рассмотрим более простую задачу: выбор лучшего "пня решения" для корпуса.  <a name="decision_stump_index_term"></a><span class="termdef">Пень решения</span> - это дерево решений с одним узлом, который решает, как классифицировать входы на основе единственного свойства.  Он содержит один лист для каждого возможного значения свойства, указывая метку класса, которая должна быть назначена входу, свойство которого имеет это значение.  Для того, чтобы построить пень решения, мы должны сначала решить, какие свойства должны быть использованы.  Самый простой способ - построить пень решения для каждого возможного свойства и посмотреть, какой из них достигает наивысшей точности на обучающих данных, хотя есть и другие альтернативы, которые мы обсудим ниже.
+После того, как мы выбрали свойство, мы можем построить пень решения путем присвоения метки для каждого листа на основе наиболее частой метки для выбранных примеров в обучающем наборе (т. е. примеров, когда выбранное свойство имеет это значение).</p>
+<!-- XX show building a decision stump -->
+<!-- XX show refining a decision stump&#39;s leaf -->
+<p>Имея алгоритм выбора пней решения, несложно построить алгоритм для выращивания больших деревьев решений.  Мы начнем с выбора наилучшего пня решения в целом для классификационной задачи.  Затем мы проверим точность каждого из листьев на тренировочном наборе.
+Листья, которые не достигают достаточной точности, затем заменяются новыми пнями решений, подготовленными на подмножестве учебного корпуса, который определяется путем к листу.  Например, мы могли бы вырастить дерево решений в <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-decision-tree">4.1</a>, заменив крайний левый лист новым пнем решения, обученным на подмножестве имен из тренировочного набора, которые не начинаются с «k» или заканчиваются на гласную или "l".</p>
+<div class="section" id="entropy-and-information-gain">
+<h2>4.1 Энтропия и информационный выигрыш</h2>
+<p>Как уже упоминалось ранее, существует несколько методов для определения наиболее информативного свойства для пня решения.  Один из популярных вариантов, который называется <a name="information_gain_index_term"></a><span class="termdef">информационный выигрыш</span>, измеряет, насколько более организованными становятся входные значения, когда мы разделяем их, используя данное свойство.  Для того, чтобы определить, насколько дезорганизован исходный набор входных значений, мы вычисляем энтропию их меток, которая будет высокой, если входные значения имеют весьма разнообразные метки, и низким, если много входных значений имеют одинаковую метку.  В частности, энтропия определяется как сумма вероятностей всех меток умноженных на логорифм вероятности той же метки по основанию 2:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(1)</td><td width="15"></td><td><span class="math">H</span> = −Σ<sub>l |in| labels</sub><span class="math">P(l)</span>×<span class="math">log</span><sub>2</sub><span class="math">P(l)</span>.</td></tr></table></p>
+<span class="target" id="fig-entropy"></span><div class="figure" id="fig-entropy">
+<img alt="../images/Binary_entropy_plot.png" src="http://www.nltk.org/images/Binary_entropy_plot.png" style="width:85.0px;height:85.5px">
+<p class="caption"><span class="caption-label">Рисунок 4.2:</span> Энтропия меток в задаче предсказания пола имени в зависимости от процентного содержания мужских имен в данном наборе.</p>
+</div>
+<p>Например, <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-entropy">4.2</a> показывает, как энтропия меток в задаче предсказания половой принадлежности имени зависит от соотношения мужских и женских имен.  Обратите внимание, что если большинство входных значений имеют одинаковую метку (например, если Р(мужское) близок к 0 или около 1), то энтропия мала.  В частности, метки, которые имеют низкую частоту, не вносят большой вклад в энтропию (так как <span class="math">Р(l)</span> мало) и метки с высокой частотой не вносят большой вклад в энтропию (так как <span class="math">log</span><sub>2</sub><span class="math">P(l)</span> мало).  С другой стороны, если входные значения имеют большое разнообразие меток, тогда есть много меток со "средней" частотой, где ни<span class="math">Р(l)</span>, ни <span class="math">log</span><sub>2</sub><span class="math">P(l)</span> не малы, поэтому энтропия высокая.
+<a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-entropy">4.3</a> показывает, как вычислить энтропию списка меток.</p>
+<!-- (skip doctest on the 0-entropy example below because it prints
+-0.0, and it&#39;s not worth it to explain *why* it does that.) -->
+<span class="target" id="code-entropy"></span><div class="pylisting">
+<table border="0" cellpadding="0" cellspacing="0" class="pylisting" width="95%">
+<tr><td class="codeblock">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_codeblock_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+import math
+def entropy(labels):
+    freqdist = nltk.FreqDist(labels)
+    probs = [freqdist.freq(l) for l in freqdist]
+    return -sum(p * math.log(p,2) for p in probs)</pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">Печать</span> (энтропия ([ <span class="pysrc-string">'мужской',</span> <span class="pysrc-string">'мужской',</span> <span class="pysrc-string">'мужской',</span> <span class="pysrc-string">'мужчина']))</span> <span class="pysrc-output">0.0</span> <span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">Печать</span> (энтропия ([ <span class="pysrc-string">'мужской',</span> <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'мужской',</span> <span class="pysrc-string">'мужчина']))</span> <span class="pysrc-output">0,811 ...</span>
+<span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">Печать</span> (энтропия ([ <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'мужской',</span> <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'мужчина']))</span> <span class="pysrc-output">1,0</span> <span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">Печать</span> (энтропия ([ <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'мужской',</span> <span class="pysrc-string">'женский']))</span> <span class="pysrc-output">0,811 ...</span>
+<span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">Печать</span> (энтропия ([ <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'женский',</span> <span class="pysrc-string">'женский']))</span> <span class="pysrc-output">0.0</span></pre>
+</td>
+</tr></table></td></tr>
+<tr><td class="caption"><p class="caption"><a class="reference external" href="http://www.nltk.org/book/pylisting/code_entropy.py" type="text/x-python"><span class="caption-label">Пример 4.3 (code_entropy.py)</span></a> : <span class="caption-label">Рисунок 4.3:</span> Расчет энтропии Список меток</p></td></tr>
+</table></div>
+<!-- The doctest: +SKIP in the last example is because doctest prints
+-0.0 on some systems rather than 0.0, which can be confusing;
+but isn&#39;t worth explaining here. -->
+<p>После того, как мы рассчитали энтропию исходного набора меток входных значений, мы можем определить, насколько более организованными стали метки после применения пня решения.  Для этого мы вычисляем энтропию для каждого из листьев пня решения и берем среднее значение величин энтропии этих листьев (взвешенных по количеству образцов в каждом листе).  Информационный выигрыш тогда равен разности между величинами исходной и новой, уменьшенной энтропии.  Чем больше информационная выгода, тем лучше пень решения выполняет работу по разделению входных значений на целостные группы, поэтому мы можем строить деревья решений путем выбора пней решений с самым высоким информационным выигрышем.</p>
+<p>Еще одно соображение относительно деревьев решений - это эффективность.  Простой алгоритм выбора пней решений, описанный выше, должен построить кандидата на пень решения для каждого возможного свойства, и этот процесс должен быть повторен для каждого узла в построенном дереве решений.  Ряд алгоритмов были разработаны, чтобы сократить время на обучение за счет хранения и повторного использования информации о ранее оцененных примерах.</p>
+<!-- <<references>>. -->
+<!-- XXX the point about decision trees being easy to interpret
+has already been made, so this sounds repetitive.
+It would be fine to delete the earlier mention of this point,
+since it was not in a section on decision trees. -->
+<p>Деревья решений имеют ряд полезных качеств.  Начнем с того, что они просты для понимания и их легко интерпретировать.  Это особенно актуально в верхней части дерева решений, где алгоритм обучения обычно может найти очень полезные свойства.
+Деревья решений особенно хорошо подходят для случаев, когда могут быть сделаны многие иерархические категориальные различия.  Например, деревья решений могут быть очень эффективными для схватывания филогенетических деревьев.</p>
+<p>Однако деревья решений также имеют несколько недостатков.  Одной из проблем является то, что, так как каждая ветвь в дереве решений расщепляет тренировочные данные, количество тренировочных данных доступных для подготовки нижних узлов дерева может стать недостаточным.  В результате эти нижние узлы решений могут </p>
+<!-- XXX overfitting was already introduced as a :dt: earlier -->
+<p><a name="overfit_index_term"></a><span class="termdef">переучиться</span> на тренировочном наборе, извлекая паттерны, которые отражают характерные особенности обучающего набора, а не лингвистически значимые закономерности базовой проблемы.  Одно из решений этой проблемы состоит в том, чтобы остановить деление узлов как только количество обучающих данных становится слишком мало.
+Другим решением является вырастить полное дерево решений, но потом <a name="prune_index_term"></a><span class="termdef">подрезать</span> узлы решений, которые не улучшают результативность на тестовом наборе разработки.</p>
+<p>Вторая проблема с деревьями решений заключается в том, что они навязывают определенную последовательность проверки свойств, даже когда они могут действовать относительно независимо друг от друга.  Например, при классификации документов по темам (таким как спорт, автомобилестроение или загадочные убийства), свойства, такие как <tt class="doctest"><span class="pre">hasword(football)</span></tt> являются весьма показательными для конкретной метки  независимо от того, каковы другие значения свойства.  Так как в верхней части дерева решений пространство ограничено, большинство из этих свойств должны повторяться на многих других ветвях дерева.  А так как число ветвей увеличивается в геометрической прогрессии по мере продвижения вниз по дереву, количество повторений может быть очень большим.</p>
+<p>Связанная с этим проблема заключается в том, что деревья решений не очень хорошо используют свойства, которые слабо предсказывают правильную метку.  Так как эти свойства делают относительно небольшие постепенные улучшения, они, как правило, возникают очень низко в дереве решений.  Но к тому времени, как обучающий компонент спустился достаточно глубоко, чтобы использовать эти свойства, уже нет достаточного количества тренировочных данных, чтобы достоверно определить, какой эффект они должны иметь.  Если бы мы могли вместо этого посмотреть на эффект этих свойств на всем тренировочном наборе, то мы могли бы сделать некоторые выводы о том, как они должны влиять на выбор метки.</p>
+<p>Тот факт, что деревья решений требуют, чтобы свойства проверялись в определенном порядке, ограничивает их способность использовать свойства, которые являются относительно независимыми друг от друга.  Наивный метод классификации Байеса, который мы обсудим далее, преодолевает это ограничение, позволяя всем свойствам действовать "параллельно".</p>
+</div>
+</div>
+<div class="section" id="naive-bayes-classifiers">
+<h1>5 Наивные классификаторы Байеса</h1>
+<p>В <a name="naive_bayes_index_term"></a><span class="termdef">наивных классификаторах Байеса</span> каждая функция получает право голоса в определении того, какие метки должны быть отнесены к заданному входному значению.  Чтобы выбрать метку для входного значения, наивный байесовский классификатор начинает с вычисления <a name="prior_probability_index_term"></a><span class="termdef">априорной вероятности</span> каждой метки, которая определяется путем проверки частоты каждой метки в обучающем наборе.
+Вклад каждой метки затем объединяется с этой априорной вероятностью, чтобы прийти к оценке правдоподобия для каждой метки.  Метка, чья оценка вероятности, является наивысшей затем присваивается входному значению.  <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-naive-bayes-triangle">5.1</a> иллюстрирует этот процесс.</p>
+<!-- I go back and forth on whether we should include a figure like this
+one.  I think it gives a good high-level feeling of what&#39;s going
+on, but the details don&#39;t really line up with the algorithm&#39;s
+specifics, and it takes a good amount of work to explain the figure. -->
+<span class="target" id="fig-naive-bayes-triangle"></span><div class="figure" id="fig-naive-bayes-triangle">
+<img alt="../images/naive-bayes-triangle.png" src="http://www.nltk.org/images/naive-bayes-triangle.png" style="width:370.2px;height:237.6px">
+<p class="caption"><span class="caption-label">Рисунок 5.1</span>: абстрактная иллюстрация процедуры, используемой наивным байесовским классификатором, чтобы выбрать тему для документа.  В учебном корпусе большинство документов посвящено автомобилестроению, поэтому классификатор начинает в точке, расположенной ближе к "автомобильной" метке.  Но затем он учитывает влияние каждого свойства.  В этом примере входной документ содержит слово "темный", которое является слабым показателем загадочных убийств, но он также содержит слово "футбол", которое является сильным индикатором для спортивных документов.  После того, как каждое свойство внесло свой вклад, классификатор проверяет, к какой метке он ближе всего, и присваивает эту метку входу.</p>
+</div>
+<p>Индивидуальные свойства вносят свой вклад в общее решение путем "голосования против" меток, которые не встречаются с этим свойством очень часто.
+В частности, оценка правдоподобия для каждой метки уменьшается путем умножения на вероятность того, что входное значение с этой меткой будет иметь это свойство.  Например, если слово <span class="example">run</span> возникает в 12% спортивных документов, 10% документов о загадочных убийствах и 2% автомобильных документов, то оценка вероятности для спортивной метки будет умножаться на 0,12; для метки загадочных убийств на 0,1, а для автомобильной метки будет умножена на 0,02.  Общий эффект будет заключаться в уменьшении балла метки загадочных убийств чуть больше, чем балла спортивной метки, и значительном уменьшении балла автомобильной метки по отношению к двум другим меткам.  Этот процесс проиллюстрирован на <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-naive-bayes-bargraph">5.2</a> и <a class="reference internal" href="http://www.nltk.org/book/ch06.html#fig-naive-bayes-graph">5.3</a>.</p>
+<span class="target" id="fig-naive-bayes-bargraph"></span><div class="figure" id="fig-naive-bayes-bargraph">
+<img alt="../images/naive_bayes_bargraph.png" src="http://www.nltk.org/images/naive_bayes_bargraph.png" style="width:660.0px;height:367.5px">
+<p class="caption"><span class="caption-label">Рисунок 5.2:</span> Расчет вероятностей меток с помощью наивного Байеса.  Наивный Байеса начинает путем вычисления предварительной вероятности каждой метки, основываясь на том, как часто каждая метка встречается в обучающих данных.  Каждое свойство затем вносит свой вклад в оценку вероятности для каждой метки путем умножения на вероятность того, что входные значения с этой меткой будут иметь это свойство.  Результирующая оценка вероятности может рассматриваться как оценка вероятности того, что случайно выбранное значение из обучающего набора будет иметь как заданную метку, так и набор свойств, предполагая, что вероятности свойств являются независимыми.</p>
+</div>
+<div class="section" id="underlying-probabilistic-model">
+<h2>5.1 Базовая вероятностная модель</h2>
+<p>Другой способ понимания наивного байесовского классификатора заключается в том, что он выбирает наиболее вероятную метку для входа, предполагая, что каждое входное значение генерируется сначала выбором метки класса для этого входного значения, а затем созданием каждого свойства, совершенно не зависимо от любого другого свойства.  Конечно, это предположение нереально; свойства часто сильно зависят друг от друга.  Мы вернемся к некоторым следствиям этого предположения в конце этого раздела.  Это упрощающее предположение, известное как <a name="naive_bayes_assumption_index_term"></a><span class="termdef">наивное байесовское предположение</span> (или <a name="independence_assumption_index_term"></a><span class="termdef">предположение независимости</span>) делает гораздо проще объединение вклада различных свойств, так как нам не нужно беспокоиться о том, как они должны взаимодействовать друг с другом.</p>
+<span class="target" id="fig-naive-bayes-graph"></span><div class="figure" id="fig-naive-bayes-graph">
+<img alt="../images/naive_bayes_graph.png" src="http://www.nltk.org/images/naive_bayes_graph.png" style="width:266.4px;height:163.79999999999998px">
+<p class="caption"><span class="caption-label">Рисунок 5.3</span>: <a name="bayesian_network_graph_index_term"></a><span class="termdef">Байесовской сетевой график</span>, иллюстрирующий генеративный процесс, который предполагается наивным байесовскоим классификатором.  Для создания помеченного входа модель сначала выбирает метку для входа, затем генерирует каждое свойство входа на основе этой метки.
+Предполагается, что каждое свойство совершенно не зависит от любого другого свойства данной метки.</p>
+</div>
+<p>Исходя из этого предположения, можно вычислить выражение для <span class="math">P(метка | свойство)</span>, вероятность того, что вход будет иметь определенную метку при условии, что он имеет определенный набор свойств.  Чтобы выбрать метку для нового входа, мы можем просто выбрать метку для нового входа <span class="math">l</span>, которая максимизирует <span class="math">P(L | свойства)</span>.</p>
+<p>Прежде всего, отметим, что <span class="math">P (метка | свойства)</span> равна вероятности того, что вход имеет определенную метку <em>и</em> определенный набор свойств, деленной на вероятность того, что он имеет определенный набор свойств:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(2)</td><td width="15"></td><td><span class="math">В (метка | свойства) = В (свойства, метка) / В (свойства)</span></td></tr></table></p>
+<p>Далее, мы замечаем, что <span class="math">P (свойства)</span> будет одинаковым для каждого выбора метки, поэтому, если мы просто заинтересованы в нахождении наиболее вероятной метки, достаточно вычислить <span class="math">P (свойства, метка)</span>, которую мы будем называть вероятность метки.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p>Если мы хотим произвести оценку вероятности для каждой метки, а не просто выбрать наиболее вероятную метку, то самый простой способ вычисления P (свойств) просто вычислить сумму для меток P (свойства, метка):</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(3)</td><td width="15"></td><td><span class="math">В(свойства)</span> =
+Σ<sub>м в| метки</sub> <span class="math">В(свойства, метка)</span></td></tr></table></p>
+</div>
+<p>Вероятность метки может быть представлена как вероятность метки умноженная на вероятность свойств данной метки:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(4)</td><td width="15"></td><td><span class="math">В (свойства, метка) = В (метка)</span> × <span class="math">В (свойства | метка)</span></td></tr></table></p>
+<p>Кроме того, поскольку все свойства не зависят друг от друга (для данной метки), мы можем выделить вероятность каждого отдельного свойства:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(5)</td><td width="15"></td><td><span class="math">В (свойства, метка)</span> = <span class="math">В (метка)</span> × Prod <sub>с в | свойства</sub> <span class="math">В (с | метка)`</span></td></tr></table></p>
+<p>Это именно то уравнение, которое мы обсуждали выше для вычисления вероятности метки: <span class="math">В (метка)</span> является априорной вероятностью для данной метки, а каждый из <span class="math">В (с | метка)</span> представляет собой вклад одного свойства в вероятность метки.</p>
+</div>
+<div class="section" id="zero-counts-and-smoothing">
+<h2>5.2 Нулевые количества и сглаживание</h2>
+<p>Самый простой способ вычислить <span class="math">В (с | метка)</span>, вклад свойства <cite>с</cite> в вероятность метки для <cite>метка</cite>, состоит в том, чтобы взять процент учебных экземпляров с данной меткой, которые также имеют данное свойство:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(6)</td><td width="15"></td><td><span class="math">В (с | метка) = кол-во (с, метка) / кол-во (метка)</span></td></tr></table></p>
+<p>Однако этот простой подход может стать проблематичным, когда свойство <em>никогда</em> не появляется с заданной метки в обучающем наборе.  В этом случае наша расчетная величина для <span class="math">В (с | метка)</span> будет равна нулю, что приведет к нулевой вероятности метки для данной метки.  Таким образом, входу никогда не будет присвоен эта метка независимо от того, насколько хорошо другие свойства подходят этой метке.</p>
+<p>Основная проблема здесь заключается в нашем расчете <span class="math">В (с | метка)</span>, вероятности того, что вход будет иметь некоторое свойство для данной метки.  В частности, только то, что мы не видели сочетание свойство / метка в тренировочном наборе, не означает, что это сочетание невозможно.  Например, мы не видели никаких документов о загадочных убийствах, содержащих слово "футбол", но мы не хотели бы сделать вывод, что это такие документы не могут существовать.</p>
+<p>Таким образом, несмотря на то, что <span class="math">кол-во (с, метка) / кол-во (метка)</span> является хорошей оценкой для <span class="math">В (с | метка)</span>, если <span class="math">кол-во (с, метка)</span> является относительно большим, эта оценка становится менее надежной, когда <span class="math">кол-во (с)</span> становится меньше.
+Таким образом, при построении наивных моделей Байеса для вычисления <span class="math">В (с | метка)</span>, вероятности свойства для данной метки, мы обычно используем более сложные методы, известные как <a name="smoothing_index_term"></a>методы <span class="termdef">сглаживания</span>.  Так, например, <a name="expected_likelihood_estimation_index_term"></a> <span class="termdef">Ожидаемая Оценка Правдоподобия</span> для вероятности свойства данной метки добавляет базовые 0,5 к каждому значению <span class="math">кол-во (с, метка)</span>, а <a name="heldout_estimation_index_term"></a> <span class="termdef">Растянутая Оценка</span> использует растянутый корпус для вычисления отношения между частотами свойств и их вероятностями.  Модуль <tt class="doctest"><span class="pre">nltk.probability</span></tt> обеспечивает поддержку широкого спектра методов сглаживания.</p>
+<!-- XXX Refer to J&M 4.5 probably just in the further reading section -->
+<!-- XXX Mention that NLTK supports many smoothing methods, and name some of them -->
+</div>
+<div class="section" id="non-binary-features">
+<h2>5.3 Небинарные свойства</h2>
+<p>Мы предположили, что каждое свойство бинарно, то есть, что каждый вход либо имеет свойство, либо нет.  Свойства с небинарными значениями (например, цветовое свойство, которое может быть красным, зеленым, синим, белым или оранжевым) могут быть преобразованы в бинарные свойства путем замены их бинарными свойствам, такими как "цвет-красный".  Числовые свойства могут быть преобразованы в двоичных свойства с помощью <a name="binning_index_term"></a><span class="termdef">биннинга</span>, который заменяет их такими свойствами, как "4 &lt;х &lt;6".</p>
+<p>Другой альтернативой является использование методов регрессии для моделирования вероятностей числовых свойств.  Например, если мы предположим, что функция высоты имеет колоколообразную кривую распределения, то мы могли бы оценить В (высота | метка) нахождением среднего значения и дисперсии высот входов для каждой метки.  В этом случае <span class="math">B (c = д | метка)</span> не будет фиксированным значением, но будет изменяться в зависимости от значения <cite>д</cite>.</p>
+</div>
+<div class="section" id="the-naivete-of-independence">
+<h2>5.4 Наивность независимости</h2>
+<p>Причина, по которой наивные классификаторы Байеса называют "наивным", заключается в том, что они необоснованно предполагают, что все свойства независимы друг от друга для данной метки.  В частности, почти все реальные проблемы содержат свойства с различной степенью зависимости друг от друга.  Если бы мы должны были избегать каких-либо свойств, которые зависят друг от друга, было бы очень трудно построить хорошие наборы свойств, которые обеспечивают необходимую информацию для алгоритма машинного обучения.</p>
+<p>Так что же происходит, когда мы игнорируем предположение о независимости и используем наивный байесовский классификатор со свойствами, которые не являются независимыми?
+Одна из проблем заключается в том, что классификатор может прийти к "двойному счету" - эффекту сильно связанных свойств, толкающему классификатор ближе к данной метке, чем это оправдано.</p>
+<p>Чтобы увидеть, как это может произойти, рассмотрим классификатор пола имени, который содержит два идентичных свойства, <span class="math">с</span><sub>1</sub> и <span class="math">с</span><sub>2</sub>.  Другими словами, <span class="math">с</span><sub>2</sub> является точной копией <span class="math">с</span><sub>1</sub> и не содержит новой информации.
+Когда классификатор рассматривает входной сигнал, он будет учитывать вклад и <span class="math">с</span><sub>1</sub> и <span class="math">с</span><sub>2</sub> при выборе того, какую метку выбрать.  Таким образом, информационному содержанию этих двух свойств будет придано больше веса, чем оно заслуживает.</p>
+<p>Конечно, мы обычно не строим наивные классификаторы Байеса, которые содержат два одинаковых свойства.  Однако мы строим классификаторы, которые содержат свойства, которые зависят друг от друга.  Например, свойства <tt class="doctest"><span class="pre">заканчивается-на(а)</span></tt> и <tt class="doctest"><span class="pre">заканчивается-на(гласную)</span></tt> зависят друг от друга, потому что если входное значение имеет первое свойство, то оно должна также иметь и второе.  Из-за свойств подобных этим дублированная информация может иметь больший вес, чем это оправдано обучающим набором.</p>
+</div>
+<div class="section" id="the-cause-of-double-counting">
+<h2>5.5 Причина двойного счета</h2>
+<p>Причиной проблемы двойного счета является то, что в процессе обучения, вклады свойств вычисляются по отдельности; а при использовании классификатора для выбора метки нового входа эти вклады свойств объединяются.  Одно из решений поэтому заключается в том, чтобы рассмотреть возможные взаимодействия между вкладами свойств во время обучения.  Тогда мы могли бы использовать эти взаимодействия для корректировки вкладов отдельных свойств.</p>
+<p>Для того, чтобы сделать это более точным, мы можем переписать уравнение для расчета вероятности метки, выделяя вклад каждого свойства (или метки):</p>
+<!-- .. _parameterized-naive-bayes: -->
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(7)</td><td width="15"></td><td><span class="math">В (свойства, метка) = w [метка]</span> × Prod <sub>с | в | свойствах</sub> <span class="math"> w [с, метка]</span></td></tr></table></p>
+<p>Здесь <span class="math">w [метка]</span> - это "стартовый счет" для данной метки, а <span class="math">w [с, метка]</span> - вклад данного свойства в вероятность этикетки.  Мы называем эти значения <span class="math">w [метка]</span> и <span class="math">w [с, метка]</span> <a name="parameters_index_term"></a><span class="termdef">параметрами</span>, или <a name="weights_index_term"></a><span class="termdef">весами</span> для данной модели.  Используя наивный алгоритм Байеса, мы устанавливаем каждый из этих параметров независимо друг от друга:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(8)</td><td width="15"></td><td><span class="math">w [метка] = В (метка)</span></td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(9)</td><td width="15"></td><td><span class="math">ж [с, метка] = В (с | метка)</span></td></tr></table></p>
+<p>Однако в следующем разделе мы рассмотрим классификатор, который рассматривает возможные взаимодействия между этими параметрами при выборе их значений.</p>
+</div>
+</div>
+<div class="section" id="maximum-entropy-classifiers">
+<h1>6 Классификаторы основанные на максимальной энтропии</h1>
+<p>Классификатор <a name="maximum_entropy_index_term"></a><span class="termdef">Максимальной Энтропии</span> использует модель, которая очень похожа на модель, используемую наивным байесовским классификатором.  Но вместо того, чтобы использовать вероятности для установки параметров модели, он использует методы поиска, чтобы найти набор параметров, которые обеспечивают максимальную результативность классификатора.  В частности, он ищет набор параметров, который максимизирует <a name="total_likelihood_index_term"></a> <span class="termdef">общая правдоподобность</span> учебного корпуса, которая определяется как:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">1:10</td><td width="15"></td><td><span class="math">P(features)</span> = Σ<sub>x |in| corpus</sub> <span class="math">P(label(x)|features(x))</span></td></tr></table></p>
+<p>Где <tt class="doctest"><span class="pre">P (label | featurs)</span></tt>, вероятность того, что вход, свойства которого <tt class="doctest"><span class="pre">featurs</span></tt> будет иметь метку класса <tt class="doctest"><span class="pre">label</span></tt>, определяется следующим образом:</p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(11)</td><td width="15"></td><td><span class="math">P (label | features) = P (label, features) /</span> Σ <sub>label</sub> <span class="math">P (label, features)</span></td></tr></table></p>
+<p>Из-за потенциально сложных взаимодействий между эффектами связанных свойств, не существует способа непосредственного расчета параметров модели, которые максимизируют вероятность обучающего набора.
+Таким образом, классификаторы максимальной энтропии выбирают параметры модели с помощью методов <a name="iterative_optimization_index_term"></a><span class="termdef">итеративной оптимизации</span>, которые инициализируют параметры модели случайными величинами, а затем многократно уточняют эти параметры, чтобы приблизить их к оптимальному решению.  Эти итерационные методы оптимизации гарантируют, что каждое уточнение параметров будет приближать их к оптимальным значениям, но не обязательно предоставляют средства определения того, когда были достигнуты эти оптимальные значения.  Поскольку параметры классификатора максимальной энтропии выбираются с помощью итерационных методов оптимизации, их обучение может занять много времени.  Это особенно актуально, когда размер обучающего набора, число свойств и число меток - все большие.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">Некоторые итерационные методы оптимизации намного быстрее, чем другие.  При обучении модели максимальной энтропии избегайте использования методов: Generalized Iterative Scaling (GIS) (Обобщенное Итерационное Масштабирование (ОИМ)) и Improved Iterative Scaling (IIS) (Улучшенное Итеративное Масштабирование (УИМ)), которые значительно медленнее, чем методы: Conjugate Gradient (CG) Сопрояженного Градиента (СГ) и BFGS оптимизации.</p>
+</div>
+<!-- The above note could go in the further reading section with a couple
+of literature references -->
+<!-- For related work section:?
+The use of iterative optimization techniques to find the parameters
+that maximize the performance of a model is quite common in machine
+learning. -->
+<div class="section" id="the-maximum-entropy-model">
+<h2>6.1 Модель максимальной энтропии</h2>
+<p>Модель классификатора на основе максимальной энтропии является обобщением модели, используемой наивным байесовским классификатором.  Подобно наивной модели Байеса, классификатор максимальной энтропии вычисляет вероятность каждой метки при заданном значении входного значения путем перемножения параметров, которые применимы для входного значения и метки.  Модель наивного классификатора Байеса определяет параметр для каждой метки, указав его априорную вероятность и параметр для каждой пары (свойство, метка) с указанием вклада индивидуальных свойств в вероятность метки.</p>
+<p>В отличие от этого, модель классификатора максимальной энтропии оставляет пользователю решить, какие комбинации меток и свойств должны получать свои собственные параметры.  В частности, можно использовать один параметр, чтобы связать свойство с более чем одной меткой; или связать более одного свойства с заданной меткой.  Это иногда позволит модели "обобщать" некоторые различия между связанными метками или свойствами.</p>
+<p>Каждая комбинация меток и свойств, которая получает свой собственный параметр называется <a name="joint_feature_index_term"></a><span class="termdef">совместным свойством</span>.  Обратите внимание, что совместные свойства - это особенности <em>помеченных</em> значений, в то время как (простые) свойства - это особенности <em>непомеченых</em> значений.</p>
+<div class="note">
+<p class="first admonition-title">Замечание</p>
+<p class="last">В литературе, в которой описываются и обсуждаются модели максимальной энтропии, термин "свойства" часто относится к совместным свойства; а термин «контексты» относится к тому, что мы до сих пор называли (простыми) свойствами.</p>
+</div>
+<p>Как правило, совместные свойства, которые используются для построения модели максимальной энтропии, точно отражают те, которые используются наивной моделью Байеса.  В частности, совместное свойство определено для каждой метки, что соответствует <span class="math">w</span><span class="math">[label]</span>, и для каждой комбинации (простого) свойства и метки, что соответствует <span class="math">w</span><span class="math">[f</span>, <span class="math">label]</span>.
+Для данных совместных свойств модели максимальной энтропии, оценка, которая присваивается метке для данного входа, - это просто произведение параметров, связанных с совместными свойствами, которые применяются к этому входу и метке:</p>
+<!-- .. _parameterized-maxent: -->
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">(12)</td><td width="15"></td><td><span class="math">P (вход, метка) =</span> Prod <sub>совместные функции (вход, этикетка)</sub> <span class="math">ш [совместное особенность]</span></td></tr></table></p>
+</div>
+<div class="section" id="maximizing-entropy">
+<h2>6.2 Максимизация Энтропия</h2>
+<p>Интуицией, которая мотивирует классификацию максимальной энтропии, является то, что мы должны построить модель, которая схватывает частоты отдельных совместных свойств не делая каких-либо необоснованных предположений.
+Пример поможет проиллюстрировать этот принцип.</p>
+<p>Предположим, что нам поставлена ​​задача выбора правильного слова для смысла данного слова из списка десяти возможных смыслов (помеченных A-J).  Сначала нам ничего больше не сказали об этом слове или этих смыслах.
+Есть много распределения вероятностей, которые мы могли бы выбрать для десяти значений, таких как:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="7%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head"></th>
+<th class="head">A</th>
+<th class="head">B</th>
+<th class="head">C</th>
+<th class="head">D</th>
+<th class="head">E</th>
+<th class="head">F</th>
+<th class="head">G</th>
+<th class="head">H</th>
+<th class="head">I</th>
+<th class="head">J</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><cite>(i)</cite></td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+<td>10%</td>
+</tr>
+<tr><td><cite>(ii)</cite></td>
+<td>5%</td>
+<td>15%</td>
+<td>0%</td>
+<td>30%</td>
+<td>0%</td>
+<td>8%</td>
+<td>12%</td>
+<td>0%</td>
+<td>6%</td>
+<td>24%</td>
+</tr>
+<tr><td><cite>(iii)</cite></td>
+<td>0%</td>
+<td>100%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 6.1</span></p>
+</td></table>
+<p>Хотя любое из этих распределений <em>могло бы</em> быть правильным, мы, скорее всего, чтобы выберем распределение <cite>(i)</cite>, потому что без какой-либо дополнительной информации нет никаких оснований полагать, что какое-либо значение слова более вероятно, чем другое.  С другой стороны, распределения <cite>(ii)</cite> и <cite>(iii)</cite> отражают предположения, которые не поддерживаются тем, что мы знаем.</p>
+<p>Один из способов схватить эту интуицию, сообщающую что распределение <cite>(i)</cite> является более "справедливым", чем два других, - сослаться на понятие энтропии.  При обсуждении деревьев решений мы описали энтропию как меру "дезорганизованности" набора меток.  В частности, если одна метка доминирует, то энтропия мала, но если метки распределены более равномерно, то энтропия высока.  В нашем примере мы выбрали распределение <cite>(i)</cite>, так как вероятности его меток равномерно распределены, другими словами, так как его энтропия высока.  В общем случае, <a name="maximum_entropy_principle_index_term"></a><span class="termdef">принцип Максимальной Энтропии</span> гласит, что среди распределений, которые согласуются с тем, что мы знаем, мы должны выбрать распределение, энтропия которого является самой высокой.</p>
+<p>Далее, предположим, что нам говорят, что значение A появляется с частотой 55%.
+Опять же есть много распределений, которые согласуются с этой новой информацией, таких как:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="7%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head"></th>
+<th class="head">A</th>
+<th class="head">B</th>
+<th class="head">C</th>
+<th class="head">D</th>
+<th class="head">E</th>
+<th class="head">F</th>
+<th class="head">G</th>
+<th class="head">H</th>
+<th class="head">I</th>
+<th class="head">J</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><cite>(iv)</cite></td>
+<td>55%</td>
+<td>45%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+<td>0%</td>
+</tr>
+<tr><td><cite>(v)</cite></td>
+<td>55%</td>
+<td>5%</td>
+<td>5%</td>
+<td>5%</td>
+<td>5%</td>
+<td>5%</td>
+<td>5%</td>
+<td>5%</td>
+<td>5%</td>
+<td>5%</td>
+</tr>
+<tr><td><cite>(vi)</cite></td>
+<td>55%</td>
+<td>3%</td>
+<td>1%</td>
+<td>2%</td>
+<td>9%</td>
+<td>5%</td>
+<td>0%</td>
+<td>25%</td>
+<td>0%</td>
+<td>0%</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 6.2</span></p>
+</td></table>
+<p>Но опять же, мы, скорее всего, выберем распределение, которое делает наименьшее количество необоснованных допущений - в данном случае распределение <cite>(v)</cite>.</p>
+<p>Наконец, предположим, что нам говорят, что слово «up» появляется в соседнем контекст 10% времени, и что, когда оно появляется в этом контексте, есть 80% вероятность того, что значение A или C будет использоваться.  В этом случае мы придумать распределение "в ручную" будет труднее; однако мы можем убедиться, что следующее распределение выглядит соответствующим образом:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="7%">
+<col width="7%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+<col width="9%">
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head"></th>
+<th class="head"> </th>
+<th class="head">A</th>
+<th class="head">B</th>
+<th class="head">C</th>
+<th class="head">D</th>
+<th class="head">E</th>
+<th class="head">F</th>
+<th class="head">G</th>
+<th class="head">H</th>
+<th class="head">I</th>
+<th class="head">J</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><cite>(vii)</cite></td>
+<td>+up</td>
+<td>5,1%</td>
+<td>0,25%</td>
+<td>2,9%</td>
+<td>0,25%</td>
+<td>0,25%</td>
+<td>0,25%</td>
+<td>0,25%</td>
+<td>0,25%</td>
+<td>0,25%</td>
+<td>0,25%</td>
+</tr>
+<tr><td>` `</td>
+<td>-up</td>
+<td>49,9%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+<td>4,46%</td>
+</tr>
+</tbody>
+<td><p class="caption"><span class="caption-label">Таблица 6.3</span></p>
+</td></table>
+<p>В частности, распределение согласуется с тем, что мы знаем: если мы сложим вероятности в колонке А, мы получаем 55%; если сложить вероятности строки 1, мы получаем 10%; и если мы складываем ячейки для значений А и С в строке +up, мы получаем 8% (или 80% +up случаев).
+Кроме того, остальные вероятности "равномерно распределены".</p>
+<p>На протяжении этого примера мы ограничились распределениями, которые согласуются с тем, что мы знаем; среди них мы выбрали распределение с самой высокой энтропией.  Это именно то, что делает классификатор максимальной энтропии.  В частности, для каждого совместного свойства модель максимальной энтропии вычисляет "эмпирическую частоту" этого свойства - т. е. частоту, с которой он встречается в обучающем наборе.  Затем он осуществляет поиск распределения, которое максимизирует энтропию, в то же время предсказывая правильную частоту для каждого совместного свойства.</p>
+</div>
+<div class="section" id="generative-vs-conditional-classifiers">
+<h2>6.3 Генеративные против условных классификаторов</h2>
+<!-- XXX cannot parse next sentence -->
+<p>Важное различие между наивным байесовским классификатором и классификатором максимальной энтропии связано с типом вопросов, для ответа на которые они могут быть использованы.  Наивный байесовский классификатор является примером <a name="generative_index_term"></a><span class="termdef">порождающего</span> классификатора, который строит модель, которая предсказывает <span class="math">P (input, label)</span>, совместную вероятность пары <span class="math">(вход, метка)</span>.  Поэтому порождающие модели могут быть использованы, чтобы ответить на следующие вопросы:</p>
+<ol class="arabic simple">
+<li>Какая метка является наиболее вероятной для данного входа?</li>
+<li>Насколько вероятна данная метка для данного входа?</li>
+<li>Каково наиболее вероятное значение входного сигнала?</li>
+<li>Насколько вероятно заданное значение входного сигнала?</li>
+<li>Насколько вероятно данное входное значение для данной метки?</li>
+<li>Какова наиболее вероятная метка для входа, который мог бы иметь одно из двух значений (но мы не знаем какое)?</li>
+</ol>
+<!-- XXX possibly add expressions like argmax_label P(label|input) to each
+of the above questions, to make more explicit connections with the
+earlier discussion -->
+<p>Классификатор максимальной энтропии, с другой стороны, является примером <a name="conditional_index_term"></a><span class="termdef">условного</span> классификатора.  Условные классификаторы строят модели, предсказывающие <span class="math">P (label | input)</span> - вероятность метки для <em>данного</em> входного значения.  Таким образом, условные модели также могут быть использованы для ответа на вопросы 1 и 2.  Однако условные модели <em>не</em> могут быть использованы, чтобы ответить на оставшиеся вопросы 3-6.</p>
+<p>В целом порождающие модели строго мощнее условных моделей, так как мы можем вычислить условную вероятность <span class="math">В (метка | вход)</span> от совместной вероятности <span class="math">В (вход, метка)</span>, но не наоборот.
+Однако эта дополнительная мощность поставляется по определенной цене.  Поскольку модель является более мощной, она имеет более "свободные параметры", которые должны быть изучены.
+Однако размер обучающего набора фиксирован.  Поэтому при использовании более мощной модели мы в конечном итоге оказываемся с меньшим количеством данных, чем может быть использовано для обучения, что делает труднее нахождение оптимальных значений параметров.  В результате порождающая модель может работать не так хорошо при ответе на вопросы 1 и 2, как условная модель, так как условная модель может сосредоточить свои усилия на этих двух вопросах.
+Однако если нам действительно нужны ответы на такие вопросы, как 3-6, то у нас нет иного выбора, кроме как использовать порождающую модель.</p>
+<p>Различие между порождающей моделью и условной моделью аналогична различию между топографической картой и изображением горизонта.  Хотя топографическая карта может быть использована, чтобы ответить на более широкий круг вопросов, сформировать точную топографическую карту значительно труднее, чем создать точную линию горизонта.</p>
+<!-- I want a figure here.  But the images I used for this in the past
+(on powerpoint) are probably copyrighted, so I&#39;ll need to draw/find
+some new images.  They should be a side-by-side picture of a
+topographical map and a skyline.  The left/right axis of each should
+be labeled as (output value), the up/down axis of each should be
+labeled as (probability), and the forward/back axis of the topo map
+should be (input value). -->
+</div>
+</div>
+<div class="section" id="modeling-linguistic-patterns">
+<h1>7 Моделирование лингвистических паттернов</h1>
+<p>Классификаторы могут помочь нам понять языковые закономерности, которые возникают в естественном языке, позволяя нам создавать явные <a name="models_index_term"></a><span class="termdef">модели</span>, которые схватывают эти закономерности.  Как правило, эти модели используют контролируемые методы классификации, но также возможно построить аналитически мотивированные модели.  В любом случае эти явные модели служат двум важным целям: они помогают нам понять языковые закономерности и они могут быть использованы для составления прогнозов о новых языковых данных.</p>
+<p>Степень, в которой явные модели могут дать нам понимание языковых закономерностей, во многом зависит от того, какая модель используется.
+Некоторые модели, такие как деревья решений, являются относительно прозрачными и дают нам прямую информацию о том, какие факторы играют важную роль в принятии решений, и о том, какие факторы связаны друг с другом.  Другие модели, такие как многоуровневые нейронные сети, гораздо более непрозрачны.
+Хотя получить некоторое представление, изучая их, возможно, как правило, это требует гораздо больше работы.</p>
+<p>Но все явные модели могут делать прогнозы о новых "<a name="unseen_index_term"></a><span class="termdef">не виденных</span>" данных языка, которые не были включены в корпус, использовавшийся для построения модели.  Эти прогнозы могут быть оценены для определения точности модели.  После того, как модель считается достаточно точной, она может быть использована, чтобы автоматически предсказывать информацию о новых языковых данных.  Эти прогностические модели могут быть объединены в системы, которые выполняют множество полезных задач обработки языка, например, классификация документов, автоматический перевод  и ответы на вопросы.</p>
+<div class="section" id="what-do-models-tell-us">
+<h2>7.1 Что модели говорят нам?</h2>
+<p>Важно понять, что мы можем узнать о языке из автоматически построенной модели.  Одним из важных моментов при работе с моделями языка является различие между описательными моделями и объясняющими моделями.  Описательные модели схватывают закономерности в данных, но они не дают никакой информации о том, <em>почему</em> данные содержат эти закономерности.  Например, как мы видели в разделе <a class="reference external" href="http://www.nltk.org/book/ch03.html#tab-absolutely">3.1</a>, синонимы <span class="example">absolutely</span> и <span class="example">definitely</span> не являются взаимозаменяемыми: мы говорим <span class="example">absolutely adore</span>, а не <span class="example">definitely adore</span> и <span class="example">definitely prefer</span>, а не <span class="example">absolutely prefer</span>.
+В противоположность этому, объясняющие модели пытаются схватить свойства и отношения, которые вызывают языковые закономерности.  Например, мы могли бы ввести абстрактное понятие "полярного глагола", как такого, который имеет экстремальное значение, и классифицировать некоторые глаголы, как <span class="example">adore</span> и <span class="example">detest</span>, как полярные.  Наша объясняющая модель содержала бы ограничение, что <span class="example">absolutely</span> можно комбинировать только с полярными глаголами, а <span class="example">definitely</span> можно комбинировать только с неполярными глаголами.  Таким образом описательные модели предоставляют информацию о корреляциях в данных, в то время как объясняющие модели идут дальше, чтобы постулировать причинно-следственные связи.</p>
+<p>Большинство моделей, которые автоматически построены из корпуса, являются описательными моделями; другими словами, они могут сказать нам, какие свойства имеют отношение к заданному паттерну или конструкции, но они не всегда могут сказать нам, как эти свойства и паттерны связаны друг с другом.  Если наша цель состоит в том, чтобы понять языковые закономерности, то мы можем использовать эту информацию о том, какие свойства связаны, в качестве отправной точки для дальнейших экспериментов, сконструированных для выискивания отношений между свойствами и закономерностями.  С другой стороны, если мы просто заинтересованы в использовании модели для прогнозирования (например, как части системы обработки языка), то мы можем использовать модель для составления прогнозов о новых данных, не заботясь о деталях лежащего в основе причинно-следственного отношения.</p>
+</div>
+</div>
+<div class="section" id="summary">
+<h1>8 Резюме</h1>
+<ul class="simple">
+<li>Моделирование лингвистических данных, находящихся в корпусе, может помочь нам понять языковые закономерности и может быть использовано для составления прогнозов о новых языковых данных.</li>
+<li>Контролируемые классификаторы используют помеченный тренировочный корпус для построения моделей, предсказывающих метку входа, основываясь на конкретных свойствах этого входа.</li>
+<li>Контролируемые классификаторы могут выполнять широкий спектр задач NLP, в том числе классификацию документов, частеречную разметку, выделение предложений, определение типа акта диалога, определение отношений воплощения и многие другие задачи.</li>
+<li>При обучении контролируемого классификатора, вы должны разделить корпус на три набора данных: учебный набор для построения модели классификатор; тестовый набор разработки для выбора и отладки свойств модели; и тестовый набор для оценки результативности конечной модели.</li>
+<li>При оценке контролируемого классификатора важно использовать свежие данные, которые не были включены в учебный или тестовый набор разработки.  В противном случае ваши результаты оценки могут быть нереалистично оптимистичными.</li>
+<li>Деревья решений - это автоматически построенные, имеющие древовидную структуру блок-схемы, которые используются для присвоения меток для входных значений в зависимости от их свойств.  Несмотря на то, что их легко интерпретировать, они не очень хороши для случаев, где значения свойств взаимодействуют при определении правильной метки.</li>
+<li>В наивных классификаторах Байеса каждое свойство самостоятельно вносит свой вклад в решение о том, какую следует использовать метку.  Это позволяет значениям свойств взаимодействовать, но может быть проблематичным, когда два или несколько свойств в высокой степени коррелируют друг с другом.</li>
+<li>Классификаторы максимальной энтропии используют базовую модель, которая похожа на модели, используемые наивными Байеса; однако они применяют итерационную оптимизацию для поиска множества весов свойств, которые максимизируют вероятность обучающего набора.</li>
+<li>Большинство моделей, которые автоматически построены из корпуса, являются описательными - они позволяют нам узнать, какие свойства имеют отношение к данной модели или конструкции, но они не дают никакой информации о причинно-следственной связи между этими свойствами и закономерностями.</li>
+</ul>
+</div>
+<div class="section" id="further-reading">
+<h1>7 Дополнительные материалы</h1>
+<p>Пожалуйста, обратитесь к <tt class="doctest"><span class="pre">http://nltk.org/</span></tt> для получения дополнительных материалов по этой главе, а также по тому, как установить внешние пакеты машинного обучения, такие как Weka, Mallet, TADM и MEGAM. Для получения большего количества примеров классификации и машинного обучения с помощью NLTK, пожалуйста, посмотрите HOWTOs по классификации на <tt class="doctest"><span class="pre">http://nltk.org/howto</span></tt>.</p>
+<p>Для общего введения в область машинного обучения мы рекомендуем <a class="reference external" href="http://www.nltk.org/book/bibliography.html#alpaydin2004" id="id1">(Alpaydin, 2004)</a>.  Для получения более математически интенсивного введения в теорию машинного обучения, см. <a class="reference external" href="http://www.nltk.org/book/bibliography.html#hastie2009" id="id2">(Hastie, Tibshirani, &amp; Friedman, 2009)</a>.  Отличные книги по использованию методов машинного обучения для НЛП включают в себя <a class="reference external" href="http://www.nltk.org/book/bibliography.html#abney2008" id="id3">(Abney, 2008)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#daelemans2005" id="id4">(Daelemans &amp; Bosch, 2005)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#feldman2007" id="id5">(Feldman &amp; Sanger, 2007)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#segaran2007" id="id6">(Segaran, 2007)</a>, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#weiss2004" id="id7">(Weiss et al, 2004)</a>.  Более подробную информацию о методах сглаживания для языковых проблем см. в <a class="reference external" href="http://www.nltk.org/book/bibliography.html#manning1999fsn" id="id8">(Manning &amp; Schutze, 1999)</a>.  Более подробную информацию по моделированию последовательностей и особенно скрытым марковским моделям, см. в <a class="reference external" href="http://www.nltk.org/book/bibliography.html#manning1999fsn" id="id9">(Manning &amp; Schutze, 1999)</a> или <a class="reference external" href="http://www.nltk.org/book/bibliography.html#jurafskymartin2008" id="id10">(Jurafsky &amp; Martin, 2008)</a>.
+Глава 13 <a class="reference external" href="http://www.nltk.org/book/bibliography.html#manning2008ir" id="id11">(Manning, Raghavan, &amp; Schutze, 2008)</a> обсуждает использование наивного Байеса для классификации текстов.</p>
+<p>Многие алгоритмы машинного обучения, обсуждаемые в этой главе, являются численно интенсивными, поэтому они будут работать медленно при кодировании их наивно на Python.  Для получения информации о повышении эффективности численно интенсивных алгоритмов в Python, см. <a class="reference external" href="http://www.nltk.org/book/bibliography.html#kiusalaas2005" id="id12">(Kiusalaas, 2005)</a>.</p>
+<p>Методы классификации, описанные в этой главе, могут быть применены к очень широкому кругу проблем.  Например, <a class="reference external" href="http://www.nltk.org/book/bibliography.html#agirre2007" id="id13">(Agirre &amp; Edmonds, 2007)</a> использует классификаторы для выполнения разрешение лексической неоднозначности; а <a class="reference external" href="http://www.nltk.org/book/bibliography.html#melamed2001" id="id14">(Melamed, 2001)</a> использует классификаторы для создания параллельных текстов.  Последние учебники, которые охватывают текстовую классификацию, включают в себя <a class="reference external" href="http://www.nltk.org/book/bibliography.html#manning2008ir" id="id15">(Manning, Raghavan, &amp; Schutze, 2008)</a> и <a class="reference external" href="http://www.nltk.org/book/bibliography.html#croft2009" id="id16">(Croft, Metzler, &amp; Strohman, 2009)</a>.</p>
+<p>Большая часть современных исследований в области применения методов машинного обучения к проблемам НЛП приводится в движение спонсируемыми правительством "вызовами", в рамках которых множеству научно-исследовательских организаций предоставляется один и тот же корпус разработки, с помощью которого они должны построить систему; после чего полученные системы сравниваются на основе зарезервированного тестового набора.  Примеры этих соревнований включают CoNLL Shared Tasks, соревнования ACE, соревнования Признания Текстового Воплощения, а также соревнования AQUAINT.  Обратитесь к <tt class="doctest"><span class="pre">http://nltk.org/</span></tt> для получения списка указателей на веб-страницы этих задач.</p>
+<!-- - supported ML packages
+- http://www.cs.waikato.ac.nz/~ml/weka/book.html
+- choosing prepositions http://itre.cis.upenn.edu/~myl/languagelog/archives/002003.html
+- Jurafsky and Martin
+- publications describing some of the corpora that were created for the
+  purpose of training and testing classifiers
+
+Xin Li, Dan Roth, Learning Question Classifiers: The Role of Semantic Information
+http://l2r.cs.uiuc.edu/~danr/Papers/LiRo05a.pdf
+
+Current challenge: The problem of applying models trained on one genre
+to another (portability across domains; domain adaptation);
+Use of unsupervised or weakly supervised approaches to exploit a small
+amount of in-domain training data, or of unlabeled in-domain training data
+[REFS] -->
+</div>
+<div class="section" id="exercises">
+<h1>10 Упражнения</h1>
+<ol class="arabic">
+<li><p class="first">☼ Читайте на одном из языковых технологий, указанных в данном разделе, например, слово смысловой неоднозначности, семантической классификации ролей, вопросов, отвечая, машинного перевода, названного обнаружения объекта.
+Узнайте, какой тип и количество аннотированных данных требуется для разработки таких систем.
+Почему вы думаете, требуется большое количество данных?</p>
+</li>
+<li><p class="first">☼ При использовании любого из трех классификаторов, описанных в этой главе, и какие-либо функции вы можете думать, строить лучшее название гендерного классификатор вы можете.  Начните путем разделения Имен Корпус на три подмножества: 500 слов для тестового набора, 500 слов для Дев-тестового набора, а остальные 6900 слов для тренировочного набора.
+Затем, начиная с примером имени гендерного классификатора, делают постепенные улучшения.  Используйте DEV-тестовый набор, чтобы проверить ваши успехи.  После того, как вы удовлетворены своей классификатор, проверить свою окончательную производительность на тестовом наборе.  Как производительность на тестовом наборе по сравнению с исполнением на Dev-тестовом наборе?
+Это то, что можно было ожидать?</p>
+</li>
+<li><p class="first">☼ Senseval 2 Корпус содержит данные, предназначенные для обучения разрешение лексической многозначности классификаторов.  Он содержит данные для четырех слов: жесткий, интерес, линии, и служить.  Выберите один из этих четырех слов, и загрузить соответствующие данные:</p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">От</span> <span class="pysrc-keyword">импорта</span> nltk.corpus senseval <span class="pysrc-prompt">&gt;&gt;&gt;</span> экземпляры = senseval.instances ( <span class="pysrc-string">'hard.pos')</span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> Размер = INT (LEN (экземпляры) * 0.1) <span class="pysrc-prompt">&gt;&gt;&gt;</span> train_set, test_set = экземпляры [размер:] экземпляры [: размер]</pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>С помощью этого набора данных, построить классификатор, который предсказывает правильный смысл тег для данного экземпляра.  См желтое HOWTO на <tt class="doctest"><span class="pre">http://nltk.org/howto</span></tt> для получения информации об использовании экземпляра объекты , возвращаемые Senseval 2 корпус.</p>
+</li>
+<li><p class="first">☼ Использование обзора фильма документа классификатор обсуждается в этой главе, сформировать список из 30 признаков, что классификатор находит наиболее информативным.  Можете ли вы объяснить, почему именно эти особенности являются информативными?  Считаете ли вы какие-либо из них удивительно?</p>
+</li>
+<li><p class="first">☼ Выберите одну из задач классификации, описанных в этой главе, такие как имя гендерного обнаружения, классификации документов, частеречная разметка, или диалоговом классификации акта.  Используя ту же подготовку и тестовые данные, а также те же функции, экстрактор, построить три классификаторы для выполнения этой задачи: дерево решений, наивного байесовского классификатора, и классификатор максимальной энтропией.  Сравните производительность трех классификаторов на выбранном Вами задачи.
+Как вы думаете, что ваши результаты могут отличаться, если вы использовали другую функцию экстрактор?</p>
+</li>
+<li><p class="first">☼ синонимов <span class="example">сильный</span> и <span class="example">мощный</span> шаблон по- разному (попробуйте сочетая их с <span class="example">чипом</span> и <span class="example">продаж).</span>
+Какие особенности имеют существенное значение в этом различии?
+Построить классификатор, который предсказывает, когда каждое слово должно быть использовано.</p>
+</li>
+<li><p class="first">◑ Диалог акт классификатор назначает метки на отдельные посты, не принимая во внимание контекст, в котором находится пост.
+Тем не менее, диалоговые акты в значительной степени зависят от контекста, и некоторые последовательности диалога действуют гораздо более вероятны, чем другие.  Например, диалог акт ynQuestion гораздо больше шансов ответить на <tt class="doctest"><span class="pre">yanswer</span></tt> чем <tt class="doctest"><span class="pre">приветствие.</span></tt>  Используйте этот факт, чтобы построить последовательный классификатор для маркировки диалоговых актов.
+Будьте уверены, чтобы рассмотреть, какие функции могут быть полезны.  Смотрите код для последовательного классификатора для частичной из-тегов в речи <a class="reference internal" href="http://www.nltk.org/book/ch06.html#code-consecutive-pos-tagger">1.7</a> , чтобы получить некоторые идеи.</p>
+</li>
+<li><p class="first">особенности ◑ Слово может быть очень полезно для выполнения классификации документов, так как слова, которые появляются в документе, дают четкое указание о том, что его семантическое содержание.  Тем не менее, многие слова встречаются очень редко, а некоторые из наиболее информативных слов в документе и не может иметь место в наших обучающих данных.  Одним из решений является сделать использование <a name="lexicon_index_term"></a> <span class="termdef">словарный запас,</span> который описывает , как разные слова соотносятся друг с другом.  Использование WordNet лексикон, увеличить обзорную фильм документа классификатор, представленные в этой главе, чтобы использовать функции, обобщающие слова, которые появляются в документе, что делает его более вероятно, что они будут соответствовать слова, найденные в обучающих данных.</p>
+</li>
+<li><p class="first">★ ПП Приложение Корпус представляет собой корпус с описанием предложных решений фразы вложений.  Каждый экземпляр в корпусе кодируется как объект <tt class="doctest"><span class="pre">PPAttachment:</span></tt></p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> <span class="pysrc-keyword">От</span> <span class="pysrc-keyword">импорта</span> nltk.corpus ppattach <span class="pysrc-prompt">&gt;&gt;&gt;</span> ppattach.attachments ( <span class="pysrc-string">«обучение»)</span> <span class="pysrc-output">[PPAttachment (отправленного = '0', глагол = 'присоединиться', noun1 = 'доска',</span> <span class="pysrc-output">преп = 'как', noun2 = ' директор ', вложение =' V '),</span> <span class="pysrc-output">PPAttachment (пересылаются =' 1 ', глагол =' является ', noun1 =' председатель ',</span> <span class="pysrc-output">преп =' о ', noun2 =' NV ', вложения =' N <span class="pysrc-output">'),.</span></span> <span class="pysrc-output">..]</span>
+<span class="pysrc-output"></span> <span class="pysrc-prompt">&gt;&gt;&gt;</span> INST = ppattach.attachments ( <span class="pysrc-string">'тренировка')</span> [1] <span class="pysrc-prompt">&gt;&gt;&gt;</span> (inst.noun1, inst.prep, inst.noun2) <span class="pysrc-output">( 'председатель', 'из', 'НВ')</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>Выберите только те случаи , когда <tt class="doctest"><span class="pre">inst.attachment</span></tt> является <tt class="doctest"><span class="pre">N:</span></tt></p>
+<div class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" class="doctest" width="95%">
+<tr><td class="doctest">
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr><td width="1" class="copybar" onclick="javascript:copy_doctest_to_clipboard(this.nextSibling);"> </td>
+<td class="pysrc"><pre class="doctest">
+<span class="pysrc-prompt">&gt;&gt;&gt;</span> Nattach = [инст <span class="pysrc-keyword">для</span> инст <span class="pysrc-keyword">в</span> ppattach.attachments ( <span class="pysrc-string">«обучения»)</span> <span class="pysrc-more">...</span> <span class="pysrc-keyword">если</span> inst.attachment == <span class="pysrc-string">'N']</span></pre>
+</td>
+</tr></table></td></tr>
+</table></div>
+<p>С помощью этого суб-корпус, построить классификатор, который пытается предсказать, какой предлог используется для подключения заданной пары существительных.  Например, с учетом пары существительных "команда" и "исследователей" классификатор должен предсказать предлог "от".  См желтое HOWTO на <tt class="doctest"><span class="pre">http://nltk.org/howto</span></tt> для получения дополнительной информации об использовании крепления корпус PP.</p>
+</li>
+<li><p class="first">★ Предположим , вы хотите , чтобы автоматически генерировать описание прозы сцены, и уже было слово однозначно описать каждую сущность, например, <span class="example">банку,</span> и просто хотел , чтобы решить , следует ли использовать или <span class="example">на</span> в соотнесении различных предметов, например , <span class="example">книга в шкафу</span> против <span class="example">книги на полке.</span>
+Исследуйте этот вопрос, посмотрев на данные деянии; написание программ по мере необходимости.</p>
+</li>
+</ol>
+<span class="target" id="ex-prepositions"></span><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right"> , ; !</td><td width="15"></td><td><p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">a.</td><td width="15"></td><td>в машине по <em>сравнению</em> с поездом</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">b.</td><td width="15"></td><td>в городе по <em>сравнению</em> с на кампусе</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">c.</td><td width="15"></td><td>на картинке по <em>сравнению</em> с на экране</td></tr></table></p>
+<p><table border="0" cellpadding="0" cellspacing="0" class="example">
+  <tr valign="top"><td width="30" align="right">d.</td><td width="15"></td><td>в <em>сравнении</em> с Макбета на Letterman</td></tr></table></p>
+</td></tr></table></p>
+<!-- Footer to be used in all chapters -->
+<div class="admonition-about-this-document admonition">
+<p class="first admonition-title">Об этом документе ...</p>
+<p>Обновлялся для NLTK 3.0.
+Это глава из книги <em>Обработка естественного языка с помощью Python</em> написанной <a class="reference external" href="http://estive.net/">Стивеном Бердом</a> , <a class="reference external" href="http://homepages.inf.ed.ac.uk/ewan/">Эваном Клайном</a> и <a class="reference external" href="http://ed.loper.org/">Эдвардом Лопером</a> , Copyright © 2014 авторов.
+Он распространяется с <em>Набором инструментов для естественного языка</em> <tt class="doctest"><span class="pre">[http://nltk.org/],</span></tt> версия 3.0 в соответствии с условиями <em>Creative Commons Attribution-Noncommercial-No Derivative Works 3.0 Лицензии Соединенных Штатов</em> [ <a class="reference external" href="http://creativecommons.org/licenses/by-nc-nd/3.0/us/">http://creativecommons.org/licenses/by-nc-nd/3.0/us/</a>].</p>
+<p class="last">Этот документ был построен на ср 1 июля 2015 12:30:05 AEST</p>
+</div>
+</div>
+<div class="system-messages section">
+<h1>Docutils Системные сообщения</h1>
+<div class="system-message" id="id17">
+<p class="system-message-title">Системное сообщение: ОШИБКА / 3 <tt class="docutils">(ch06.rst2,</tt> строка 1264); <em><a href="http://www.nltk.org/book/ch06.html#id18">обратной</a></em></p>
+Неопределенное замещение ссылки: "II".</div>
+</div>
+</div>
+</body>
+</html>
